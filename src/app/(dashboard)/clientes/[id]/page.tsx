@@ -55,16 +55,18 @@ function PipelineTracker({
 }) {
   const mutation = useMutation({
     mutationFn: async (novoEstagio: EstagioLead) => {
-      if (leadId) {
-        return axios.patch(`/api/leads/${leadId}/mover`, { estagio: novoEstagio });
-      }
-      // Cria o lead vinculado ao cliente se ainda não existir
-      return axios.post("/api/leads", {
-        titulo: clienteNome,
-        estagio: novoEstagio,
-        origem: "OUTROS",
-        clienteId,
-      });
+      // Atualiza o lead
+      await (leadId
+        ? axios.patch(`/api/leads/${leadId}/mover`, { estagio: novoEstagio })
+        : axios.post("/api/leads", { titulo: clienteNome, estagio: novoEstagio, origem: "OUTROS", clienteId }));
+
+      // Sincroniza statusOrcamento do cliente com o estágio do pipeline
+      const statusMap: Partial<Record<EstagioLead, string>> = {
+        FECHADO_GANHO:   "APROVADO",
+        FECHADO_PERDIDO: "NAO_APROVADO",
+      };
+      const novoStatus = statusMap[novoEstagio] ?? "PENDENTE";
+      await axios.patch(`/api/clientes/${clienteId}`, { statusOrcamento: novoStatus });
     },
     onSuccess: () => { toast.success("Etapa atualizada!"); onUpdate(); },
     onError: () => toast.error("Erro ao atualizar etapa"),
@@ -136,6 +138,29 @@ function PipelineTracker({
         </button>
       </div>
     </div>
+  );
+}
+
+function TemperaturaSelect({
+  clienteId, valor, onSaved,
+}: { clienteId: string; valor: string; onSaved: () => void }) {
+  const mutation = useMutation({
+    mutationFn: (v: string) => axios.patch(`/api/clientes/${clienteId}`, { temperatura: v }),
+    onSuccess: () => { toast.success("Temperatura atualizada!"); onSaved(); },
+    onError: () => toast.error("Erro ao atualizar temperatura"),
+  });
+
+  return (
+    <select
+      value={valor ?? "MORNO"}
+      onChange={e => mutation.mutate(e.target.value)}
+      disabled={mutation.isPending}
+      className="text-xs font-medium bg-transparent border border-border rounded px-2 py-1 cursor-pointer focus:outline-none focus:ring-1 focus:ring-ring"
+    >
+      <option value="QUENTE">🔥 Quente</option>
+      <option value="MORNO">➖ Morno</option>
+      <option value="FRIO">❄️ Frio</option>
+    </select>
   );
 }
 
@@ -389,14 +414,6 @@ export default function ClienteDetalhePage() {
                 <span className="font-medium">{cliente.servicoBuscado}</span>
               </div>
             )}
-            <div className="flex justify-between items-center">
-              <span className="text-muted-foreground">Temperatura</span>
-              <span className="flex items-center gap-1 font-medium">
-                {cliente.temperatura === "QUENTE" && <><Flame className="w-3.5 h-3.5 text-red-500" /> Quente</>}
-                {cliente.temperatura === "MORNO"  && <><Minus className="w-3.5 h-3.5 text-amber-500" /> Morno</>}
-                {cliente.temperatura === "FRIO"   && <><Snowflake className="w-3.5 h-3.5 text-blue-500" /> Frio</>}
-              </span>
-            </div>
           </div>
         </Card>
 
@@ -429,9 +446,22 @@ export default function ClienteDetalhePage() {
                 cliente.statusOrcamento === "APROVADO" ? "success" :
                 cliente.statusOrcamento === "NAO_APROVADO" ? "destructive" : "secondary"
               }>
-                {cliente.statusOrcamento === "APROVADO" ? "✅ Aprovado" :
-                 cliente.statusOrcamento === "NAO_APROVADO" ? "❌ Não Aprovado" : "⏳ Pendente"}
+                {cliente.statusOrcamento === "APROVADO" ? "✅ Confirmado" :
+                 cliente.statusOrcamento === "NAO_APROVADO" ? "❌ Cancelado" : "⏳ Pendente"}
               </Badge>
+            </div>
+            <div className="flex justify-between items-center pt-1 border-t border-border">
+              <span className="text-muted-foreground flex items-center gap-1">
+                {cliente.temperatura === "QUENTE" && <Flame className="w-3 h-3 text-red-500" />}
+                {cliente.temperatura === "MORNO"  && <Minus className="w-3 h-3 text-amber-500" />}
+                {cliente.temperatura === "FRIO"   && <Snowflake className="w-3 h-3 text-blue-500" />}
+                Temperatura
+              </span>
+              <TemperaturaSelect
+                clienteId={id}
+                valor={cliente.temperatura as string}
+                onSaved={() => qc.invalidateQueries({ queryKey: ["cliente", id] })}
+              />
             </div>
           </div>
         </Card>

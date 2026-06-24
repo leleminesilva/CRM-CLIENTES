@@ -6,11 +6,10 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import axios from "axios";
 import { toast } from "sonner";
-import { ArrowLeft, Loader2, ClipboardList, FileText, CheckCircle, User2, X, Plus, Lock } from "lucide-react";
+import { ArrowLeft, Loader2, ClipboardList, FileText, User2, X, Plus, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
@@ -248,39 +247,6 @@ function FormGestor({ cliente, usuarios, onSuccess, userRole }: {
           <div className="space-y-1.5"><Label>Número do Orçamento</Label><Input {...register("numeroOrcamento")} placeholder="ORC-001" /></div>
           <div className="space-y-1.5"><Label>Valor (R$)</Label><Input type="number" step="0.01" {...register("valorOrcamento")} placeholder="0,00" /></div>
           <div className="space-y-1.5"><Label>Prazo da Proposta</Label><Input type="date" {...register("prazoOrcamento")} /></div>
-        </CardContent>
-      </Card>
-
-      <div className="flex items-center gap-3 pt-4">
-        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-600 text-sm font-bold text-white shrink-0">3</div>
-        <div><p className="font-semibold">Acompanhamento</p></div>
-      </div>
-      <Card>
-        <CardHeader><CardTitle className="text-sm flex items-center gap-2"><CheckCircle className="w-4 h-4" />Status e Observações</CardTitle></CardHeader>
-        <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="space-y-1.5">
-            <Label>Status do Orçamento</Label>
-            <Select onValueChange={v => setValue("statusOrcamento", v as ClienteInput["statusOrcamento"])} value={watch("statusOrcamento")}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="PENDENTE">⏳ Pendente</SelectItem>
-                <SelectItem value="APROVADO">✅ Aprovado</SelectItem>
-                <SelectItem value="NAO_APROVADO">❌ Não Aprovado</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-1.5">
-            <Label>Temperatura</Label>
-            <Select onValueChange={v => setValue("temperatura", v as ClienteInput["temperatura"])} value={watch("temperatura")}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="QUENTE">🔥 Quente</SelectItem>
-                <SelectItem value="MORNO">➖ Morno</SelectItem>
-                <SelectItem value="FRIO">❄️ Frio</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="md:col-span-2 space-y-1.5"><Label>Observações</Label><Textarea {...register("observacoes")} rows={4} placeholder="Observações sobre o atendimento..." /></div>
         </CardContent>
       </Card>
 

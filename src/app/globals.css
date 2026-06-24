@@ -75,6 +75,65 @@
   }
 }
 
+/* ── react-big-calendar dark mode ── */
+.dark .rbc-calendar,
+.dark .rbc-month-view,
+.dark .rbc-time-view,
+.dark .rbc-agenda-view { background: transparent; color: hsl(210 20% 98%); }
+
+.dark .rbc-toolbar { color: hsl(210 20% 98%); }
+.dark .rbc-toolbar button {
+  color: hsl(210 20% 98%);
+  background: hsl(215 27.9% 16.9%);
+  border-color: hsl(215 27.9% 22%);
+  border-radius: 6px;
+}
+.dark .rbc-toolbar button:hover { background: hsl(215 27.9% 22%); }
+.dark .rbc-toolbar button.rbc-active,
+.dark .rbc-toolbar button.rbc-active:hover {
+  background: hsl(239 84% 67%);
+  border-color: hsl(239 84% 67%);
+  color: #fff;
+}
+
+.dark .rbc-header {
+  background: hsl(224 71.4% 6%);
+  color: hsl(217.9 10.6% 64.9%);
+  border-color: hsl(215 27.9% 16.9%);
+  padding: 8px 0;
+  font-weight: 500;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.dark .rbc-month-row,
+.dark .rbc-day-bg { border-color: hsl(215 27.9% 14%) !important; }
+.dark .rbc-month-view { border-color: hsl(215 27.9% 14%); }
+.dark .rbc-day-bg { background: hsl(224 71.4% 5%); }
+.dark .rbc-off-range-bg { background: hsl(224 71.4% 3.5%); }
+.dark .rbc-today { background: hsl(239 84% 67% / 0.10) !important; }
+.dark .rbc-date-cell { color: hsl(210 20% 80%); padding: 4px 8px; }
+.dark .rbc-date-cell.rbc-off-range { color: hsl(217.9 10.6% 40%); }
+.dark .rbc-date-cell.rbc-now a { color: hsl(239 84% 75%); font-weight: 700; }
+.dark .rbc-show-more { color: hsl(239 84% 67%); }
+.dark .rbc-row-segment .rbc-event { border: none; }
+
+/* week / day / time views */
+.dark .rbc-time-content,
+.dark .rbc-time-header-content { border-color: hsl(215 27.9% 14%) !important; }
+.dark .rbc-time-slot { color: hsl(217.9 10.6% 64.9%); border-color: hsl(215 27.9% 14%); }
+.dark .rbc-timeslot-group { border-color: hsl(215 27.9% 14%); }
+.dark .rbc-label { color: hsl(217.9 10.6% 64.9%); }
+.dark .rbc-current-time-indicator { background: hsl(239 84% 67%); }
+
+/* agenda view */
+.dark .rbc-agenda-table { border-color: hsl(215 27.9% 14%); }
+.dark .rbc-agenda-table thead tr th { background: hsl(224 71.4% 6%); color: hsl(217.9 10.6% 64.9%); border-color: hsl(215 27.9% 14%); }
+.dark .rbc-agenda-date-cell,
+.dark .rbc-agenda-time-cell,
+.dark .rbc-agenda-event-cell { border-color: hsl(215 27.9% 14%); color: hsl(210 20% 90%); }
+.dark .rbc-agenda-empty { color: hsl(217.9 10.6% 64.9%); }
+
 @layer utilities {
   .scrollbar-thin {
     scrollbar-width: thin;

@@ -164,6 +164,145 @@ function TemperaturaSelect({
   );
 }
 
+function OrcamentoCard({
+  clienteId, numeroOrcamento, valorOrcamento, prazoOrcamento, statusOrcamento, temperatura, onSaved,
+}: {
+  clienteId: string;
+  numeroOrcamento?: string | null;
+  valorOrcamento?: number | null;
+  prazoOrcamento?: string | null;
+  statusOrcamento: string;
+  temperatura: string;
+  onSaved: () => void;
+}) {
+  const [editando, setEditando] = useState(false);
+  const [numero, setNumero] = useState(numeroOrcamento ?? "");
+  const [valor, setValor] = useState(valorOrcamento ? String(valorOrcamento) : "");
+  const [prazo, setPrazo] = useState(
+    prazoOrcamento ? new Date(prazoOrcamento).toISOString().split("T")[0] : ""
+  );
+
+  const mutation = useMutation({
+    mutationFn: () => axios.patch(`/api/clientes/${clienteId}`, {
+      numeroOrcamento: numero || null,
+      valorOrcamento: valor ? Number(valor) : null,
+      prazoOrcamento: prazo || null,
+    }),
+    onSuccess: () => { toast.success("Orçamento salvo!"); onSaved(); setEditando(false); },
+    onError: () => toast.error("Erro ao salvar orçamento"),
+  });
+
+  const handleEdit = () => {
+    setNumero(numeroOrcamento ?? "");
+    setValor(valorOrcamento ? String(valorOrcamento) : "");
+    setPrazo(prazoOrcamento ? new Date(prazoOrcamento).toISOString().split("T")[0] : "");
+    setEditando(true);
+  };
+
+  return (
+    <Card className="p-4">
+      <div className="flex items-center justify-between mb-3">
+        <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide flex items-center gap-1.5">
+          <FileText className="w-3.5 h-3.5" /> Orçamento
+        </p>
+        {!editando ? (
+          <button onClick={handleEdit} className="text-muted-foreground hover:text-foreground transition-colors">
+            <Pencil className="w-3.5 h-3.5" />
+          </button>
+        ) : (
+          <div className="flex items-center gap-2">
+            <button onClick={() => setEditando(false)} className="text-muted-foreground hover:text-foreground">
+              <X className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => mutation.mutate()}
+              disabled={mutation.isPending}
+              className="text-indigo-500 hover:text-indigo-400 font-medium text-xs flex items-center gap-1"
+            >
+              <Check className="w-3.5 h-3.5" />
+              {mutation.isPending ? "Salvando..." : "Salvar"}
+            </button>
+          </div>
+        )}
+      </div>
+      <div className="space-y-2 text-sm">
+        {editando ? (
+          <div className="space-y-3">
+            <div className="space-y-1">
+              <label className="text-xs text-muted-foreground">Número do Orçamento</label>
+              <input
+                value={numero}
+                onChange={e => setNumero(e.target.value)}
+                placeholder="ORC-001"
+                className="w-full text-sm bg-background border border-border rounded-md px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-ring"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs text-muted-foreground">Valor (R$)</label>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                value={valor}
+                onChange={e => setValor(e.target.value)}
+                placeholder="0,00"
+                className="w-full text-sm bg-background border border-border rounded-md px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-ring"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs text-muted-foreground">Prazo da Proposta</label>
+              <input
+                type="date"
+                value={prazo}
+                onChange={e => setPrazo(e.target.value)}
+                className="w-full text-sm bg-background border border-border rounded-md px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-ring"
+              />
+            </div>
+          </div>
+        ) : (
+          <>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Número</span>
+              <span className="font-medium font-mono">{numeroOrcamento || "—"}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Valor</span>
+              <span className={valorOrcamento ? "font-semibold text-emerald-600" : "text-muted-foreground"}>
+                {valorOrcamento ? formatCurrency(Number(valorOrcamento)) : "—"}
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Prazo</span>
+              <span className="font-medium">
+                {prazoOrcamento ? new Date(prazoOrcamento).toLocaleDateString("pt-BR") : "—"}
+              </span>
+            </div>
+          </>
+        )}
+        <div className="flex justify-between items-center pt-1 border-t border-border">
+          <span className="text-muted-foreground">Status</span>
+          <Badge variant={
+            statusOrcamento === "APROVADO" ? "success" :
+            statusOrcamento === "NAO_APROVADO" ? "destructive" : "secondary"
+          }>
+            {statusOrcamento === "APROVADO" ? "✅ Confirmado" :
+             statusOrcamento === "NAO_APROVADO" ? "❌ Cancelado" : "⏳ Pendente"}
+          </Badge>
+        </div>
+        <div className="flex justify-between items-center pt-1 border-t border-border">
+          <span className="text-muted-foreground flex items-center gap-1">
+            {temperatura === "QUENTE" && <Flame className="w-3 h-3 text-red-500" />}
+            {temperatura === "MORNO"  && <Minus className="w-3 h-3 text-amber-500" />}
+            {temperatura === "FRIO"   && <Snowflake className="w-3 h-3 text-blue-500" />}
+            Temperatura
+          </span>
+          <TemperaturaSelect clienteId={clienteId} valor={temperatura} onSaved={onSaved} />
+        </div>
+      </div>
+    </Card>
+  );
+}
+
 function ObservacoesCard({
   clienteId, observacoes, onSaved,
 }: { clienteId: string; observacoes: string | null; onSaved: () => void }) {
@@ -417,54 +556,15 @@ export default function ClienteDetalhePage() {
           </div>
         </Card>
 
-        <Card className="p-4">
-          <p className="text-xs text-muted-foreground mb-3 font-medium uppercase tracking-wide flex items-center gap-1.5">
-            <FileText className="w-3.5 h-3.5" /> Orçamento
-          </p>
-          <div className="space-y-2 text-sm">
-            {cliente.numeroOrcamento && (
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Número</span>
-                <span className="font-medium font-mono">{cliente.numeroOrcamento}</span>
-              </div>
-            )}
-            {cliente.valorOrcamento && (
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Valor</span>
-                <span className="font-semibold text-emerald-600">{formatCurrency(Number(cliente.valorOrcamento))}</span>
-              </div>
-            )}
-            {cliente.prazoOrcamento && (
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Prazo</span>
-                <span className="font-medium">{new Date(cliente.prazoOrcamento).toLocaleDateString("pt-BR")}</span>
-              </div>
-            )}
-            <div className="flex justify-between items-center">
-              <span className="text-muted-foreground">Status</span>
-              <Badge variant={
-                cliente.statusOrcamento === "APROVADO" ? "success" :
-                cliente.statusOrcamento === "NAO_APROVADO" ? "destructive" : "secondary"
-              }>
-                {cliente.statusOrcamento === "APROVADO" ? "✅ Confirmado" :
-                 cliente.statusOrcamento === "NAO_APROVADO" ? "❌ Cancelado" : "⏳ Pendente"}
-              </Badge>
-            </div>
-            <div className="flex justify-between items-center pt-1 border-t border-border">
-              <span className="text-muted-foreground flex items-center gap-1">
-                {cliente.temperatura === "QUENTE" && <Flame className="w-3 h-3 text-red-500" />}
-                {cliente.temperatura === "MORNO"  && <Minus className="w-3 h-3 text-amber-500" />}
-                {cliente.temperatura === "FRIO"   && <Snowflake className="w-3 h-3 text-blue-500" />}
-                Temperatura
-              </span>
-              <TemperaturaSelect
-                clienteId={id}
-                valor={cliente.temperatura as string}
-                onSaved={() => qc.invalidateQueries({ queryKey: ["cliente", id] })}
-              />
-            </div>
-          </div>
-        </Card>
+        <OrcamentoCard
+          clienteId={id}
+          numeroOrcamento={cliente.numeroOrcamento as string | null}
+          valorOrcamento={cliente.valorOrcamento ? Number(cliente.valorOrcamento) : null}
+          prazoOrcamento={cliente.prazoOrcamento as string | null}
+          statusOrcamento={cliente.statusOrcamento as string}
+          temperatura={cliente.temperatura as string}
+          onSaved={() => qc.invalidateQueries({ queryKey: ["cliente", id] })}
+        />
       </div>
 
       <ObservacoesCard

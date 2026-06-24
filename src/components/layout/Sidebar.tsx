@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  LayoutDashboard, Users, TrendingUp, Target,
+  LayoutDashboard, Users, TrendingUp,
   CheckSquare, Calendar, BarChart3, UserCog,
   Settings, ChevronLeft, ChevronRight, Shield, X,
 } from "lucide-react";
@@ -17,12 +17,11 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 type Role = "ADMINISTRADOR" | "GESTOR" | "COMERCIAL" | "OPERACIONAL";
 
 const navItems = [
-  { href: "/",             label: "Dashboard",      icon: LayoutDashboard },
-  { href: "/clientes",     label: "Clientes",       icon: Users },
-  { href: "/leads",        label: "Leads / Kanban", icon: TrendingUp },
-  { href: "/oportunidades",label: "Oportunidades",  icon: Target },
-  { href: "/tarefas",      label: "Tarefas",        icon: CheckSquare },
-  { href: "/agenda",       label: "Agenda",         icon: Calendar },
+  { href: "/",         label: "Dashboard",      icon: LayoutDashboard },
+  { href: "/clientes", label: "Clientes",       icon: Users },
+  { href: "/leads",    label: "Leads / Kanban", icon: TrendingUp },
+  { href: "/tarefas",  label: "Tarefas",        icon: CheckSquare },
+  { href: "/agenda",   label: "Agenda",         icon: Calendar },
 ];
 
 const bottomNavItems: { href: string; label: string; icon: React.ElementType; roles?: Role[] }[] = [

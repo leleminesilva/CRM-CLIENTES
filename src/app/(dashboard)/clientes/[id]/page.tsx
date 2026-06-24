@@ -31,21 +31,38 @@ import { formatCurrency, formatCPFCNPJ, formatPhone, ORIGEM_LABELS, PORTE_LABELS
 import { cn } from "@/lib/utils/cn";
 import type { Cliente } from "@/types";
 
-type EstagioLead = "NOVO_LEAD" | "CONTATO_INICIAL" | "PROPOSTA_ENVIADA" | "NEGOCIACAO" | "FECHADO_GANHO" | "FECHADO_PERDIDO";
+type EstagioLead = "NOVO_LEAD" | "CONTATO_INICIAL" | "QUALIFICACAO" | "PROPOSTA_ENVIADA" | "NEGOCIACAO" | "FECHADO_GANHO" | "FECHADO_PERDIDO";
 
 const ETAPAS: { estagio: EstagioLead; label: string; icon: React.ElementType }[] = [
-  { estagio: "NOVO_LEAD",        label: "Novo Contato",      icon: PhoneCall },
-  { estagio: "CONTATO_INICIAL",  label: "Em Contato",        icon: MessageCircle },
-  { estagio: "PROPOSTA_ENVIADA", label: "Orçamento Enviado", icon: FileCheck },
-  { estagio: "NEGOCIACAO",       label: "Em Negociação",     icon: Handshake },
+  { estagio: "NOVO_LEAD",        label: "Entrar em Contato",  icon: PhoneCall },
+  { estagio: "CONTATO_INICIAL",  label: "Contato Feito",      icon: MessageCircle },
+  { estagio: "QUALIFICACAO",     label: "Visita / Medição",   icon: ClipboardList },
+  { estagio: "PROPOSTA_ENVIADA", label: "Orçamento Enviado",  icon: FileCheck },
+  { estagio: "NEGOCIACAO",       label: "Em Negociação",      icon: Handshake },
 ];
 
 function PipelineTracker({
-  leadId, estagio, onUpdate,
-}: { leadId: string; estagio: EstagioLead; onUpdate: () => void }) {
+  leadId, clienteId, clienteNome, estagio, onUpdate,
+}: {
+  leadId: string | null;
+  clienteId: string;
+  clienteNome: string;
+  estagio: EstagioLead;
+  onUpdate: () => void;
+}) {
   const mutation = useMutation({
-    mutationFn: (novoEstagio: EstagioLead) =>
-      axios.patch(`/api/leads/${leadId}/mover`, { estagio: novoEstagio }),
+    mutationFn: async (novoEstagio: EstagioLead) => {
+      if (leadId) {
+        return axios.patch(`/api/leads/${leadId}/mover`, { estagio: novoEstagio });
+      }
+      // Cria o lead vinculado ao cliente se ainda não existir
+      return axios.post("/api/leads", {
+        titulo: clienteNome,
+        estagio: novoEstagio,
+        origem: "OUTROS",
+        clienteId,
+      });
+    },
     onSuccess: () => { toast.success("Etapa atualizada!"); onUpdate(); },
     onError: () => toast.error("Erro ao atualizar etapa"),
   });
@@ -59,9 +76,8 @@ function PipelineTracker({
       <div className="flex items-center gap-1 flex-wrap">
         {ETAPAS.map((etapa, idx) => {
           const Icon = etapa.icon;
-          const isPast    = !isFechado && idx < currentIdx;
-          const isActive  = !isFechado && idx === currentIdx;
-          const isFuture  = !isFechado && idx > currentIdx;
+          const isPast   = !isFechado && idx < currentIdx;
+          const isActive = !isFechado && idx === currentIdx;
 
           return (
             <div key={etapa.estagio} className="flex items-center gap-1">
@@ -71,10 +87,9 @@ function PipelineTracker({
                 onClick={() => mutation.mutate(etapa.estagio)}
                 className={cn(
                   "flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all border",
-                  isActive  && "bg-indigo-600 text-white border-indigo-600 shadow-sm",
-                  isPast    && "bg-indigo-600/20 text-indigo-400 border-indigo-600/30 hover:bg-indigo-600/30",
-                  isFuture  && "bg-muted text-muted-foreground border-border hover:bg-accent hover:text-accent-foreground",
-                  isFechado && "bg-muted text-muted-foreground border-border hover:bg-accent hover:text-accent-foreground",
+                  isActive && "bg-indigo-600 text-white border-indigo-600 shadow-sm",
+                  isPast   && "bg-indigo-600/20 text-indigo-400 border-indigo-600/30 hover:bg-indigo-600/30",
+                  !isActive && !isPast && "bg-muted text-muted-foreground border-border hover:bg-accent hover:text-accent-foreground",
                 )}
               >
                 <Icon className="w-3 h-3" />
@@ -87,10 +102,8 @@ function PipelineTracker({
           );
         })}
 
-        {/* Separador */}
         <ChevronRight className="w-3 h-3 text-muted-foreground shrink-0" />
 
-        {/* Terminais */}
         <button
           type="button"
           disabled={mutation.isPending}
@@ -102,8 +115,7 @@ function PipelineTracker({
               : "bg-emerald-600/10 text-emerald-500 border-emerald-600/30 hover:bg-emerald-600/20",
           )}
         >
-          <ThumbsUp className="w-3 h-3" />
-          Confirmado
+          <ThumbsUp className="w-3 h-3" /> Confirmado
         </button>
 
         <button
@@ -117,8 +129,7 @@ function PipelineTracker({
               : "bg-red-600/10 text-red-500 border-red-600/30 hover:bg-red-600/20",
           )}
         >
-          <ThumbsDown className="w-3 h-3" />
-          Cancelado
+          <ThumbsDown className="w-3 h-3" /> Cancelado
         </button>
       </div>
     </div>
@@ -209,14 +220,14 @@ export default function ClienteDetalhePage() {
         </div>
       </div>
 
-      {/* Pipeline */}
-      {cliente.leads && cliente.leads.length > 0 && (
-        <PipelineTracker
-          leadId={cliente.leads[0].id}
-          estagio={cliente.leads[0].estagio as EstagioLead}
-          onUpdate={() => qc.invalidateQueries({ queryKey: ["cliente", id] })}
-        />
-      )}
+      {/* Pipeline — sempre visível */}
+      <PipelineTracker
+        leadId={cliente.leads?.[0]?.id ?? null}
+        clienteId={id}
+        clienteNome={cliente.nome}
+        estagio={(cliente.leads?.[0]?.estagio as EstagioLead) ?? "NOVO_LEAD"}
+        onUpdate={() => qc.invalidateQueries({ queryKey: ["cliente", id] })}
+      />
 
       {/* Info Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

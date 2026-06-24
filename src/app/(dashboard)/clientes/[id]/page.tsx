@@ -257,21 +257,31 @@ export default function ClienteDetalhePage() {
 
         <Card className="p-4">
           <p className="text-xs text-muted-foreground mb-2 font-medium uppercase tracking-wide">Endereço</p>
-          {cliente.logradouro ? (
+          {(cliente.logradouro || cliente.bairro || cliente.cidade || cliente.cep) ? (
             <div className="flex items-start gap-2 text-sm">
               <MapPin className="w-3.5 h-3.5 text-muted-foreground mt-0.5 shrink-0" />
-              <span>
+              <div className="space-y-0.5">
                 {cliente.tipoResidencia && (
-                  <span className="font-medium mr-1">
-                    {cliente.tipoResidencia === "CASA" ? "🏠 Casa" :
-                     cliente.tipoResidencia === "APARTAMENTO" ? "🏢 Apartamento" :
-                     cliente.tipoResidencia === "COMERCIAL" ? "🏪 Comercial" : "📍 Outros"} —{" "}
-                  </span>
+                  <p className="font-medium text-xs text-muted-foreground">
+                    {cliente.tipoResidencia === "CASA" ? "Casa" :
+                     cliente.tipoResidencia === "APARTAMENTO" ? "Apartamento" :
+                     cliente.tipoResidencia === "COMERCIAL" ? "Comercial" : "Outros"}
+                  </p>
                 )}
-                {cliente.logradouro}{cliente.numero ? `, ${cliente.numero}` : ""}
-                {cliente.complemento ? `, ${cliente.complemento}` : ""} — {cliente.bairro}<br />
-                {cliente.cidade}/{cliente.estado} — {cliente.cep}
-              </span>
+                {(cliente.logradouro || cliente.numero || cliente.complemento) && (
+                  <p>
+                    {[cliente.logradouro, cliente.numero, cliente.complemento].filter(Boolean).join(", ")}
+                  </p>
+                )}
+                {(cliente.bairro || cliente.cidade || cliente.estado) && (
+                  <p className="text-muted-foreground">
+                    {[cliente.bairro, cliente.cidade && cliente.estado ? `${cliente.cidade}/${cliente.estado}` : (cliente.cidade || cliente.estado)].filter(Boolean).join(" — ")}
+                  </p>
+                )}
+                {cliente.cep && (
+                  <p className="text-muted-foreground">CEP: {cliente.cep}</p>
+                )}
+              </div>
             </div>
           ) : (
             <p className="text-sm text-muted-foreground">Sem endereço cadastrado</p>

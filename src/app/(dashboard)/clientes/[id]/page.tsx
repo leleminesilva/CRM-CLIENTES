@@ -1,7 +1,7 @@
 "use client";
 
 import { useParams, useRouter } from "next/navigation";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
 import { toast } from "sonner";
 import Link from "next/link";
@@ -9,6 +9,7 @@ import {
   ArrowLeft, Edit, Trash2, User, Phone, Mail, MapPin,
   Clock, MessageSquare, TrendingUp, CheckSquare, ExternalLink,
   ClipboardList, FileText, Flame, Minus, Snowflake,
+  PhoneCall, MessageCircle, FileCheck, Handshake, ThumbsUp, ThumbsDown, ChevronRight,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -27,11 +28,107 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { formatCurrency, formatCPFCNPJ, formatPhone, ORIGEM_LABELS, PORTE_LABELS, formatDateTime } from "@/lib/utils/formatters";
+import { cn } from "@/lib/utils/cn";
 import type { Cliente } from "@/types";
+
+type EstagioLead = "NOVO_LEAD" | "CONTATO_INICIAL" | "PROPOSTA_ENVIADA" | "NEGOCIACAO" | "FECHADO_GANHO" | "FECHADO_PERDIDO";
+
+const ETAPAS: { estagio: EstagioLead; label: string; icon: React.ElementType }[] = [
+  { estagio: "NOVO_LEAD",        label: "Novo Contato",      icon: PhoneCall },
+  { estagio: "CONTATO_INICIAL",  label: "Em Contato",        icon: MessageCircle },
+  { estagio: "PROPOSTA_ENVIADA", label: "Orçamento Enviado", icon: FileCheck },
+  { estagio: "NEGOCIACAO",       label: "Em Negociação",     icon: Handshake },
+];
+
+function PipelineTracker({
+  leadId, estagio, onUpdate,
+}: { leadId: string; estagio: EstagioLead; onUpdate: () => void }) {
+  const mutation = useMutation({
+    mutationFn: (novoEstagio: EstagioLead) =>
+      axios.patch(`/api/leads/${leadId}/mover`, { estagio: novoEstagio }),
+    onSuccess: () => { toast.success("Etapa atualizada!"); onUpdate(); },
+    onError: () => toast.error("Erro ao atualizar etapa"),
+  });
+
+  const isFechado = estagio === "FECHADO_GANHO" || estagio === "FECHADO_PERDIDO";
+  const currentIdx = ETAPAS.findIndex(e => e.estagio === estagio);
+
+  return (
+    <div className="bg-card border rounded-xl p-4">
+      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-3">Processo de Venda</p>
+      <div className="flex items-center gap-1 flex-wrap">
+        {ETAPAS.map((etapa, idx) => {
+          const Icon = etapa.icon;
+          const isPast    = !isFechado && idx < currentIdx;
+          const isActive  = !isFechado && idx === currentIdx;
+          const isFuture  = !isFechado && idx > currentIdx;
+
+          return (
+            <div key={etapa.estagio} className="flex items-center gap-1">
+              <button
+                type="button"
+                disabled={mutation.isPending}
+                onClick={() => mutation.mutate(etapa.estagio)}
+                className={cn(
+                  "flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all border",
+                  isActive  && "bg-indigo-600 text-white border-indigo-600 shadow-sm",
+                  isPast    && "bg-indigo-600/20 text-indigo-400 border-indigo-600/30 hover:bg-indigo-600/30",
+                  isFuture  && "bg-muted text-muted-foreground border-border hover:bg-accent hover:text-accent-foreground",
+                  isFechado && "bg-muted text-muted-foreground border-border hover:bg-accent hover:text-accent-foreground",
+                )}
+              >
+                <Icon className="w-3 h-3" />
+                {etapa.label}
+              </button>
+              {idx < ETAPAS.length - 1 && (
+                <ChevronRight className="w-3 h-3 text-muted-foreground shrink-0" />
+              )}
+            </div>
+          );
+        })}
+
+        {/* Separador */}
+        <ChevronRight className="w-3 h-3 text-muted-foreground shrink-0" />
+
+        {/* Terminais */}
+        <button
+          type="button"
+          disabled={mutation.isPending}
+          onClick={() => mutation.mutate("FECHADO_GANHO")}
+          className={cn(
+            "flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all border",
+            estagio === "FECHADO_GANHO"
+              ? "bg-emerald-600 text-white border-emerald-600 shadow-sm"
+              : "bg-emerald-600/10 text-emerald-500 border-emerald-600/30 hover:bg-emerald-600/20",
+          )}
+        >
+          <ThumbsUp className="w-3 h-3" />
+          Confirmado
+        </button>
+
+        <button
+          type="button"
+          disabled={mutation.isPending}
+          onClick={() => mutation.mutate("FECHADO_PERDIDO")}
+          className={cn(
+            "flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all border",
+            estagio === "FECHADO_PERDIDO"
+              ? "bg-red-600 text-white border-red-600 shadow-sm"
+              : "bg-red-600/10 text-red-500 border-red-600/30 hover:bg-red-600/20",
+          )}
+        >
+          <ThumbsDown className="w-3 h-3" />
+          Cancelado
+        </button>
+      </div>
+    </div>
+  );
+}
 
 export default function ClienteDetalhePage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
+  const qc = useQueryClient();
 
   const { data: cliente, isLoading } = useQuery({
     queryKey: ["cliente", id],
@@ -111,6 +208,15 @@ export default function ClienteDetalhePage() {
           </AlertDialog>
         </div>
       </div>
+
+      {/* Pipeline */}
+      {cliente.leads && cliente.leads.length > 0 && (
+        <PipelineTracker
+          leadId={cliente.leads[0].id}
+          estagio={cliente.leads[0].estagio as EstagioLead}
+          onUpdate={() => qc.invalidateQueries({ queryKey: ["cliente", id] })}
+        />
+      )}
 
       {/* Info Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

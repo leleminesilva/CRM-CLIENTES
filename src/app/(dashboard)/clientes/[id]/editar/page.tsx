@@ -7,15 +7,17 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import axios from "axios";
 import { toast } from "sonner";
-import { ArrowLeft, Loader2, ClipboardList, FileText, CheckCircle, User2 } from "lucide-react";
+import { ArrowLeft, Loader2, ClipboardList, FileText, CheckCircle, User2, X, Plus, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
 import { clienteSchema, type ClienteInput } from "@/lib/validators/cliente";
 import { maskCpfCnpj, maskPhone, maskCep } from "@/lib/utils/masks";
+import { useAuth } from "@/contexts/AuthContext";
 import type { User } from "@/types";
 
 const ORIGENS = [
@@ -34,14 +36,19 @@ const SERVICOS = [
   "Fachada", "Guarda-corpo", "Pergolado de vidro", "Vitrine", "Divisória", "Outros",
 ];
 
-// ─── Formulário exclusivo para Gestor/Admin (todos os campos) ───────────────
-function FormGestor({ cliente, usuarios, onSuccess }: {
+// ─── Formulário ─────────────────────────────────────────────────────────────
+function FormGestor({ cliente, usuarios, onSuccess, userRole }: {
   cliente: Record<string, unknown>;
   usuarios: User[];
   onSuccess: () => void;
+  userRole: string;
 }) {
   const { id } = useParams<{ id: string }>();
   const [buscandoCep, setBuscandoCep] = useState(false);
+  const [servicosSelecionados, setServicosSelecionados] = useState<string[]>([]);
+  const [servicoCustom, setServicoCustom] = useState("");
+
+  const isGestor = userRole === "ADMINISTRADOR" || userRole === "GESTOR";
 
   const { register, handleSubmit, setValue, watch, reset } = useForm<ClienteInput>({
     resolver: zodResolver(clienteSchema),
@@ -58,7 +65,23 @@ function FormGestor({ cliente, usuarios, onSuccess }: {
       prazoOrcamento: (cliente.prazoOrcamento as string | undefined)?.split("T")[0],
       valorOrcamento: cliente.valorOrcamento ? Number(cliente.valorOrcamento) : undefined,
     } as ClienteInput);
+    const servicos = (cliente.servicoBuscado as string | null) ?? "";
+    setServicosSelecionados(servicos ? servicos.split(",").map(s => s.trim()).filter(Boolean) : []);
   }, [cliente, reset]);
+
+  function adicionarServico(servico: string) {
+    const s = servico.trim();
+    if (!s || servicosSelecionados.includes(s)) return;
+    const novo = [...servicosSelecionados, s];
+    setServicosSelecionados(novo);
+    setValue("servicoBuscado", novo.join(","));
+  }
+
+  function removerServico(servico: string) {
+    const novo = servicosSelecionados.filter(s => s !== servico);
+    setServicosSelecionados(novo);
+    setValue("servicoBuscado", novo.join(",") || undefined);
+  }
 
   async function buscarCep(cepValue: string) {
     const clean = cepValue.replace(/\D/g, "");
@@ -148,19 +171,58 @@ function FormGestor({ cliente, usuarios, onSuccess }: {
       <Card>
         <CardHeader><CardTitle className="text-sm flex items-center gap-2"><ClipboardList className="w-4 h-4" />Atendimento</CardTitle></CardHeader>
         <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Vendedor Responsável — só Gestor/Admin pode alterar */}
           <div className="space-y-1.5">
-            <Label>Vendedor Responsável</Label>
-            <Select onValueChange={v => setValue("responsavelId", v)} value={watch("responsavelId") ?? ""}>
-              <SelectTrigger><SelectValue placeholder="Selecione o vendedor" /></SelectTrigger>
-              <SelectContent>{usuarios.map(u => <SelectItem key={u.id} value={u.id}>{u.nome}</SelectItem>)}</SelectContent>
-            </Select>
+            <Label className="flex items-center gap-1.5">
+              Vendedor Responsável
+              {!isGestor && <Lock className="w-3 h-3 text-muted-foreground" />}
+            </Label>
+            {isGestor ? (
+              <Select onValueChange={v => setValue("responsavelId", v)} value={watch("responsavelId") ?? ""}>
+                <SelectTrigger><SelectValue placeholder="Selecione o vendedor" /></SelectTrigger>
+                <SelectContent>{usuarios.map(u => <SelectItem key={u.id} value={u.id}>{u.nome}</SelectItem>)}</SelectContent>
+              </Select>
+            ) : (
+              <div className="flex h-9 w-full items-center rounded-md border border-input bg-muted px-3 text-sm text-muted-foreground">
+                {usuarios.find(u => u.id === watch("responsavelId"))?.nome ?? "Não atribuído"}
+              </div>
+            )}
           </div>
+
+          {/* Serviços Buscados — multi-tag */}
           <div className="space-y-1.5">
-            <Label>Serviço Buscado</Label>
-            <Select onValueChange={v => setValue("servicoBuscado", v)} value={watch("servicoBuscado") ?? ""}>
-              <SelectTrigger><SelectValue placeholder="Selecione o serviço" /></SelectTrigger>
-              <SelectContent>{SERVICOS.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
+            <Label>Serviços Buscados</Label>
+            {servicosSelecionados.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 pb-1">
+                {servicosSelecionados.map(s => (
+                  <Badge key={s} variant="secondary" className="gap-1 pr-1">
+                    {s}
+                    <button type="button" onClick={() => removerServico(s)} className="ml-0.5 rounded hover:bg-destructive/20">
+                      <X className="w-3 h-3" />
+                    </button>
+                  </Badge>
+                ))}
+              </div>
+            )}
+            <Select onValueChange={v => adicionarServico(v)} value="">
+              <SelectTrigger><SelectValue placeholder="Adicionar serviço..." /></SelectTrigger>
+              <SelectContent>
+                {SERVICOS.filter(s => !servicosSelecionados.includes(s)).map(s => (
+                  <SelectItem key={s} value={s}>{s}</SelectItem>
+                ))}
+              </SelectContent>
             </Select>
+            <div className="flex gap-2">
+              <Input
+                placeholder="Outro serviço..."
+                value={servicoCustom}
+                onChange={e => setServicoCustom(e.target.value)}
+                onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); adicionarServico(servicoCustom); setServicoCustom(""); } }}
+              />
+              <Button type="button" size="icon" variant="outline" onClick={() => { adicionarServico(servicoCustom); setServicoCustom(""); }}>
+                <Plus className="w-4 h-4" />
+              </Button>
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -226,6 +288,7 @@ function FormGestor({ cliente, usuarios, onSuccess }: {
 export default function EditarClientePage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
+  const { user } = useAuth();
   const { data: cliente, isLoading } = useQuery({
     queryKey: ["cliente", id],
     queryFn: async () => {
@@ -265,7 +328,7 @@ export default function EditarClientePage() {
         </div>
       </div>
 
-      <FormGestor cliente={cliente} usuarios={usuarios ?? []} onSuccess={handleSuccess} />
+      <FormGestor cliente={cliente} usuarios={usuarios ?? []} onSuccess={handleSuccess} userRole={user?.role ?? "COMERCIAL"} />
     </div>
   );
 }

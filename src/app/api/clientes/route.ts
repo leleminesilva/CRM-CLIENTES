@@ -55,6 +55,12 @@ export async function GET(request: NextRequest) {
         include: {
           responsavel: { select: { id: true, nome: true, avatar: true } },
           empresa: { select: { id: true, razaoSocial: true, nomeFantasia: true } },
+          leads: {
+            where: { deletedAt: null },
+            orderBy: { createdAt: "desc" },
+            take: 1,
+            select: { estagio: true },
+          },
         },
         orderBy: { createdAt: "desc" },
         skip: (page - 1) * limit,

@@ -43,6 +43,16 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { ORIGEM_LABELS } from "@/lib/utils/formatters";
 import type { Cliente } from "@/types";
 
+const ETAPA_CONFIG: Record<string, { label: string; color: string }> = {
+  NOVO_LEAD:        { label: "Entrar em Contato",  color: "bg-slate-500/15 text-slate-400 border-slate-500/30" },
+  CONTATO_INICIAL:  { label: "Contato Feito",      color: "bg-blue-500/15 text-blue-400 border-blue-500/30" },
+  QUALIFICACAO:     { label: "Visita / Medição",   color: "bg-violet-500/15 text-violet-400 border-violet-500/30" },
+  PROPOSTA_ENVIADA: { label: "Orçamento Enviado",  color: "bg-amber-500/15 text-amber-400 border-amber-500/30" },
+  NEGOCIACAO:       { label: "Em Negociação",      color: "bg-orange-500/15 text-orange-400 border-orange-500/30" },
+  FECHADO_GANHO:    { label: "Confirmado",         color: "bg-green-500/15 text-green-400 border-green-500/30" },
+  FECHADO_PERDIDO:  { label: "Cancelado",          color: "bg-red-500/15 text-red-400 border-red-500/30" },
+};
+
 export default function ClientesPage() {
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
@@ -170,6 +180,7 @@ export default function ClientesPage() {
                 <th className="text-left p-4 font-medium text-muted-foreground">Cliente</th>
                 <th className="text-left p-4 font-medium text-muted-foreground">Contato</th>
                 <th className="text-left p-4 font-medium text-muted-foreground">Empresa</th>
+                <th className="text-left p-4 font-medium text-muted-foreground">Etapa</th>
                 <th className="text-left p-4 font-medium text-muted-foreground">Origem</th>
                 <th className="text-left p-4 font-medium text-muted-foreground">Responsável</th>
                 <th className="p-4" />
@@ -179,14 +190,14 @@ export default function ClientesPage() {
               {isLoading ? (
                 [...Array(5)].map((_, i) => (
                   <tr key={i} className="border-b">
-                    {[...Array(6)].map((_, j) => (
+                    {[...Array(7)].map((_, j) => (
                       <td key={j} className="p-4"><div className="h-4 bg-muted animate-pulse rounded" /></td>
                     ))}
                   </tr>
                 ))
               ) : clientes.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="p-12 text-center text-muted-foreground">
+                  <td colSpan={7} className="p-12 text-center text-muted-foreground">
                     <Building2 className="w-8 h-8 mx-auto mb-3 opacity-40" />
                     <p>Nenhum cliente encontrado</p>
                     <Link href="/clientes/novo">
@@ -220,6 +231,15 @@ export default function ClientesPage() {
                   </td>
                   <td className="p-4">
                     {c.empresa ? <span className="text-sm">{c.empresa.nomeFantasia || c.empresa.razaoSocial}</span> : <span className="text-muted-foreground text-sm">—</span>}
+                  </td>
+                  <td className="p-4">
+                    {(() => {
+                      const estagio = (c as unknown as { leads?: { estagio: string }[] }).leads?.[0]?.estagio;
+                      const cfg = estagio ? ETAPA_CONFIG[estagio] : null;
+                      return cfg
+                        ? <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${cfg.color}`}>{cfg.label}</span>
+                        : <span className="text-muted-foreground text-xs">—</span>;
+                    })()}
                   </td>
                   <td className="p-4">
                     <Badge variant="secondary" className="text-xs">{ORIGEM_LABELS[c.origem] || c.origem}</Badge>

@@ -6,7 +6,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import axios from "axios";
 import { toast } from "sonner";
-import { ArrowLeft, Loader2, ClipboardList, FileText, User2, X, Plus, Lock } from "lucide-react";
+import { ArrowLeft, Loader2, ClipboardList, User2, X, Plus, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -233,20 +233,6 @@ function FormGestor({ cliente, usuarios, onSuccess, userRole }: {
               </Button>
             </div>
           </div>
-        </CardContent>
-      </Card>
-
-      {/* Etapas 2 e 3 */}
-      <div className="flex items-center gap-3 pt-4">
-        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-amber-500 text-sm font-bold text-white shrink-0">2</div>
-        <div><p className="font-semibold">Orçamento</p></div>
-      </div>
-      <Card>
-        <CardHeader><CardTitle className="text-sm flex items-center gap-2"><FileText className="w-4 h-4" />Dados do Orçamento</CardTitle></CardHeader>
-        <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="space-y-1.5"><Label>Número do Orçamento</Label><Input {...register("numeroOrcamento")} placeholder="ORC-001" /></div>
-          <div className="space-y-1.5"><Label>Valor (R$)</Label><Input type="number" step="0.01" {...register("valorOrcamento")} placeholder="0,00" /></div>
-          <div className="space-y-1.5"><Label>Prazo da Proposta</Label><Input type="date" {...register("prazoOrcamento")} /></div>
         </CardContent>
       </Card>
 

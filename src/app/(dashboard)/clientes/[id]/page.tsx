@@ -1,6 +1,7 @@
 "use client";
 
 import { useParams, useRouter } from "next/navigation";
+import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
 import { toast } from "sonner";
@@ -10,10 +11,12 @@ import {
   Clock, MessageSquare, TrendingUp, CheckSquare, ExternalLink,
   ClipboardList, FileText, Flame, Minus, Snowflake,
   PhoneCall, MessageCircle, FileCheck, Handshake, ThumbsUp, ThumbsDown, ChevronRight,
+  Pencil, X, Check,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
+import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -133,6 +136,65 @@ function PipelineTracker({
         </button>
       </div>
     </div>
+  );
+}
+
+function ObservacoesCard({
+  clienteId, observacoes, onSaved,
+}: { clienteId: string; observacoes: string | null; onSaved: () => void }) {
+  const [editando, setEditando] = useState(false);
+  const [texto, setTexto] = useState(observacoes ?? "");
+
+  const mutation = useMutation({
+    mutationFn: () => axios.patch(`/api/clientes/${clienteId}`, { observacoes: texto }),
+    onSuccess: () => { toast.success("Observações salvas!"); onSaved(); setEditando(false); },
+    onError: () => toast.error("Erro ao salvar observações"),
+  });
+
+  return (
+    <Card className="p-4">
+      <div className="flex items-center justify-between mb-3">
+        <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide flex items-center gap-1.5">
+          <MessageSquare className="w-3.5 h-3.5" /> Observações
+        </p>
+        {!editando ? (
+          <button
+            onClick={() => { setTexto(observacoes ?? ""); setEditando(true); }}
+            className="text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <Pencil className="w-3.5 h-3.5" />
+          </button>
+        ) : (
+          <div className="flex items-center gap-2">
+            <button onClick={() => setEditando(false)} className="text-muted-foreground hover:text-foreground">
+              <X className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => mutation.mutate()}
+              disabled={mutation.isPending}
+              className="text-indigo-500 hover:text-indigo-400 font-medium text-xs flex items-center gap-1"
+            >
+              <Check className="w-3.5 h-3.5" />
+              {mutation.isPending ? "Salvando..." : "Salvar"}
+            </button>
+          </div>
+        )}
+      </div>
+      {editando ? (
+        <Textarea
+          value={texto}
+          onChange={e => setTexto(e.target.value)}
+          rows={4}
+          placeholder="Adicione observações sobre este cliente..."
+          className="text-sm resize-none"
+          autoFocus
+        />
+      ) : (
+        <p className="text-sm text-muted-foreground whitespace-pre-wrap min-h-[40px]">
+          {observacoes || <span className="italic">Nenhuma observação. Clique no lápis para adicionar.</span>}
+        </p>
+      )}
+    </Card>
   );
 }
 
@@ -375,12 +437,11 @@ export default function ClienteDetalhePage() {
         </Card>
       </div>
 
-      {cliente.observacoes && (
-        <Card className="p-4">
-          <p className="text-xs text-muted-foreground mb-2 font-medium uppercase tracking-wide">Observações</p>
-          <p className="text-sm whitespace-pre-wrap">{cliente.observacoes}</p>
-        </Card>
-      )}
+      <ObservacoesCard
+        clienteId={id}
+        observacoes={cliente.observacoes as string | null}
+        onSaved={() => qc.invalidateQueries({ queryKey: ["cliente", id] })}
+      />
 
       {/* Tabs */}
       <Tabs defaultValue="historico">

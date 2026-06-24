@@ -180,7 +180,7 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
   }
 }
 
-// Atualização parcial: apenas Etapas 2+3 (orçamento + acompanhamento)
+// Atualização parcial — só atualiza os campos enviados no body
 export async function PATCH(request: NextRequest, { params }: { params: { id: string } }) {
   try {
     const payload = await getCurrentUser(request);
@@ -194,56 +194,45 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     if (!old) return NextResponse.json({ error: "Cliente não encontrado" }, { status: 404 });
 
     const body = await request.json();
-    const data = orcamentoSchema.parse(body);
 
-    const { prazoOrcamento, valorOrcamento, ...rest } = data;
+    // Constrói o objeto de update apenas com os campos presentes no body
+    const updateData: Record<string, unknown> = {};
+    if ("observacoes"     in body) updateData.observacoes     = body.observacoes     || null;
+    if ("numeroOrcamento" in body) updateData.numeroOrcamento = body.numeroOrcamento || null;
+    if ("valorOrcamento"  in body) updateData.valorOrcamento  = body.valorOrcamento  ? Number(body.valorOrcamento) : null;
+    if ("prazoOrcamento"  in body) updateData.prazoOrcamento  = body.prazoOrcamento  ? new Date(body.prazoOrcamento) : null;
+    if ("statusOrcamento" in body) updateData.statusOrcamento = body.statusOrcamento;
+    if ("temperatura"     in body) updateData.temperatura     = body.temperatura;
 
     const cliente = await prisma.cliente.update({
       where: { id: params.id },
-      data: {
-        ...rest,
-        prazoOrcamento: prazoOrcamento ? new Date(prazoOrcamento) : null,
-        valorOrcamento: valorOrcamento ?? null,
-      },
+      data: updateData,
     });
 
-    // Sincroniza Lead vinculado ao cliente (cria se não existir)
-    const leadExistentePatch = await prisma.lead.findFirst({
-      where: { clienteId: params.id, deletedAt: null },
-    });
-    const novoEstagioPatch = mapStatusToEstagio(rest.statusOrcamento ?? "PENDENTE", valorOrcamento);
-    const isFechadoPatch = novoEstagioPatch === "FECHADO_GANHO" || novoEstagioPatch === "FECHADO_PERDIDO";
-    if (leadExistentePatch) {
-      await prisma.lead.update({
-        where: { id: leadExistentePatch.id },
-        data: {
-          estagio: novoEstagioPatch,
-          temperatura: rest.temperatura ?? leadExistentePatch.temperatura,
-          valorEstimado: valorOrcamento ?? null,
-          dataFechamento: isFechadoPatch ? (leadExistentePatch.dataFechamento ?? new Date()) : null,
-        },
-      });
-    } else {
-      // Cliente não tinha lead (criado antes da funcionalidade) — cria agora
-      await prisma.lead.create({
-        data: {
-          titulo: `${old.nome}${old.servicoBuscado ? ` — ${old.servicoBuscado}` : ""}`,
-          estagio: novoEstagioPatch,
-          temperatura: (rest.temperatura as Temperatura) ?? (old.temperatura as Temperatura) ?? "MORNO",
-          origem: (old.origem as OrigemCliente) ?? "OUTROS",
-          responsavelId: old.responsavelId ?? payload.userId,
-          clienteId: params.id,
-          valorEstimado: valorOrcamento ?? undefined,
-          dataFechamento: isFechadoPatch ? new Date() : undefined,
-          ordemKanban: 0,
-        },
-      });
+    // Sincroniza lead se statusOrcamento ou valorOrcamento foram alterados
+    if ("statusOrcamento" in body || "valorOrcamento" in body) {
+      const leadExistente = await prisma.lead.findFirst({ where: { clienteId: params.id, deletedAt: null } });
+      const novoEstagio = mapStatusToEstagio(
+        (updateData.statusOrcamento as string) ?? old.statusOrcamento ?? "PENDENTE",
+        updateData.valorOrcamento as number | undefined
+      );
+      const isFechado = novoEstagio === "FECHADO_GANHO" || novoEstagio === "FECHADO_PERDIDO";
+      if (leadExistente) {
+        await prisma.lead.update({
+          where: { id: leadExistente.id },
+          data: {
+            estagio: novoEstagio,
+            valorEstimado: (updateData.valorOrcamento as number | null) ?? null,
+            dataFechamento: isFechado ? (leadExistente.dataFechamento ?? new Date()) : null,
+          },
+        });
+      }
     }
 
     await prisma.atividade.create({
       data: {
         tipo: "EDICAO",
-        descricao: `Orçamento do cliente ${cliente.nome} atualizado`,
+        descricao: `Cliente ${cliente.nome} atualizado`,
         userId: payload.userId,
         clienteId: params.id,
       },
@@ -252,7 +241,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     return NextResponse.json({ data: cliente });
   } catch (error) {
     console.error("PATCH /clientes/[id]", error);
-    return NextResponse.json({ error: "Erro ao atualizar orçamento" }, { status: 500 });
+    return NextResponse.json({ error: "Erro ao atualizar" }, { status: 500 });
   }
 }
 

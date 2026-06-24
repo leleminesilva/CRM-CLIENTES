@@ -3,7 +3,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { requirePermission } from "@/lib/rbac";
 import { createAuditLog, sanitizeForAudit } from "@/lib/audit";
 import prisma from "@/lib/prisma";
-import { orcamentoSchema, type ClienteInput } from "@/lib/validators/cliente";
+import { type ClienteInput } from "@/lib/validators/cliente";
 import type { EstagioLead, OrigemCliente, Temperatura } from "@prisma/client";
 
 export const dynamic = "force-dynamic";

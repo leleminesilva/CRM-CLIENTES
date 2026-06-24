@@ -179,9 +179,8 @@ export default function ClientesPage() {
               <tr className="border-b bg-muted/50">
                 <th className="text-left p-4 font-medium text-muted-foreground">Cliente</th>
                 <th className="text-left p-4 font-medium text-muted-foreground">Contato</th>
-                <th className="text-left p-4 font-medium text-muted-foreground">Empresa</th>
+                <th className="text-left p-4 font-medium text-muted-foreground">Serviço Buscado</th>
                 <th className="text-left p-4 font-medium text-muted-foreground">Etapa</th>
-                <th className="text-left p-4 font-medium text-muted-foreground">Origem</th>
                 <th className="text-left p-4 font-medium text-muted-foreground">Responsável</th>
                 <th className="p-4" />
               </tr>
@@ -190,14 +189,14 @@ export default function ClientesPage() {
               {isLoading ? (
                 [...Array(5)].map((_, i) => (
                   <tr key={i} className="border-b">
-                    {[...Array(7)].map((_, j) => (
+                    {[...Array(6)].map((_, j) => (
                       <td key={j} className="p-4"><div className="h-4 bg-muted animate-pulse rounded" /></td>
                     ))}
                   </tr>
                 ))
               ) : clientes.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="p-12 text-center text-muted-foreground">
+                  <td colSpan={6} className="p-12 text-center text-muted-foreground">
                     <Building2 className="w-8 h-8 mx-auto mb-3 opacity-40" />
                     <p>Nenhum cliente encontrado</p>
                     <Link href="/clientes/novo">
@@ -229,8 +228,14 @@ export default function ClientesPage() {
                       {c.email && <div className="flex items-center gap-1.5 text-muted-foreground"><Mail className="w-3 h-3" /><span className="text-xs">{c.email}</span></div>}
                     </div>
                   </td>
-                  <td className="p-4">
-                    {c.empresa ? <span className="text-sm">{c.empresa.nomeFantasia || c.empresa.razaoSocial}</span> : <span className="text-muted-foreground text-sm">—</span>}
+                  <td className="p-4 max-w-[180px]">
+                    {c.servicoBuscado
+                      ? <div className="flex flex-wrap gap-1">
+                          {c.servicoBuscado.split(",").map(s => s.trim()).filter(Boolean).map(s => (
+                            <span key={s} className="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">{s}</span>
+                          ))}
+                        </div>
+                      : <span className="text-muted-foreground text-xs">—</span>}
                   </td>
                   <td className="p-4">
                     {(() => {
@@ -240,9 +245,6 @@ export default function ClientesPage() {
                         ? <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${cfg.color}`}>{cfg.label}</span>
                         : <span className="text-muted-foreground text-xs">—</span>;
                     })()}
-                  </td>
-                  <td className="p-4">
-                    <Badge variant="secondary" className="text-xs">{ORIGEM_LABELS[c.origem] || c.origem}</Badge>
                   </td>
                   <td className="p-4">
                     {c.responsavel ? (

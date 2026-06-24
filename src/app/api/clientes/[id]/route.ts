@@ -262,9 +262,22 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
     if (!payload) return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
     requirePermission(payload.role, "clientes:delete");
 
+    const agora = new Date();
+
     await prisma.cliente.update({
       where: { id: params.id },
-      data: { deletedAt: new Date() },
+      data: { deletedAt: agora },
+    });
+
+    // Remove todos os leads e oportunidades vinculados para não distorcer o dashboard
+    await prisma.lead.updateMany({
+      where: { clienteId: params.id, deletedAt: null },
+      data: { deletedAt: agora },
+    });
+
+    await prisma.oportunidade.updateMany({
+      where: { clienteId: params.id, deletedAt: null },
+      data: { deletedAt: agora },
     });
 
     await createAuditLog({

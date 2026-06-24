@@ -43,19 +43,24 @@ export async function GET(request: NextRequest) {
       // Total clientes
       prisma.cliente.count({ where: { deletedAt: null, ...userFilter } }),
 
-      // Leads ativos (não fechados)
+      // Leads ativos (não fechados) — exclui os de clientes deletados
       prisma.lead.count({
         where: {
           deletedAt: null,
           estagio: { notIn: ["FECHADO_GANHO", "FECHADO_PERDIDO"] },
+          OR: [{ clienteId: null }, { cliente: { deletedAt: null } }],
           ...userFilter,
         },
       }),
 
-      // Funil de vendas (leads por estágio — sem filtro de período)
+      // Funil de vendas
       prisma.lead.groupBy({
         by: ["estagio"],
-        where: { deletedAt: null, ...userFilter },
+        where: {
+          deletedAt: null,
+          OR: [{ clienteId: null }, { cliente: { deletedAt: null } }],
+          ...userFilter,
+        },
         _count: { _all: true },
         _sum: { valorEstimado: true },
       }),
@@ -63,46 +68,59 @@ export async function GET(request: NextRequest) {
       // Leads por origem no período
       prisma.lead.groupBy({
         by: ["origem"],
-        where: { deletedAt: null, createdAt: { gte: de, lte: ate }, ...userFilter },
+        where: {
+          deletedAt: null,
+          createdAt: { gte: de, lte: ate },
+          OR: [{ clienteId: null }, { cliente: { deletedAt: null } }],
+          ...userFilter,
+        },
         _count: { _all: true },
       }),
 
-      // Leads ganhos (fechados com ganho) no período
+      // Leads ganhos no período
       prisma.lead.count({
         where: {
           deletedAt: null,
           estagio: "FECHADO_GANHO",
           dataFechamento: { gte: de, lte: ate },
+          OR: [{ clienteId: null }, { cliente: { deletedAt: null } }],
           ...userFilter,
         },
       }),
 
-      // Valor em negociação (soma do valorEstimado dos leads ativos)
+      // Valor em negociação
       prisma.lead.aggregate({
         where: {
           deletedAt: null,
           estagio: { notIn: ["FECHADO_GANHO", "FECHADO_PERDIDO"] },
           valorEstimado: { not: null },
+          OR: [{ clienteId: null }, { cliente: { deletedAt: null } }],
           ...userFilter,
         },
         _sum: { valorEstimado: true },
       }),
 
-      // Receita fechada no período (soma do valorEstimado dos leads FECHADO_GANHO)
+      // Receita fechada no período
       prisma.lead.aggregate({
         where: {
           deletedAt: null,
           estagio: "FECHADO_GANHO",
           dataFechamento: { gte: de, lte: ate },
+          OR: [{ clienteId: null }, { cliente: { deletedAt: null } }],
           ...userFilter,
         },
         _sum: { valorEstimado: true },
         _count: { _all: true },
       }),
 
-      // Total de leads criados no período (para taxa de conversão)
+      // Total de leads criados no período
       prisma.lead.count({
-        where: { deletedAt: null, createdAt: { gte: de, lte: ate }, ...userFilter },
+        where: {
+          deletedAt: null,
+          createdAt: { gte: de, lte: ate },
+          OR: [{ clienteId: null }, { cliente: { deletedAt: null } }],
+          ...userFilter,
+        },
       }),
 
       // Leads convertidos no período
@@ -111,17 +129,19 @@ export async function GET(request: NextRequest) {
           deletedAt: null,
           estagio: "FECHADO_GANHO",
           dataFechamento: { gte: de, lte: ate },
+          OR: [{ clienteId: null }, { cliente: { deletedAt: null } }],
           ...userFilter,
         },
       }),
 
-      // Vendas por vendedor no período (top 5 por receita) — com filtro de usuário
+      // Vendas por vendedor
       prisma.lead.groupBy({
         by: ["responsavelId"],
         where: {
           deletedAt: null,
           estagio: "FECHADO_GANHO",
           dataFechamento: { gte: de, lte: ate },
+          OR: [{ clienteId: null }, { cliente: { deletedAt: null } }],
           ...buildWhereClause(payload.role, payload.userId),
         },
         _count: { _all: true },

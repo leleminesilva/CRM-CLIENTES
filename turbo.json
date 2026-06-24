@@ -1,0 +1,9 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "tasks": {
+    "build": {
+      "outputs": [".next/**", "!.next/cache/**"],
+      "inputs": ["$TURBO_DEFAULT$", "src/**", "public/**", "prisma/**", "*.config.*", "*.json", "!turbo.json"]
+    }
+  }
+}

@@ -1,0 +1,433 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ==========================================
+// ENUMS
+// ==========================================
+
+enum Role {
+  ADMINISTRADOR
+  GESTOR
+  COMERCIAL
+  OPERACIONAL
+}
+
+enum Porte {
+  MICRO
+  PEQUENO
+  MEDIO
+  GRANDE
+  ENTERPRISE
+}
+
+enum OrigemCliente {
+  INDICACAO
+  SITE
+  REDES_SOCIAIS
+  GOOGLE_ADS
+  EVENTO
+  LIGACAO_ATIVA
+  PARCEIRO
+  OUTROS
+}
+
+enum EstagioLead {
+  NOVO_LEAD
+  CONTATO_INICIAL
+  QUALIFICACAO
+  PROPOSTA_ENVIADA
+  NEGOCIACAO
+  FECHADO_GANHO
+  FECHADO_PERDIDO
+}
+
+enum Temperatura {
+  QUENTE
+  MORNO
+  FRIO
+}
+
+enum StatusOportunidade {
+  ABERTA
+  GANHA
+  PERDIDA
+  SUSPENSA
+}
+
+enum TipoTarefa {
+  REUNIAO
+  LIGACAO
+  VISITA
+  FOLLOW_UP
+  EMAIL
+  TAREFA
+}
+
+enum StatusTarefa {
+  PENDENTE
+  EM_ANDAMENTO
+  CONCLUIDA
+  CANCELADA
+  ATRASADA
+}
+
+enum Prioridade {
+  ALTA
+  MEDIA
+  BAIXA
+}
+
+enum TipoAtividade {
+  CRIACAO
+  EDICAO
+  ESTAGIO_ALTERADO
+  COMENTARIO
+  TAREFA_CRIADA
+  TAREFA_CONCLUIDA
+  LIGACAO
+  EMAIL
+  REUNIAO
+  ANEXO_ADICIONADO
+}
+
+enum TipoNotificacao {
+  LEAD_NOVO
+  TAREFA_VENCENDO
+  OPORTUNIDADE_PARADA
+  CLIENTE_SEM_CONTATO
+  SISTEMA
+}
+
+enum StatusOrcamentoCliente {
+  PENDENTE
+  APROVADO
+  NAO_APROVADO
+}
+
+// ==========================================
+// MODELS
+// ==========================================
+
+model User {
+  id           String    @id @default(cuid())
+  nome         String
+  email        String    @unique
+  senha        String
+  role         Role      @default(COMERCIAL)
+  avatar       String?
+  ativo        Boolean   @default(true)
+  deletedAt    DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  clientes      Cliente[]
+  leads         Lead[]
+  oportunidades Oportunidade[]
+  tarefas       Tarefa[]
+  atividades    Atividade[]
+  comentarios   Comentario[]
+  notificacoes  Notificacao[]
+  auditLogs     AuditLog[]
+
+  @@map("users")
+}
+
+model Empresa {
+  id           String    @id @default(cuid())
+  razaoSocial  String
+  nomeFantasia String?
+  cnpj         String?   @unique
+  segmento     String?
+  porte        Porte     @default(PEQUENO)
+  website      String?
+  telefone     String?
+  email        String?
+  cep          String?
+  logradouro   String?
+  numero       String?
+  bairro       String?
+  cidade       String?
+  estado       String?
+  observacoes  String?
+  deletedAt    DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  contatos      Contato[]
+  clientes      Cliente[]
+  leads         Lead[]
+  oportunidades Oportunidade[]
+  atividades    Atividade[]
+
+  @@map("empresas")
+}
+
+model Contato {
+  id          String    @id @default(cuid())
+  nome        String
+  cargo       String?
+  email       String?
+  telefone    String?
+  whatsapp    String?
+  cpf         String?
+  avatar      String?
+  principal   Boolean   @default(false)
+  observacoes String?
+  empresaId   String?
+  deletedAt   DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  empresa       Empresa?       @relation(fields: [empresaId], references: [id])
+  clientes      Cliente[]
+  leads         Lead[]
+  oportunidades Oportunidade[]
+  atividades    Atividade[]
+  comentarios   Comentario[]
+
+  @@map("contatos")
+}
+
+model Cliente {
+  id            String        @id @default(cuid())
+  nome          String
+  razaoSocial   String?
+  nomeFantasia  String?
+  cpfCnpj       String?
+  telefone      String?
+  whatsapp      String?
+  email         String?
+  cep           String?
+  logradouro    String?
+  numero        String?
+  complemento   String?
+  tipoResidencia String?
+  bairro        String?
+  cidade        String?
+  estado        String?
+  segmento        String?
+  porte           Porte?
+  origem          OrigemCliente          @default(OUTROS)
+  responsavelId   String?
+  empresaId       String?
+  contatoId       String?
+  observacoes     String?
+  // Campos do fluxo de atendimento
+  dataInscricao   DateTime?
+  servicoBuscado  String?
+  numeroOrcamento String?
+  valorOrcamento  Decimal?               @db.Decimal(15, 2)
+  prazoOrcamento  DateTime?
+  statusOrcamento StatusOrcamentoCliente @default(PENDENTE)
+  temperatura     Temperatura            @default(MORNO)
+  deletedAt       DateTime?
+  createdAt       DateTime               @default(now())
+  updatedAt       DateTime               @updatedAt
+
+  responsavel   User?         @relation(fields: [responsavelId], references: [id])
+  empresa       Empresa?      @relation(fields: [empresaId], references: [id])
+  contato       Contato?      @relation(fields: [contatoId], references: [id])
+  leads         Lead[]
+  oportunidades Oportunidade[]
+  tarefas       Tarefa[]
+  atividades    Atividade[]
+  comentarios   Comentario[]
+  anexos        Anexo[]
+
+  @@map("clientes")
+}
+
+model Lead {
+  id             String        @id @default(cuid())
+  titulo         String
+  descricao      String?
+  estagio        EstagioLead   @default(NOVO_LEAD)
+  ordemKanban    Int           @default(0)
+  valorEstimado  Decimal?      @db.Decimal(15, 2)
+  temperatura    Temperatura   @default(MORNO)
+  origem         OrigemCliente @default(OUTROS)
+  responsavelId  String?
+  clienteId      String?
+  empresaId      String?
+  contatoId      String?
+  dataFechamento DateTime?
+  motivoPerda    String?
+  deletedAt      DateTime?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  responsavel   User?          @relation(fields: [responsavelId], references: [id])
+  cliente       Cliente?       @relation(fields: [clienteId], references: [id])
+  empresa       Empresa?       @relation(fields: [empresaId], references: [id])
+  contato       Contato?       @relation(fields: [contatoId], references: [id])
+  oportunidades Oportunidade[]
+  tarefas       Tarefa[]
+  atividades    Atividade[]
+  comentarios   Comentario[]
+  anexos        Anexo[]
+
+  @@map("leads")
+}
+
+model Oportunidade {
+  id             String             @id @default(cuid())
+  titulo         String
+  descricao      String?
+  valor          Decimal            @db.Decimal(15, 2)
+  probabilidade  Int                @default(50)
+  status         StatusOportunidade @default(ABERTA)
+  dataPrevisao   DateTime?
+  dataFechamento DateTime?
+  responsavelId  String?
+  clienteId      String?
+  empresaId      String?
+  contatoId      String?
+  leadId         String?
+  motivoPerda    String?
+  deletedAt      DateTime?
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+
+  responsavel User?     @relation(fields: [responsavelId], references: [id])
+  cliente     Cliente?  @relation(fields: [clienteId], references: [id])
+  empresa     Empresa?  @relation(fields: [empresaId], references: [id])
+  contato     Contato?  @relation(fields: [contatoId], references: [id])
+  lead        Lead?     @relation(fields: [leadId], references: [id])
+  tarefas     Tarefa[]
+  atividades  Atividade[]
+  comentarios Comentario[]
+  anexos      Anexo[]
+
+  @@map("oportunidades")
+}
+
+model Tarefa {
+  id             String       @id @default(cuid())
+  titulo         String
+  descricao      String?
+  tipo           TipoTarefa   @default(TAREFA)
+  status         StatusTarefa @default(PENDENTE)
+  prioridade     Prioridade   @default(MEDIA)
+  dataVencimento DateTime
+  dataInicio     DateTime?
+  dataConclusao  DateTime?
+  responsavelId  String?
+  clienteId      String?
+  leadId         String?
+  oportunidadeId String?
+  deletedAt      DateTime?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  responsavel  User?         @relation(fields: [responsavelId], references: [id])
+  cliente      Cliente?      @relation(fields: [clienteId], references: [id])
+  lead         Lead?         @relation(fields: [leadId], references: [id])
+  oportunidade Oportunidade? @relation(fields: [oportunidadeId], references: [id])
+  atividades   Atividade[]
+
+  @@map("tarefas")
+}
+
+model Atividade {
+  id             String        @id @default(cuid())
+  tipo           TipoAtividade
+  descricao      String
+  userId         String
+  clienteId      String?
+  leadId         String?
+  oportunidadeId String?
+  contatoId      String?
+  empresaId      String?
+  tarefaId       String?
+  metadata       Json?
+  createdAt      DateTime      @default(now())
+
+  user         User          @relation(fields: [userId], references: [id])
+  cliente      Cliente?      @relation(fields: [clienteId], references: [id])
+  lead         Lead?         @relation(fields: [leadId], references: [id])
+  oportunidade Oportunidade? @relation(fields: [oportunidadeId], references: [id])
+  contato      Contato?      @relation(fields: [contatoId], references: [id])
+  empresa      Empresa?      @relation(fields: [empresaId], references: [id])
+  tarefa       Tarefa?       @relation(fields: [tarefaId], references: [id])
+
+  @@map("atividades")
+}
+
+model Comentario {
+  id             String    @id @default(cuid())
+  texto          String
+  userId         String
+  clienteId      String?
+  leadId         String?
+  oportunidadeId String?
+  contatoId      String?
+  deletedAt      DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  user         User          @relation(fields: [userId], references: [id])
+  cliente      Cliente?      @relation(fields: [clienteId], references: [id])
+  lead         Lead?         @relation(fields: [leadId], references: [id])
+  oportunidade Oportunidade? @relation(fields: [oportunidadeId], references: [id])
+  contato      Contato?      @relation(fields: [contatoId], references: [id])
+
+  @@map("comentarios")
+}
+
+model Anexo {
+  id             String    @id @default(cuid())
+  nome           String
+  url            String
+  tipo           String
+  tamanho        Int
+  clienteId      String?
+  leadId         String?
+  oportunidadeId String?
+  deletedAt      DateTime?
+  createdAt      DateTime  @default(now())
+
+  cliente      Cliente?      @relation(fields: [clienteId], references: [id])
+  lead         Lead?         @relation(fields: [leadId], references: [id])
+  oportunidade Oportunidade? @relation(fields: [oportunidadeId], references: [id])
+
+  @@map("anexos")
+}
+
+model Notificacao {
+  id        String          @id @default(cuid())
+  titulo    String
+  mensagem  String
+  tipo      TipoNotificacao
+  lida      Boolean         @default(false)
+  userId    String
+  linkUrl   String?
+  createdAt DateTime        @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@map("notificacoes")
+}
+
+model AuditLog {
+  id          String   @id @default(cuid())
+  userId      String
+  entidade    String
+  entidadeId  String
+  acao        String
+  dadosAntigos Json?
+  dadosNovos  Json?
+  ip          String?
+  userAgent   String?
+  createdAt   DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@map("audit_logs")
+}

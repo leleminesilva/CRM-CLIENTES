@@ -1,17 +1,51 @@
 "use client";
 
+import { useState } from "react";
 import { useTheme } from "next-themes";
-import { Moon, Sun, Monitor, Bell, User, Building2 } from "lucide-react";
+import { Moon, Sun, Monitor, Bell, User, Building2, Lock, Eye, EyeOff } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { useAuth } from "@/contexts/AuthContext";
 import { ROLE_LABELS } from "@/lib/utils/formatters";
+import { useMutation } from "@tanstack/react-query";
+import axios from "axios";
+import { toast } from "sonner";
 
 export default function ConfiguracoesPage() {
   const { theme, setTheme } = useTheme();
   const { user } = useAuth();
+
+  const [senhaAtual, setSenhaAtual] = useState("");
+  const [novaSenha, setNovaSenha] = useState("");
+  const [confirmarSenha, setConfirmarSenha] = useState("");
+  const [mostrarSenhas, setMostrarSenhas] = useState(false);
+
+  const mudarSenhaMutation = useMutation({
+    mutationFn: () => axios.post("/api/usuarios/mudar-senha", { senhaAtual, novaSenha }),
+    onSuccess: () => {
+      toast.success("Senha alterada com sucesso!");
+      setSenhaAtual("");
+      setNovaSenha("");
+      setConfirmarSenha("");
+    },
+    onError: (err) => {
+      const msg = axios.isAxiosError(err)
+        ? err.response?.data?.error ?? "Erro ao alterar senha"
+        : "Erro ao alterar senha";
+      toast.error(msg);
+    },
+  });
+
+  function handleMudarSenha(e: React.FormEvent) {
+    e.preventDefault();
+    if (novaSenha.length < 6) return toast.error("A nova senha deve ter pelo menos 6 caracteres");
+    if (novaSenha !== confirmarSenha) return toast.error("As senhas não coincidem");
+    mudarSenhaMutation.mutate();
+  }
 
   const themes = [
     { value: "light", label: "Claro", icon: Sun },
@@ -45,6 +79,67 @@ export default function ConfiguracoesPage() {
               <p className="text-sm text-indigo-600 font-medium">{ROLE_LABELS[user?.role || ""]}</p>
             </div>
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Alterar Senha */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <Lock className="w-4 h-4" />
+            Alterar Senha
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleMudarSenha} className="space-y-4">
+            <div className="space-y-1.5">
+              <Label>Senha atual</Label>
+              <div className="relative">
+                <Input
+                  type={mostrarSenhas ? "text" : "password"}
+                  placeholder="Digite sua senha atual"
+                  value={senhaAtual}
+                  onChange={e => setSenhaAtual(e.target.value)}
+                  className="pr-10"
+                />
+                <button
+                  type="button"
+                  onClick={() => setMostrarSenhas(v => !v)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                >
+                  {mostrarSenhas ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>Nova senha</Label>
+              <Input
+                type={mostrarSenhas ? "text" : "password"}
+                placeholder="Mínimo 6 caracteres"
+                value={novaSenha}
+                onChange={e => setNovaSenha(e.target.value)}
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>Confirmar nova senha</Label>
+              <Input
+                type={mostrarSenhas ? "text" : "password"}
+                placeholder="Repita a nova senha"
+                value={confirmarSenha}
+                onChange={e => setConfirmarSenha(e.target.value)}
+              />
+            </div>
+
+            <Button
+              type="submit"
+              className="w-full bg-indigo-600 hover:bg-indigo-700"
+              disabled={!senhaAtual || !novaSenha || !confirmarSenha || mudarSenhaMutation.isPending}
+            >
+              {mudarSenhaMutation.isPending ? "Alterando..." : "Alterar Senha"}
+            </Button>
+          </form>
         </CardContent>
       </Card>
 

@@ -16,6 +16,7 @@ import {
   Edit,
   Trash2,
   Filter,
+  MessageCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -39,7 +40,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Card } from "@/components/ui/card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { ORIGEM_LABELS, PORTE_LABELS } from "@/lib/utils/formatters";
+import { ORIGEM_LABELS } from "@/lib/utils/formatters";
 import type { Cliente } from "@/types";
 
 export default function ClientesPage() {
@@ -170,7 +171,6 @@ export default function ClientesPage() {
                 <th className="text-left p-4 font-medium text-muted-foreground">Empresa</th>
                 <th className="text-left p-4 font-medium text-muted-foreground">Origem</th>
                 <th className="text-left p-4 font-medium text-muted-foreground">Responsável</th>
-                <th className="text-left p-4 font-medium text-muted-foreground">Porte</th>
                 <th className="p-4" />
               </tr>
             </thead>
@@ -178,14 +178,14 @@ export default function ClientesPage() {
               {isLoading ? (
                 [...Array(5)].map((_, i) => (
                   <tr key={i} className="border-b">
-                    {[...Array(7)].map((_, j) => (
+                    {[...Array(6)].map((_, j) => (
                       <td key={j} className="p-4"><div className="h-4 bg-muted animate-pulse rounded" /></td>
                     ))}
                   </tr>
                 ))
               ) : clientes.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="p-12 text-center text-muted-foreground">
+                  <td colSpan={6} className="p-12 text-center text-muted-foreground">
                     <Building2 className="w-8 h-8 mx-auto mb-3 opacity-40" />
                     <p>Nenhum cliente encontrado</p>
                     <Link href="/clientes/novo">
@@ -212,8 +212,9 @@ export default function ClientesPage() {
                   </td>
                   <td className="p-4">
                     <div className="space-y-0.5">
+                      {c.whatsapp && <div className="flex items-center gap-1.5"><MessageCircle className="w-3 h-3 text-green-500" /><span className="text-xs">{c.whatsapp}</span></div>}
+                      {!c.whatsapp && c.telefone && <div className="flex items-center gap-1.5 text-muted-foreground"><Phone className="w-3 h-3" /><span className="text-xs">{c.telefone}</span></div>}
                       {c.email && <div className="flex items-center gap-1.5 text-muted-foreground"><Mail className="w-3 h-3" /><span className="text-xs">{c.email}</span></div>}
-                      {c.telefone && <div className="flex items-center gap-1.5 text-muted-foreground"><Phone className="w-3 h-3" /><span className="text-xs">{c.telefone}</span></div>}
                     </div>
                   </td>
                   <td className="p-4">
@@ -233,9 +234,6 @@ export default function ClientesPage() {
                         <span className="text-sm">{c.responsavel.nome}</span>
                       </div>
                     ) : <span className="text-muted-foreground text-sm">—</span>}
-                  </td>
-                  <td className="p-4">
-                    {c.porte ? <Badge variant="outline" className="text-xs">{PORTE_LABELS[c.porte]}</Badge> : <span className="text-muted-foreground text-sm">—</span>}
                   </td>
                   <td className="p-4"><ActionMenu c={c} /></td>
                 </tr>

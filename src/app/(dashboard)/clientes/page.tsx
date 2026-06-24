@@ -64,6 +64,7 @@ export default function ClientesPage() {
     onSuccess: () => {
       toast.success("Cliente removido com sucesso");
       qc.invalidateQueries({ queryKey: ["clientes"] });
+      qc.invalidateQueries({ queryKey: ["dashboard"] });
       setDeleteId(null);
     },
     onError: () => toast.error("Erro ao remover cliente"),

@@ -62,6 +62,7 @@ export default function NovoClientePage() {
     onSuccess: (res) => {
       toast.success("Cliente cadastrado com sucesso!");
       qc.invalidateQueries({ queryKey: ["clientes"] });
+      qc.invalidateQueries({ queryKey: ["dashboard"] });
       router.push(`/clientes/${res.data.data.id}`);
     },
     onError: () => toast.error("Erro ao cadastrar cliente"),

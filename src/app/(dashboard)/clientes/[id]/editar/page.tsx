@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import axios from "axios";
 import { toast } from "sonner";
@@ -43,6 +43,7 @@ function FormGestor({ cliente, usuarios, onSuccess, userRole }: {
   userRole: string;
 }) {
   const { id } = useParams<{ id: string }>();
+  const qc = useQueryClient();
   const [buscandoCep, setBuscandoCep] = useState(false);
   const [servicosSelecionados, setServicosSelecionados] = useState<string[]>([]);
   const [servicoCustom, setServicoCustom] = useState("");
@@ -99,7 +100,13 @@ function FormGestor({ cliente, usuarios, onSuccess, userRole }: {
 
   const mutation = useMutation({
     mutationFn: (data: ClienteInput) => axios.put(`/api/clientes/${id}`, data),
-    onSuccess: () => { toast.success("Cliente atualizado!"); onSuccess(); },
+    onSuccess: () => {
+      toast.success("Cliente atualizado!");
+      qc.invalidateQueries({ queryKey: ["clientes"] });
+      qc.invalidateQueries({ queryKey: ["cliente", id] });
+      qc.invalidateQueries({ queryKey: ["dashboard"] });
+      onSuccess();
+    },
     onError: (err) => {
       const msg = axios.isAxiosError(err)
         ? err.response?.data?.error ?? "Erro ao salvar"

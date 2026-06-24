@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
 import axios from "axios";
 import { toast } from "sonner";
 import { ArrowLeft, Loader2, ClipboardList, FileText, CheckCircle, User2, X, Plus, Lock } from "lucide-react";
@@ -15,7 +14,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { clienteSchema, type ClienteInput } from "@/lib/validators/cliente";
+import { type ClienteInput } from "@/lib/validators/cliente";
 import { maskCpfCnpj, maskPhone, maskCep } from "@/lib/utils/masks";
 import { useAuth } from "@/contexts/AuthContext";
 import type { User } from "@/types";
@@ -51,7 +50,6 @@ function FormGestor({ cliente, usuarios, onSuccess, userRole }: {
   const isGestor = userRole === "ADMINISTRADOR" || userRole === "GESTOR";
 
   const { register, handleSubmit, setValue, watch, reset } = useForm<ClienteInput>({
-    resolver: zodResolver(clienteSchema),
     defaultValues: { origem: "OUTROS", statusOrcamento: "PENDENTE", temperatura: "MORNO" },
   });
 
@@ -116,13 +114,7 @@ function FormGestor({ cliente, usuarios, onSuccess, userRole }: {
   const cepVal = watch("cep") ?? "";
 
   return (
-    <form onSubmit={handleSubmit(
-        d => mutation.mutate(d),
-        (errs) => {
-          const first = Object.values(errs)[0];
-          toast.error((first as { message?: string })?.message || "Verifique os campos obrigatórios");
-        }
-      )} className="space-y-6">
+    <form onSubmit={handleSubmit(d => mutation.mutate(d))} className="space-y-6">
       {/* Etapa 1 */}
       <div className="flex items-center gap-3 pt-2">
         <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-600 text-sm font-bold text-white shrink-0">1</div>

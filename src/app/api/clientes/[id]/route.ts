@@ -3,7 +3,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { requirePermission } from "@/lib/rbac";
 import { createAuditLog, sanitizeForAudit } from "@/lib/audit";
 import prisma from "@/lib/prisma";
-import { clienteSchema, orcamentoSchema } from "@/lib/validators/cliente";
+import { orcamentoSchema, type ClienteInput } from "@/lib/validators/cliente";
 import type { EstagioLead, OrigemCliente, Temperatura } from "@prisma/client";
 
 export const dynamic = "force-dynamic";
@@ -72,7 +72,40 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
     if (!old) return NextResponse.json({ error: "Cliente não encontrado" }, { status: 404 });
 
     const body = await request.json();
-    const data = clienteSchema.parse(body);
+
+    // Aceita qualquer dado — sem rejeição por campos faltantes ou inválidos
+    const nu = (v: unknown) => (v === null || v === "" ? undefined : v);
+    const data: ClienteInput = {
+      nome:              String(body.nome || ""),
+      razaoSocial:       nu(body.razaoSocial)  as string | undefined,
+      nomeFantasia:      nu(body.nomeFantasia) as string | undefined,
+      cpfCnpj:           nu(body.cpfCnpj)      as string | undefined,
+      telefone:          nu(body.telefone)      as string | undefined,
+      whatsapp:          nu(body.whatsapp)      as string | undefined,
+      email:             nu(body.email)         as string | undefined,
+      cep:               nu(body.cep)           as string | undefined,
+      logradouro:        nu(body.logradouro)    as string | undefined,
+      numero:            nu(body.numero)        as string | undefined,
+      complemento:       nu(body.complemento)   as string | undefined,
+      tipoResidencia:    nu(body.tipoResidencia) as ClienteInput["tipoResidencia"],
+      bairro:            nu(body.bairro)        as string | undefined,
+      cidade:            nu(body.cidade)        as string | undefined,
+      estado:            nu(body.estado)        as string | undefined,
+      segmento:          nu(body.segmento)      as string | undefined,
+      porte:             nu(body.porte)         as ClienteInput["porte"],
+      origem:            body.origem            || "OUTROS",
+      responsavelId:     nu(body.responsavelId) as string | undefined,
+      empresaId:         nu(body.empresaId)     as string | undefined,
+      contatoId:         nu(body.contatoId)     as string | undefined,
+      observacoes:       nu(body.observacoes)   as string | undefined,
+      dataInscricao:     nu(body.dataInscricao) as string | undefined,
+      servicoBuscado:    nu(body.servicoBuscado) as string | undefined,
+      numeroOrcamento:   nu(body.numeroOrcamento) as string | undefined,
+      valorOrcamento:    body.valorOrcamento ? Number(body.valorOrcamento) : undefined,
+      prazoOrcamento:    nu(body.prazoOrcamento) as string | undefined,
+      statusOrcamento:   body.statusOrcamento   || "PENDENTE",
+      temperatura:       body.temperatura       || "MORNO",
+    };
 
     const { dataInscricao, prazoOrcamento, valorOrcamento, ...rest } = data;
 

@@ -102,7 +102,12 @@ function FormGestor({ cliente, usuarios, onSuccess, userRole }: {
   const mutation = useMutation({
     mutationFn: (data: ClienteInput) => axios.put(`/api/clientes/${id}`, data),
     onSuccess: () => { toast.success("Cliente atualizado!"); onSuccess(); },
-    onError: () => toast.error("Erro ao atualizar"),
+    onError: (err) => {
+      const msg = axios.isAxiosError(err)
+        ? err.response?.data?.error ?? "Erro ao salvar"
+        : "Erro ao salvar";
+      toast.error(msg);
+    },
   });
 
   const cpfCnpjVal = watch("cpfCnpj") ?? "";
@@ -111,7 +116,13 @@ function FormGestor({ cliente, usuarios, onSuccess, userRole }: {
   const cepVal = watch("cep") ?? "";
 
   return (
-    <form onSubmit={handleSubmit(d => mutation.mutate(d))} className="space-y-6">
+    <form onSubmit={handleSubmit(
+        d => mutation.mutate(d),
+        (errs) => {
+          const first = Object.values(errs)[0];
+          toast.error((first as { message?: string })?.message || "Verifique os campos obrigatórios");
+        }
+      )} className="space-y-6">
       {/* Etapa 1 */}
       <div className="flex items-center gap-3 pt-2">
         <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-600 text-sm font-bold text-white shrink-0">1</div>

@@ -140,8 +140,10 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
     });
 
     return NextResponse.json({ data: cliente });
-  } catch {
-    return NextResponse.json({ error: "Erro ao atualizar cliente" }, { status: 500 });
+  } catch (err) {
+    console.error("PUT /clientes/[id]", err);
+    const msg = err instanceof Error ? err.message : "Erro ao atualizar cliente";
+    return NextResponse.json({ error: msg }, { status: 500 });
   }
 }
 

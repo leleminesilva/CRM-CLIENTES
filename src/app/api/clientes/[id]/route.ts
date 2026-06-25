@@ -212,20 +212,51 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     // Sincroniza lead se statusOrcamento ou valorOrcamento foram alterados
     if ("statusOrcamento" in body || "valorOrcamento" in body) {
       const leadExistente = await prisma.lead.findFirst({ where: { clienteId: params.id, deletedAt: null } });
-      const novoEstagio = mapStatusToEstagio(
-        (updateData.statusOrcamento as string) ?? old.statusOrcamento ?? "PENDENTE",
-        updateData.valorOrcamento as number | undefined
-      );
-      const isFechado = novoEstagio === "FECHADO_GANHO" || novoEstagio === "FECHADO_PERDIDO";
-      if (leadExistente) {
-        await prisma.lead.update({
-          where: { id: leadExistente.id },
-          data: {
-            estagio: novoEstagio,
-            valorEstimado: (updateData.valorOrcamento as number | null) ?? null,
-            dataFechamento: isFechado ? (leadExistente.dataFechamento ?? new Date()) : null,
-          },
-        });
+      const leadUpdate: Record<string, unknown> = {};
+
+      // Atualiza valor estimado sempre que valorOrcamento é enviado
+      if ("valorOrcamento" in body) {
+        leadUpdate.valorEstimado = (updateData.valorOrcamento as number | null) ?? null;
+      }
+
+      // Só força estagio em casos de status final — nunca reseta o estagio do pipeline
+      if ("statusOrcamento" in body) {
+        const status = updateData.statusOrcamento as string;
+        if (status === "APROVADO") {
+          leadUpdate.estagio = "FECHADO_GANHO";
+          leadUpdate.dataFechamento = leadExistente?.dataFechamento ?? new Date();
+        } else if (status === "NAO_APROVADO") {
+          leadUpdate.estagio = "FECHADO_PERDIDO";
+          leadUpdate.dataFechamento = leadExistente?.dataFechamento ?? new Date();
+        } else {
+          // PENDENTE: não sobrescreve estagio do pipeline, apenas limpa dataFechamento
+          leadUpdate.dataFechamento = null;
+        }
+      }
+
+      if (Object.keys(leadUpdate).length > 0) {
+        if (leadExistente) {
+          await prisma.lead.update({ where: { id: leadExistente.id }, data: leadUpdate });
+        } else {
+          // Cria lead se não existe para que o valor apareça no dashboard
+          const estagio: EstagioLead =
+            updateData.statusOrcamento === "APROVADO" ? "FECHADO_GANHO" :
+            updateData.statusOrcamento === "NAO_APROVADO" ? "FECHADO_PERDIDO" :
+            updateData.valorOrcamento ? "PROPOSTA_ENVIADA" : "NOVO_LEAD";
+          await prisma.lead.create({
+            data: {
+              titulo: old.nome,
+              estagio,
+              temperatura: (old.temperatura as Temperatura) ?? "MORNO",
+              origem: (old.origem as OrigemCliente) ?? "OUTROS",
+              responsavelId: old.responsavelId ?? payload.userId,
+              clienteId: params.id,
+              valorEstimado: (updateData.valorOrcamento as number | null) ?? undefined,
+              dataFechamento: (estagio === "FECHADO_GANHO" || estagio === "FECHADO_PERDIDO") ? new Date() : undefined,
+              ordemKanban: 0,
+            },
+          });
+        }
       }
     }
 

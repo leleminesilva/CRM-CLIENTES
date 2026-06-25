@@ -181,6 +181,27 @@ export async function GET(request: NextRequest) {
       ? Prisma.empty
       : Prisma.sql`AND "responsavelId" = ${payload.userId}`;
 
+    // Serviços mais solicitados — só para admins/gestores
+    let servicosMaisSolicitados: Array<{ servico: string; total: number }> = [];
+    if (canViewAllUsers) {
+      servicosMaisSolicitados = await prisma.$queryRaw<Array<{ servico: string; total: number }>>(
+        Prisma.sql`
+          SELECT servico, COUNT(*)::int as total
+          FROM (
+            SELECT trim(unnest(string_to_array("servicoBuscado", ','))) as servico
+            FROM clientes
+            WHERE "deletedAt" IS NULL
+              AND "servicoBuscado" IS NOT NULL
+              AND "servicoBuscado" != ''
+          ) sub
+          WHERE servico != ''
+          GROUP BY servico
+          ORDER BY total DESC
+          LIMIT 10
+        `
+      );
+    }
+
     const vendasMesRaw = await prisma.$queryRaw<Array<{ mes: string; mes_num: number; total: number; valor: number }>>(
       Prisma.sql`
         SELECT
@@ -218,6 +239,7 @@ export async function GET(request: NextRequest) {
           total: l._count._all,
         })),
         vendasPorVendedor,
+        servicosMaisSolicitados,
       },
     });
   } catch (error) {

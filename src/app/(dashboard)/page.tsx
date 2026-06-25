@@ -30,6 +30,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { formatCurrency, ORIGEM_LABELS, ESTAGIO_LABELS } from "@/lib/utils/formatters";
+import { useAuth } from "@/contexts/AuthContext";
 
 const PERIOD_OPTIONS = [
   { label: "Hoje", value: "hoje" },
@@ -80,6 +81,8 @@ function KPICard({ title, value, icon, variacao, prefix = "", color = "bg-indigo
 
 export default function DashboardPage() {
   const [periodo, setPeriodo] = useState("mes");
+  const { user } = useAuth();
+  const isGestor = user?.role === "ADMINISTRADOR" || user?.role === "GESTOR";
 
   const { data, isLoading } = useQuery({
     queryKey: ["dashboard", periodo],
@@ -105,6 +108,7 @@ export default function DashboardPage() {
   const vendasMes = Array.isArray(data?.vendasMes) ? data.vendasMes : [];
   const leadsPorOrigem = data?.leadsPorOrigem || [];
   const vendasPorVendedor = data?.vendasPorVendedor || [];
+  const servicosMaisSolicitados: Array<{ servico: string; total: number }> = data?.servicosMaisSolicitados || [];
 
   const funnelOrdem = ["NOVO_LEAD", "CONTATO_INICIAL", "QUALIFICACAO", "PROPOSTA_ENVIADA", "NEGOCIACAO", "FECHADO_GANHO"];
   const funnelOrdenado = funnelOrdem.map((e) => funil.find((f: { estagio: string; total: number; valor: number }) => f.estagio === e)).filter(Boolean);
@@ -255,6 +259,50 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Serviços Mais Solicitados — só Gestor/Admin */}
+      {isGestor && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              Serviços Mais Solicitados
+              <span className="text-xs font-normal text-muted-foreground bg-muted px-2 py-0.5 rounded-full">Gestores</span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {servicosMaisSolicitados.length > 0 ? (
+              <div className="space-y-2">
+                {servicosMaisSolicitados.map((s, i) => {
+                  const max = Math.max(...servicosMaisSolicitados.map(x => x.total));
+                  const pct = max > 0 ? (s.total / max) * 100 : 0;
+                  const totalGeral = servicosMaisSolicitados.reduce((acc, x) => acc + x.total, 0);
+                  const pctReal = totalGeral > 0 ? Math.round((s.total / totalGeral) * 100) : 0;
+                  return (
+                    <div key={s.servico} className="space-y-1">
+                      <div className="flex justify-between text-sm">
+                        <span className="font-medium">{s.servico}</span>
+                        <span className="text-muted-foreground">{s.total} {s.total === 1 ? "cliente" : "clientes"} · {pctReal}%</span>
+                      </div>
+                      <div className="h-7 bg-muted rounded-lg overflow-hidden">
+                        <div
+                          className="h-full rounded-lg flex items-center pl-3 text-white text-xs font-medium transition-all"
+                          style={{ width: `${Math.max(pct, 4)}%`, backgroundColor: COLORS[i % COLORS.length] }}
+                        >
+                          {pct > 15 && s.servico}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="flex items-center justify-center h-32 text-muted-foreground text-sm">
+                Sem dados para exibir
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Charts Row 2 */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

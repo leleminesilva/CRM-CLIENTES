@@ -563,7 +563,10 @@ export default function ClienteDetalhePage() {
           prazoOrcamento={cliente.prazoOrcamento as string | null}
           statusOrcamento={cliente.statusOrcamento as string}
           temperatura={cliente.temperatura as string}
-          onSaved={() => qc.invalidateQueries({ queryKey: ["cliente", id] })}
+          onSaved={() => {
+            qc.invalidateQueries({ queryKey: ["cliente", id] });
+            qc.invalidateQueries({ queryKey: ["dashboard"] });
+          }}
         />
       </div>
 

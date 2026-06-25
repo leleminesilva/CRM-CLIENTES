@@ -1,13 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
 import { toast } from "sonner";
-import { ArrowLeft, Search, User2, ClipboardList, Info } from "lucide-react";
+import { ArrowLeft, Search, User2, ClipboardList, Info, Lock } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,6 +16,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { clienteSchema, type ClienteInput } from "@/lib/validators/cliente";
 import { maskCpfCnpj, maskPhone, maskCep } from "@/lib/utils/masks";
+import { useAuth } from "@/contexts/AuthContext";
 import type { User } from "@/types";
 
 const ORIGENS = [
@@ -37,6 +38,8 @@ const SERVICOS = [
 export default function NovoClientePage() {
   const router = useRouter();
   const qc = useQueryClient();
+  const { user } = useAuth();
+  const isGestor = user?.role === "ADMINISTRADOR" || user?.role === "GESTOR";
   const [buscandoCEP, setBuscandoCEP] = useState(false);
 
   const { data: usuarios } = useQuery({
@@ -51,6 +54,13 @@ export default function NovoClientePage() {
     resolver: zodResolver(clienteSchema),
     defaultValues: { origem: "OUTROS", statusOrcamento: "PENDENTE", temperatura: "MORNO" },
   });
+
+  // COMERCIAL: auto-preenche com o próprio usuário e não pode alterar
+  useEffect(() => {
+    if (!isGestor && user?.id) {
+      setValue("responsavelId", user.id);
+    }
+  }, [user, isGestor, setValue]);
 
   const cpfCnpjVal = watch("cpfCnpj") ?? "";
   const telefoneVal = watch("telefone") ?? "";
@@ -225,15 +235,24 @@ export default function NovoClientePage() {
           </CardHeader>
           <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-1.5">
-              <Label>Vendedor Responsável</Label>
-              <Select onValueChange={(v) => setValue("responsavelId", v)}>
-                <SelectTrigger><SelectValue placeholder="Selecione o vendedor" /></SelectTrigger>
-                <SelectContent>
-                  {(usuarios || []).map((u) => (
-                    <SelectItem key={u.id} value={u.id}>{u.nome}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Label className="flex items-center gap-1.5">
+                Vendedor Responsável
+                {!isGestor && <Lock className="w-3 h-3 text-muted-foreground" />}
+              </Label>
+              {isGestor ? (
+                <Select onValueChange={(v) => setValue("responsavelId", v)}>
+                  <SelectTrigger><SelectValue placeholder="Selecione o vendedor" /></SelectTrigger>
+                  <SelectContent>
+                    {(usuarios || []).map((u) => (
+                      <SelectItem key={u.id} value={u.id}>{u.nome}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <div className="flex h-9 w-full items-center rounded-md border border-input bg-muted px-3 text-sm text-muted-foreground">
+                  {user?.nome ?? "Você"}
+                </div>
+              )}
             </div>
 
             <div className="space-y-1.5">

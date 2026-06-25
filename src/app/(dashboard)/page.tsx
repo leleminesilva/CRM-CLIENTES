@@ -122,19 +122,21 @@ export default function DashboardPage() {
           <h2 className="text-xl md:text-2xl font-bold">Dashboard Executivo</h2>
           <p className="text-sm text-muted-foreground">Visão geral do desempenho comercial</p>
         </div>
-        <div className="flex items-center gap-1 bg-muted p-1 rounded-lg">
-          {PERIOD_OPTIONS.map((opt) => (
-            <Button
-              key={opt.value}
-              variant={periodo === opt.value ? "default" : "ghost"}
-              size="sm"
-              onClick={() => setPeriodo(opt.value)}
-              className={periodo === opt.value ? "bg-background shadow-sm" : ""}
-            >
-              {opt.label}
-            </Button>
-          ))}
-        </div>
+        {isGestor && (
+          <div className="flex items-center gap-1 bg-muted p-1 rounded-lg">
+            {PERIOD_OPTIONS.map((opt) => (
+              <Button
+                key={opt.value}
+                variant={periodo === opt.value ? "default" : "ghost"}
+                size="sm"
+                onClick={() => setPeriodo(opt.value)}
+                className={periodo === opt.value ? "bg-background shadow-sm" : ""}
+              >
+                {opt.label}
+              </Button>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* KPIs Grid */}

@@ -16,6 +16,8 @@ export function Providers({ children }: { children: React.ReactNode }) {
             staleTime: 0,
             refetchOnWindowFocus: true,
             refetchOnMount: true,
+            refetchInterval: 30000,          // atualiza automaticamente a cada 30s
+            refetchIntervalInBackground: false, // pausa quando a aba está em segundo plano
             retry: 1,
           },
         },

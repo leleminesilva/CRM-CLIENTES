@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
@@ -53,7 +53,11 @@ function FormGestor({ cliente, usuarios, onSuccess, userRole }: {
     defaultValues: { origem: "OUTROS", statusOrcamento: "PENDENTE", temperatura: "MORNO" },
   });
 
+  // Popula o form apenas na primeira carga — refetches automáticos não resetam campos em edição
+  const hasPopulated = useRef(false);
   useEffect(() => {
+    if (hasPopulated.current) return;
+    hasPopulated.current = true;
     const clean = Object.fromEntries(
       Object.entries(cliente).map(([k, v]) => [k, v === null ? undefined : v])
     );

@@ -68,6 +68,7 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
       where: { id: params.id },
       data: {
         ...data,
+        horario: data.horario || null,
         dataVencimento: new Date(data.dataVencimento),
         dataInicio: data.dataInicio ? new Date(data.dataInicio) : null,
       },

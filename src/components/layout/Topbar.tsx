@@ -48,6 +48,7 @@ interface Tarefa {
   status: string;
   prioridade: string;
   dataVencimento: string;
+  horario?: string | null;
   cliente?: { id: string; nome: string } | null;
   lead?: { id: string; titulo: string } | null;
 }
@@ -205,11 +206,10 @@ export function Topbar() {
                               <p className="text-sm font-medium truncate leading-tight">
                                 {tarefa.titulo}
                               </p>
-                              {(tarefa.cliente || tarefa.lead) && (
-                                <p className="text-xs text-muted-foreground truncate mt-0.5">
-                                  {tarefa.cliente?.nome ?? tarefa.lead?.titulo}
-                                </p>
-                              )}
+                              <p className="text-xs text-muted-foreground truncate mt-0.5">
+                                {tarefa.horario && <span className="font-medium">{tarefa.horario} · </span>}
+                                {tarefa.cliente?.nome ?? tarefa.lead?.titulo}
+                              </p>
                             </div>
                           </div>
                         </button>

@@ -196,6 +196,7 @@ export interface Tarefa {
   status: StatusTarefa;
   prioridade: Prioridade;
   dataVencimento: string;
+  horario?: string | null;
   dataInicio?: string | null;
   dataConclusao?: string | null;
   responsavelId?: string | null;

@@ -61,6 +61,7 @@ export async function POST(request: NextRequest) {
     const tarefa = await prisma.tarefa.create({
       data: {
         ...data,
+        horario: data.horario || null,
         dataVencimento: new Date(data.dataVencimento),
         dataInicio: data.dataInicio ? new Date(data.dataInicio) : null,
         responsavelId: data.responsavelId || payload.userId,

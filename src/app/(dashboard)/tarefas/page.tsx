@@ -38,7 +38,7 @@ const STATUS_GROUPS = [
 function NovaTarefaDialog({ onSuccess }: { onSuccess: () => void }) {
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({
-    titulo: "", descricao: "", tipo: "TAREFA", prioridade: "MEDIA", dataVencimento: "",
+    titulo: "", descricao: "", tipo: "TAREFA", prioridade: "MEDIA", dataVencimento: "", horario: "",
   });
 
   const mutation = useMutation({
@@ -92,9 +92,15 @@ function NovaTarefaDialog({ onSuccess }: { onSuccess: () => void }) {
               </Select>
             </div>
           </div>
-          <div className="space-y-1.5">
-            <Label>Data de Vencimento *</Label>
-            <Input type="date" value={form.dataVencimento} onChange={e => setForm(f => ({ ...f, dataVencimento: e.target.value }))} />
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label>Data de Vencimento *</Label>
+              <Input type="date" value={form.dataVencimento} onChange={e => setForm(f => ({ ...f, dataVencimento: e.target.value }))} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Horário</Label>
+              <Input type="time" value={form.horario} onChange={e => setForm(f => ({ ...f, horario: e.target.value }))} />
+            </div>
           </div>
           <div className="flex justify-end gap-2">
             <Button variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
@@ -209,6 +215,7 @@ export default function TarefasPage() {
                               <span className={`text-xs ${vencida ? "text-red-500 font-medium" : "text-muted-foreground"}`}>
                                 {vencida ? "Atrasada — " : ""}
                                 {formatDate(t.dataVencimento)}
+                                {t.horario ? ` às ${t.horario}` : ""}
                               </span>
                             </div>
                           </div>

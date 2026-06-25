@@ -84,6 +84,7 @@ function EventCard({ event, compact = false }: { event: AgendaEvent; compact?: b
         title={event.title}
       >
         {concluida && <CheckCircle2 className="w-3 h-3 shrink-0" />}
+        {t.horario && <span className="shrink-0 opacity-80">{t.horario}</span>}
         <span className="truncate">{t.titulo}</span>
       </div>
     );
@@ -106,6 +107,11 @@ function EventCard({ event, compact = false }: { event: AgendaEvent; compact?: b
           <span className={cn("text-xs font-medium", PRIORIDADE_COLOR[t.prioridade])}>
             {PRIORIDADE_LABEL[t.prioridade]}
           </span>
+          {t.horario && (
+            <span className="text-xs text-muted-foreground flex items-center gap-0.5">
+              <Clock className="w-3 h-3" /> {t.horario}
+            </span>
+          )}
           {t.status === "PENDENTE" && isPast(new Date(t.dataVencimento)) && (
             <span className="text-xs text-red-500 font-medium flex items-center gap-0.5">
               <Clock className="w-3 h-3" /> Atrasada
@@ -130,6 +136,7 @@ export default function AgendaPage() {
     tipo: "TAREFA",
     prioridade: "MEDIA",
     dataVencimento: "",
+    horario: "",
     descricao: "",
   });
 
@@ -147,7 +154,7 @@ export default function AgendaPage() {
       toast.success("Evento adicionado à agenda!");
       queryClient.invalidateQueries({ queryKey: ["tarefas-agenda"] });
       setOpen(false);
-      setForm({ titulo: "", tipo: "TAREFA", prioridade: "MEDIA", dataVencimento: "", descricao: "" });
+      setForm({ titulo: "", tipo: "TAREFA", prioridade: "MEDIA", dataVencimento: "", horario: "", descricao: "" });
     },
     onError: () => toast.error("Erro ao criar evento"),
   });
@@ -490,13 +497,23 @@ export default function AgendaPage() {
               </div>
             </div>
 
-            <div className="space-y-1.5">
-              <Label>Data *</Label>
-              <Input
-                type="date"
-                value={form.dataVencimento}
-                onChange={(e) => setForm((f) => ({ ...f, dataVencimento: e.target.value }))}
-              />
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label>Data *</Label>
+                <Input
+                  type="date"
+                  value={form.dataVencimento}
+                  onChange={(e) => setForm((f) => ({ ...f, dataVencimento: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Horário</Label>
+                <Input
+                  type="time"
+                  value={form.horario}
+                  onChange={(e) => setForm((f) => ({ ...f, horario: e.target.value }))}
+                />
+              </div>
             </div>
 
             <div className="space-y-1.5">

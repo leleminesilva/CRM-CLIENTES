@@ -316,6 +316,7 @@ model Tarefa {
   status         StatusTarefa @default(PENDENTE)
   prioridade     Prioridade   @default(MEDIA)
   dataVencimento DateTime
+  horario        String?
   dataInicio     DateTime?
   dataConclusao  DateTime?
   responsavelId  String?

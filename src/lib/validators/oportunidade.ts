@@ -26,6 +26,7 @@ export const tarefaSchema = z.object({
     .default("TAREFA"),
   prioridade: z.enum(["ALTA", "MEDIA", "BAIXA"]).default("MEDIA"),
   dataVencimento: z.string(),
+  horario: z.string().optional(),
   dataInicio: z.string().optional(),
   responsavelId: z.string().optional(),
   clienteId: z.string().optional(),

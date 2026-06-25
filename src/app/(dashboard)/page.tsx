@@ -88,15 +88,18 @@ export default function DashboardPage() {
   const { user } = useAuth();
   const isGestor = user?.role === "ADMINISTRADOR" || user?.role === "GESTOR";
 
-  // Gera lista: 3 meses anteriores + atual + próximo (cresce automaticamente)
+  // Começa em junho/2026 e cresce um mês a cada dia 1º
   const mesesDisponiveis = useMemo(() => {
+    const inicio = new Date(2026, 5, 1); // junho 2026
     const now = new Date();
+    const atual = new Date(now.getFullYear(), now.getMonth(), 1);
     const opts: { value: string; label: string }[] = [];
-    for (let i = 3; i >= -1; i--) {
-      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-      const value = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-      const label = d.toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
+    const cursor = new Date(inicio);
+    while (cursor <= atual) {
+      const value = `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, "0")}`;
+      const label = cursor.toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
       opts.push({ value, label: label.charAt(0).toUpperCase() + label.slice(1) });
+      cursor.setMonth(cursor.getMonth() + 1);
     }
     return opts;
   }, []);

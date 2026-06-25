@@ -11,13 +11,28 @@ import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { useAuth } from "@/contexts/AuthContext";
 import { ROLE_LABELS } from "@/lib/utils/formatters";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
 import { toast } from "sonner";
+
+interface Prefs {
+  leadNovo: boolean;
+  tarefaVencendo: boolean;
+  oportunidadeParada: boolean;
+  clienteSemContato: boolean;
+}
+
+const NOTIF_OPTIONS: { key: keyof Prefs; label: string; desc: string }[] = [
+  { key: "leadNovo", label: "Novo lead atribuído", desc: "Quando um lead é atribuído a você" },
+  { key: "tarefaVencendo", label: "Tarefa vencendo", desc: "1 dia antes do vencimento" },
+  { key: "oportunidadeParada", label: "Oportunidade parada", desc: "Sem movimentação por 7 dias" },
+  { key: "clienteSemContato", label: "Cliente sem contato", desc: "Há mais de 30 dias sem contato" },
+];
 
 export default function ConfiguracoesPage() {
   const { theme, setTheme } = useTheme();
   const { user } = useAuth();
+  const qc = useQueryClient();
 
   const [senhaAtual, setSenhaAtual] = useState("");
   const [novaSenha, setNovaSenha] = useState("");
@@ -39,6 +54,36 @@ export default function ConfiguracoesPage() {
       toast.error(msg);
     },
   });
+
+  // Notification prefs
+  const { data: prefs } = useQuery<Prefs>({
+    queryKey: ["prefs-notificacoes"],
+    queryFn: async () => {
+      const { data } = await axios.get("/api/configuracoes/notificacoes");
+      return data.data as Prefs;
+    },
+  });
+
+  const prefsMutation = useMutation({
+    mutationFn: (newPrefs: Prefs) => axios.put("/api/configuracoes/notificacoes", newPrefs),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["prefs-notificacoes"] });
+      toast.success("Preferências salvas");
+    },
+    onError: () => toast.error("Erro ao salvar preferências"),
+  });
+
+  function togglePref(key: keyof Prefs, value: boolean) {
+    const updated: Prefs = {
+      leadNovo: true,
+      tarefaVencendo: true,
+      oportunidadeParada: true,
+      clienteSemContato: true,
+      ...(prefs ?? {}),
+      [key]: value,
+    };
+    prefsMutation.mutate(updated);
+  }
 
   function handleMudarSenha(e: React.FormEvent) {
     e.preventDefault();
@@ -181,18 +226,17 @@ export default function ConfiguracoesPage() {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          {[
-            { label: "Novo lead atribuído", desc: "Quando um lead é atribuído a você" },
-            { label: "Tarefa vencendo", desc: "1 dia antes do vencimento" },
-            { label: "Oportunidade parada", desc: "Sem movimentação por 7 dias" },
-            { label: "Cliente sem contato", desc: "Há mais de 30 dias sem contato" },
-          ].map((item, i) => (
-            <div key={i} className="flex items-center justify-between">
+          {NOTIF_OPTIONS.map((item) => (
+            <div key={item.key} className="flex items-center justify-between">
               <div>
                 <p className="font-medium text-sm">{item.label}</p>
                 <p className="text-xs text-muted-foreground">{item.desc}</p>
               </div>
-              <Switch defaultChecked />
+              <Switch
+                checked={prefs ? prefs[item.key] : true}
+                onCheckedChange={(v) => togglePref(item.key, v)}
+                disabled={prefsMutation.isPending}
+              />
             </div>
           ))}
         </CardContent>

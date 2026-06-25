@@ -7,13 +7,14 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
 import { toast } from "sonner";
-import { ArrowLeft, Search, User2, ClipboardList, Info, Lock } from "lucide-react";
+import { ArrowLeft, Search, User2, ClipboardList, Info, Lock, X, Plus } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { clienteSchema, type ClienteInput } from "@/lib/validators/cliente";
 import { maskCpfCnpj, maskPhone, maskCep } from "@/lib/utils/masks";
 import { useAuth } from "@/contexts/AuthContext";
@@ -41,6 +42,8 @@ export default function NovoClientePage() {
   const { user } = useAuth();
   const isGestor = user?.role === "ADMINISTRADOR" || user?.role === "GESTOR";
   const [buscandoCEP, setBuscandoCEP] = useState(false);
+  const [servicosSelecionados, setServicosSelecionados] = useState<string[]>([]);
+  const [servicoCustom, setServicoCustom] = useState("");
 
   const { data: usuarios } = useQuery({
     queryKey: ["usuarios-select"],
@@ -77,6 +80,20 @@ export default function NovoClientePage() {
     },
     onError: () => toast.error("Erro ao cadastrar cliente"),
   });
+
+  function adicionarServico(servico: string) {
+    const s = servico.trim();
+    if (!s || servicosSelecionados.includes(s)) return;
+    const novo = [...servicosSelecionados, s];
+    setServicosSelecionados(novo);
+    setValue("servicoBuscado", novo.join(","));
+  }
+
+  function removerServico(servico: string) {
+    const novo = servicosSelecionados.filter(s => s !== servico);
+    setServicosSelecionados(novo);
+    setValue("servicoBuscado", novo.join(",") || undefined);
+  }
 
   async function buscarCEP(cep: string) {
     const digits = cep.replace(/\D/g, "");
@@ -256,13 +273,38 @@ export default function NovoClientePage() {
             </div>
 
             <div className="space-y-1.5">
-              <Label>Serviço Buscado</Label>
-              <Select onValueChange={(v) => setValue("servicoBuscado", v)}>
-                <SelectTrigger><SelectValue placeholder="Selecione o serviço" /></SelectTrigger>
+              <Label>Serviços Buscados</Label>
+              {servicosSelecionados.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 pb-1">
+                  {servicosSelecionados.map(s => (
+                    <Badge key={s} variant="secondary" className="gap-1 pr-1">
+                      {s}
+                      <button type="button" onClick={() => removerServico(s)} className="ml-0.5 rounded hover:bg-destructive/20">
+                        <X className="w-3 h-3" />
+                      </button>
+                    </Badge>
+                  ))}
+                </div>
+              )}
+              <Select onValueChange={v => adicionarServico(v)} value="">
+                <SelectTrigger><SelectValue placeholder="Adicionar serviço..." /></SelectTrigger>
                 <SelectContent>
-                  {SERVICOS.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                  {SERVICOS.filter(s => !servicosSelecionados.includes(s)).map(s => (
+                    <SelectItem key={s} value={s}>{s}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
+              <div className="flex gap-2">
+                <Input
+                  placeholder="Outro serviço..."
+                  value={servicoCustom}
+                  onChange={e => setServicoCustom(e.target.value)}
+                  onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); adicionarServico(servicoCustom); setServicoCustom(""); } }}
+                />
+                <Button type="button" size="icon" variant="outline" onClick={() => { adicionarServico(servicoCustom); setServicoCustom(""); }}>
+                  <Plus className="w-4 h-4" />
+                </Button>
+              </div>
             </div>
           </CardContent>
         </Card>

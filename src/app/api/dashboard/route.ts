@@ -206,23 +206,24 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Vendas por mês (últimos 6 meses) — usa COALESCE(c.valorOrcamento, l.valorEstimado)
-    const vendasMesRaw = await prisma.$queryRaw<Array<{ mes: string; mes_num: number; total: number; valor: number }>>(
+    // Vendas por dia — agrupado por dia dentro do período selecionado
+    const vendasMesRaw = await prisma.$queryRaw<Array<{ dia: string; total: number; valor: number }>>(
       Prisma.sql`
         SELECT
-          TO_CHAR(l."dataFechamento", 'Mon') AS mes,
-          EXTRACT(MONTH FROM l."dataFechamento") AS mes_num,
+          TO_CHAR(l."dataFechamento", 'DD/MM') AS dia,
+          DATE(l."dataFechamento") AS data_ord,
           COUNT(*)::int AS total,
           COALESCE(SUM(COALESCE(c."valorOrcamento", l."valorEstimado")), 0)::float AS valor
         FROM leads l
         LEFT JOIN clientes c ON l."clienteId" = c.id AND c."deletedAt" IS NULL
         WHERE l."deletedAt" IS NULL
           AND l.estagio = 'FECHADO_GANHO'::"EstagioLead"
-          AND l."dataFechamento" >= NOW() - INTERVAL '6 months'
+          AND l."dataFechamento" >= ${de}
+          AND l."dataFechamento" <= ${ate}
           AND (l."clienteId" IS NULL OR c.id IS NOT NULL)
           ${leadsUserFilterSql}
-        GROUP BY TO_CHAR(l."dataFechamento", 'Mon'), EXTRACT(MONTH FROM l."dataFechamento")
-        ORDER BY mes_num
+        GROUP BY TO_CHAR(l."dataFechamento", 'DD/MM'), DATE(l."dataFechamento")
+        ORDER BY data_ord
       `
     );
 

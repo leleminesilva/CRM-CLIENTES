@@ -232,20 +232,21 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        {/* Vendas por Mês */}
+        {/* Vendas por Dia */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Vendas por Mês</CardTitle>
+            <CardTitle className="text-base">Vendas por Dia</CardTitle>
           </CardHeader>
           <CardContent>
             {vendasMes.length > 0 ? (
               <ResponsiveContainer width="100%" height={200}>
                 <BarChart data={vendasMes}>
                   <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                  <XAxis dataKey="mes" className="text-xs fill-muted-foreground" />
-                  <YAxis className="text-xs fill-muted-foreground" />
+                  <XAxis dataKey="dia" className="text-xs fill-muted-foreground" tick={{ fontSize: 11 }} />
+                  <YAxis className="text-xs fill-muted-foreground" tickFormatter={(v: number) => `R$${(v/1000).toFixed(0)}k`} />
                   <RechartTooltip
                     formatter={(v: number) => [formatCurrency(v), "Valor"]}
+                    labelFormatter={(l) => `Dia ${l}`}
                     contentStyle={{ borderRadius: "8px", border: "1px solid hsl(var(--border))" }}
                   />
                   <Bar dataKey="valor" fill="#6366f1" radius={[4, 4, 0, 0]} />
@@ -253,7 +254,7 @@ export default function DashboardPage() {
               </ResponsiveContainer>
             ) : (
               <div className="flex items-center justify-center h-40 text-muted-foreground">
-                Sem dados para exibir
+                Sem vendas confirmadas no período
               </div>
             )}
           </CardContent>

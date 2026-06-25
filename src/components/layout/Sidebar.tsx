@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -13,6 +13,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useSidebar } from "@/contexts/SidebarContext";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { useQuery } from "@tanstack/react-query";
+import axios from "axios";
 
 type Role = "ADMINISTRADOR" | "GESTOR" | "COMERCIAL" | "OPERACIONAL";
 
@@ -31,10 +33,10 @@ const bottomNavItems: { href: string; label: string; icon: React.ElementType; ro
 ];
 
 function NavLink({
-  href, label, icon: Icon, active, collapsed, onClick,
+  href, label, icon: Icon, active, collapsed, onClick, badge,
 }: {
   href: string; label: string; icon: React.ElementType;
-  active: boolean; collapsed: boolean; onClick?: () => void;
+  active: boolean; collapsed: boolean; onClick?: () => void; badge?: boolean;
 }) {
   return (
     <Tooltip>
@@ -50,8 +52,16 @@ function NavLink({
             collapsed && "justify-center px-2"
           )}
         >
-          <Icon className="w-5 h-5 shrink-0" />
+          <div className="relative">
+            <Icon className="w-5 h-5 shrink-0" />
+            {badge && collapsed && (
+              <span className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full ring-1 ring-sidebar" />
+            )}
+          </div>
           {!collapsed && <span>{label}</span>}
+          {!collapsed && badge && (
+            <span className="ml-auto w-2 h-2 bg-red-500 rounded-full" />
+          )}
         </Link>
       </TooltipTrigger>
       {collapsed && <TooltipContent side="right">{label}</TooltipContent>}
@@ -62,6 +72,42 @@ function NavLink({
 function SidebarContent({ collapsed, onLinkClick }: { collapsed: boolean; onLinkClick?: () => void }) {
   const pathname = usePathname();
   const { user, loading } = useAuth();
+  const [hydrated, setHydrated] = useState(false);
+
+  // Initialize localStorage key for this user (first visit = save now, no badge on old clients)
+  useEffect(() => {
+    if (!user?.id) return;
+    const key = `lastClientsView_${user.id}`;
+    if (!localStorage.getItem(key)) {
+      localStorage.setItem(key, new Date().toISOString());
+    }
+    setHydrated(true);
+  }, [user?.id]);
+
+  // When user visits /clientes, mark all clients as seen
+  useEffect(() => {
+    if (!user?.id || !hydrated) return;
+    if (pathname.startsWith("/clientes")) {
+      localStorage.setItem(`lastClientsView_${user.id}`, new Date().toISOString());
+    }
+  }, [pathname, user?.id, hydrated]);
+
+  const isOnClientes = pathname.startsWith("/clientes");
+
+  const { data: novosData } = useQuery({
+    queryKey: ["clientes-novos", user?.id],
+    queryFn: async () => {
+      const since = localStorage.getItem(`lastClientsView_${user?.id}`);
+      const params = since ? `?since=${encodeURIComponent(since)}` : "";
+      const { data } = await axios.get(`/api/clientes/novos${params}`);
+      return data as { count: number };
+    },
+    enabled: !!user?.id && hydrated && !isOnClientes,
+    refetchInterval: 30000,
+    staleTime: 0,
+  });
+
+  const hasNewClientes = !isOnClientes && (novosData?.count ?? 0) > 0;
 
   const visibleBottom = loading
     ? []
@@ -75,7 +121,14 @@ function SidebarContent({ collapsed, onLinkClick }: { collapsed: boolean; onLink
         {navItems.map((item) => {
           const active = pathname === item.href || (item.href !== "/" && pathname.startsWith(item.href));
           return (
-            <NavLink key={item.href} {...item} active={active} collapsed={collapsed} onClick={onLinkClick} />
+            <NavLink
+              key={item.href}
+              {...item}
+              active={active}
+              collapsed={collapsed}
+              onClick={onLinkClick}
+              badge={item.href === "/clientes" && hasNewClientes}
+            />
           );
         })}
       </nav>

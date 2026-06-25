@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import axios from "axios";
 import {
@@ -30,6 +30,7 @@ import {
 } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { formatCurrency, ORIGEM_LABELS, ESTAGIO_LABELS } from "@/lib/utils/formatters";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -82,13 +83,44 @@ function KPICard({ title, value, icon, variacao, prefix = "", color = "bg-indigo
 
 export default function DashboardPage() {
   const [periodo, setPeriodo] = useState("mes");
+  const [mesSelecionado, setMesSelecionado] = useState("");   // YYYY-MM
+  const [vendedorId, setVendedorId] = useState("");           // UUID
   const { user } = useAuth();
   const isGestor = user?.role === "ADMINISTRADOR" || user?.role === "GESTOR";
 
-  const { data, isLoading } = useQuery({
-    queryKey: ["dashboard", periodo],
+  // Gera lista dos últimos 24 meses
+  const mesesDisponiveis = useMemo(() => {
+    const now = new Date();
+    const opts: { value: string; label: string }[] = [];
+    for (let i = 23; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const value = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+      const label = d.toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
+      opts.push({ value, label: label.charAt(0).toUpperCase() + label.slice(1) });
+    }
+    return opts;
+  }, []);
+
+  const { data: vendedoresData } = useQuery({
+    queryKey: ["usuarios-ativos-dashboard"],
     queryFn: async () => {
-      const { data } = await axios.get(`/api/dashboard?periodo=${periodo}`);
+      const { data } = await axios.get("/api/usuarios/ativos");
+      return data.data as Array<{ id: string; nome: string }>;
+    },
+    enabled: isGestor,
+  });
+
+  const { data, isLoading } = useQuery({
+    queryKey: ["dashboard", periodo, mesSelecionado, vendedorId],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (mesSelecionado) {
+        params.set("mes", mesSelecionado);
+      } else {
+        params.set("periodo", periodo);
+      }
+      if (vendedorId) params.set("vendedorId", vendedorId);
+      const { data } = await axios.get(`/api/dashboard?${params}`);
       return data.data;
     },
   });
@@ -117,24 +149,62 @@ export default function DashboardPage() {
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Header com filtros */}
-      <div className="flex items-center justify-between flex-wrap gap-3">
+      <div className="flex items-start justify-between flex-wrap gap-3">
         <div>
           <h2 className="text-xl md:text-2xl font-bold">Dashboard Executivo</h2>
           <p className="text-sm text-muted-foreground">Visão geral do desempenho comercial</p>
         </div>
+
         {isGestor && (
-          <div className="flex items-center gap-1 bg-muted p-1 rounded-lg">
-            {PERIOD_OPTIONS.map((opt) => (
-              <Button
-                key={opt.value}
-                variant={periodo === opt.value ? "default" : "ghost"}
-                size="sm"
-                onClick={() => setPeriodo(opt.value)}
-                className={periodo === opt.value ? "bg-background shadow-sm" : ""}
-              >
-                {opt.label}
-              </Button>
-            ))}
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Botões de período rápido */}
+            <div className="flex items-center gap-1 bg-muted p-1 rounded-lg">
+              {PERIOD_OPTIONS.map((opt) => (
+                <Button
+                  key={opt.value}
+                  variant={!mesSelecionado && periodo === opt.value ? "default" : "ghost"}
+                  size="sm"
+                  onClick={() => { setPeriodo(opt.value); setMesSelecionado(""); }}
+                  className={!mesSelecionado && periodo === opt.value ? "bg-background shadow-sm" : ""}
+                >
+                  {opt.label}
+                </Button>
+              ))}
+            </div>
+
+            {/* Seletor de mês específico */}
+            <Select
+              value={mesSelecionado || "_none"}
+              onValueChange={(v) => {
+                if (v === "_none") { setMesSelecionado(""); } else { setMesSelecionado(v); }
+              }}
+            >
+              <SelectTrigger className={`h-9 w-44 text-sm ${mesSelecionado ? "border-indigo-500 text-indigo-600 dark:text-indigo-400" : ""}`}>
+                <SelectValue placeholder="Selecionar mês..." />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="_none">Período rápido</SelectItem>
+                {mesesDisponiveis.map((m) => (
+                  <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            {/* Seletor de vendedor — Gestor/Admin */}
+            <Select
+              value={vendedorId || "_all"}
+              onValueChange={(v) => setVendedorId(v === "_all" ? "" : v)}
+            >
+              <SelectTrigger className={`h-9 w-48 text-sm ${vendedorId ? "border-indigo-500 text-indigo-600 dark:text-indigo-400" : ""}`}>
+                <SelectValue placeholder="Todos os vendedores" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="_all">Todos os vendedores</SelectItem>
+                {(vendedoresData || []).map((v) => (
+                  <SelectItem key={v.id} value={v.id}>{v.nome}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
         )}
       </div>

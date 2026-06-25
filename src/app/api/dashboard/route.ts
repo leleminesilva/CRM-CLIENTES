@@ -7,7 +7,13 @@ import { startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth,
 
 export const dynamic = "force-dynamic";
 
-function getPeriodRange(periodo: string) {
+function getPeriodRange(periodo: string, mes?: string | null) {
+  // Mês específico no formato YYYY-MM
+  if (mes && /^\d{4}-\d{2}$/.test(mes)) {
+    const [year, month] = mes.split("-").map(Number);
+    const mesDate = new Date(year, month - 1, 1);
+    return { de: startOfMonth(mesDate), ate: endOfMonth(mesDate) };
+  }
   const now = new Date();
   switch (periodo) {
     case "hoje":   return { de: startOfDay(now),  ate: endOfDay(now) };
@@ -25,14 +31,23 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url);
     const periodo = searchParams.get("periodo") || "mes";
-    const { de, ate } = getPeriodRange(periodo);
-    const userFilter = buildWhereClause(payload.role, payload.userId);
+    const mes = searchParams.get("mes");
+    const { de, ate } = getPeriodRange(periodo, mes);
     const canViewAllUsers = payload.role === "ADMINISTRADOR" || payload.role === "GESTOR";
 
+    // Filtro por vendedor específico — só Gestor/Admin pode solicitar
+    const vendedorId = canViewAllUsers ? (searchParams.get("vendedorId") || null) : null;
+
+    // Filtro Prisma para clientes/leads
+    const baseUserFilter = buildWhereClause(payload.role, payload.userId);
+    const userFilter = vendedorId ? { responsavelId: vendedorId } : baseUserFilter;
+
     // Filtro SQL para queries de leads (tabela com alias "l")
-    const leadsUserFilterSql = canViewAllUsers
-      ? Prisma.empty
-      : Prisma.sql`AND l."responsavelId" = ${payload.userId}`;
+    const leadsUserFilterSql = vendedorId
+      ? Prisma.sql`AND l."responsavelId" = ${vendedorId}`
+      : canViewAllUsers
+        ? Prisma.empty
+        : Prisma.sql`AND l."responsavelId" = ${payload.userId}`;
 
     const [
       totalClientes,

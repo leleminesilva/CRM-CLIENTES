@@ -16,8 +16,9 @@ import {
   ArrowDown,
 } from "lucide-react";
 import {
-  BarChart,
-  Bar,
+  LineChart,
+  Line,
+  ReferenceLine,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -232,31 +233,43 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        {/* Vendas por Dia */}
+        {/* Vendas por Dia — acumulado vs meta */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Vendas por Dia</CardTitle>
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-base">Vendas por Dia</CardTitle>
+              <span className="text-xs text-amber-500 font-medium">Meta: {formatCurrency(100000)}/mês</span>
+            </div>
           </CardHeader>
           <CardContent>
-            {vendasMes.length > 0 ? (
-              <ResponsiveContainer width="100%" height={200}>
-                <BarChart data={vendasMes}>
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                  <XAxis dataKey="dia" className="text-xs fill-muted-foreground" tick={{ fontSize: 11 }} />
-                  <YAxis className="text-xs fill-muted-foreground" tickFormatter={(v: number) => `R$${(v/1000).toFixed(0)}k`} />
-                  <RechartTooltip
-                    formatter={(v: number) => [formatCurrency(v), "Valor"]}
-                    labelFormatter={(l) => `Dia ${l}`}
-                    contentStyle={{ borderRadius: "8px", border: "1px solid hsl(var(--border))" }}
-                  />
-                  <Bar dataKey="valor" fill="#6366f1" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            ) : (
-              <div className="flex items-center justify-center h-40 text-muted-foreground">
-                Sem vendas confirmadas no período
-              </div>
-            )}
+            {(() => {
+              const META_MES = 100000;
+              const acumulado: Array<{ dia: string; valor: number; acumulado: number }> = [];
+              (vendasMes as Array<{ dia: string; valor: number }>).forEach((item, i) => {
+                const prev = i > 0 ? acumulado[i - 1].acumulado : 0;
+                acumulado.push({ dia: item.dia, valor: item.valor, acumulado: prev + item.valor });
+              });
+              return acumulado.length > 0 ? (
+                <ResponsiveContainer width="100%" height={200}>
+                  <LineChart data={acumulado} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                    <XAxis dataKey="dia" tick={{ fontSize: 11 }} />
+                    <YAxis tickFormatter={(v: number) => `${(v / 1000).toFixed(0)}k`} tick={{ fontSize: 11 }} domain={[0, Math.max(META_MES, ...acumulado.map(d => d.acumulado)) * 1.1]} />
+                    <RechartTooltip
+                      formatter={(v: number, name: string) => [formatCurrency(v), name === "acumulado" ? "Acumulado" : "No dia"]}
+                      labelFormatter={(l) => `Dia ${l}`}
+                      contentStyle={{ borderRadius: "8px", border: "1px solid hsl(var(--border))" }}
+                    />
+                    <ReferenceLine y={META_MES} stroke="#f59e0b" strokeDasharray="5 3" label={{ value: "Meta 100k", position: "insideTopRight", fontSize: 11, fill: "#f59e0b" }} />
+                    <Line type="monotone" dataKey="acumulado" stroke="#6366f1" strokeWidth={2.5} dot={{ fill: "#6366f1", r: 4, strokeWidth: 0 }} activeDot={{ r: 6 }} />
+                  </LineChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="flex items-center justify-center h-40 text-muted-foreground text-sm">
+                  Sem vendas confirmadas no período
+                </div>
+              );
+            })()}
           </CardContent>
         </Card>
       </div>

@@ -346,49 +346,43 @@ export default function DashboardPage() {
         </Card>
       </div>
 
-      {/* Serviços Mais Solicitados — só Gestor/Admin */}
-      {isGestor && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base flex items-center gap-2">
-              Serviços Mais Solicitados
-              <span className="text-xs font-normal text-muted-foreground bg-muted px-2 py-0.5 rounded-full">Gestores</span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {servicosMaisSolicitados.length > 0 ? (
-              <div className="space-y-2">
-                {servicosMaisSolicitados.map((s, i) => {
-                  const max = Math.max(...servicosMaisSolicitados.map(x => x.total));
-                  const pct = max > 0 ? (s.total / max) * 100 : 0;
-                  const totalGeral = servicosMaisSolicitados.reduce((acc, x) => acc + x.total, 0);
-                  const pctReal = totalGeral > 0 ? Math.round((s.total / totalGeral) * 100) : 0;
-                  return (
-                    <div key={s.servico} className="space-y-1">
-                      <div className="flex justify-between text-sm">
-                        <span className="font-medium">{s.servico}</span>
-                        <span className="text-muted-foreground">{s.total} {s.total === 1 ? "cliente" : "clientes"} · {pctReal}%</span>
-                      </div>
-                      <div className="h-7 bg-muted rounded-lg overflow-hidden">
-                        <div
-                          className="h-full rounded-lg flex items-center pl-3 text-white text-xs font-medium transition-all"
-                          style={{ width: `${Math.max(pct, 4)}%`, backgroundColor: COLORS[i % COLORS.length] }}
-                        >
-                          {pct > 15 && s.servico}
-                        </div>
+      {/* Performance por Vendedor — largura total */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Performance por Vendedor</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {vendasPorVendedor.length > 0 ? (
+            <div className="space-y-4">
+              {vendasPorVendedor.map((v: { vendedor: string; total: number; valor: number }, i: number) => {
+                const max = Math.max(...vendasPorVendedor.map((x: { valor: number }) => x.valor));
+                const pct = max > 0 ? (v.valor / max) * 100 : 0;
+                return (
+                  <div key={v.vendedor} className="space-y-1.5">
+                    <div className="flex justify-between text-sm">
+                      <span className="font-medium">{v.vendedor}</span>
+                      <div className="text-right">
+                        <span className="text-muted-foreground">{v.total} vendas</span>
+                        <span className="ml-2 font-semibold">{formatCurrency(v.valor)}</span>
                       </div>
                     </div>
-                  );
-                })}
-              </div>
-            ) : (
-              <div className="flex items-center justify-center h-32 text-muted-foreground text-sm">
-                Sem dados para exibir
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      )}
+                    <div className="h-2 bg-muted rounded-full overflow-hidden">
+                      <div
+                        className="h-full rounded-full transition-all"
+                        style={{ width: `${pct}%`, backgroundColor: COLORS[i % COLORS.length] }}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="flex items-center justify-center h-20 text-muted-foreground">
+              Sem dados para exibir
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Charts Row 2 */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -432,43 +426,49 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        {/* Top Vendedores */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Performance por Vendedor</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {vendasPorVendedor.length > 0 ? (
-              <div className="space-y-4">
-                {vendasPorVendedor.map((v: { vendedor: string; total: number; valor: number }, i: number) => {
-                  const max = Math.max(...vendasPorVendedor.map((x: { valor: number }) => x.valor));
-                  const pct = max > 0 ? (v.valor / max) * 100 : 0;
-                  return (
-                    <div key={v.vendedor} className="space-y-1.5">
-                      <div className="flex justify-between text-sm">
-                        <span className="font-medium">{v.vendedor}</span>
-                        <div className="text-right">
-                          <span className="text-muted-foreground">{v.total} vendas</span>
-                          <span className="ml-2 font-semibold">{formatCurrency(v.valor)}</span>
+        {/* Serviços Mais Solicitados — só Gestor/Admin */}
+        {isGestor ? (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base flex items-center gap-2">
+                Serviços Mais Solicitados
+                <span className="text-xs font-normal text-muted-foreground bg-muted px-2 py-0.5 rounded-full">Gestores</span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {servicosMaisSolicitados.length > 0 ? (
+                <div className="space-y-2">
+                  {servicosMaisSolicitados.map((s, i) => {
+                    const max = Math.max(...servicosMaisSolicitados.map(x => x.total));
+                    const pct = max > 0 ? (s.total / max) * 100 : 0;
+                    const totalGeral = servicosMaisSolicitados.reduce((acc, x) => acc + x.total, 0);
+                    const pctReal = totalGeral > 0 ? Math.round((s.total / totalGeral) * 100) : 0;
+                    return (
+                      <div key={s.servico} className="space-y-1">
+                        <div className="flex justify-between text-sm">
+                          <span className="font-medium">{s.servico}</span>
+                          <span className="text-muted-foreground">{s.total} {s.total === 1 ? "cliente" : "clientes"} · {pctReal}%</span>
+                        </div>
+                        <div className="h-7 bg-muted rounded-lg overflow-hidden">
+                          <div
+                            className="h-full rounded-lg flex items-center pl-3 text-white text-xs font-medium transition-all"
+                            style={{ width: `${Math.max(pct, 4)}%`, backgroundColor: COLORS[i % COLORS.length] }}
+                          >
+                            {pct > 15 && s.servico}
+                          </div>
                         </div>
                       </div>
-                      <div className="h-2 bg-muted rounded-full overflow-hidden">
-                        <div
-                          className="h-full rounded-full transition-all"
-                          style={{ width: `${pct}%`, backgroundColor: COLORS[i % COLORS.length] }}
-                        />
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            ) : (
-              <div className="flex items-center justify-center h-40 text-muted-foreground">
-                Sem dados para exibir
-              </div>
-            )}
-          </CardContent>
-        </Card>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="flex items-center justify-center h-32 text-muted-foreground text-sm">
+                  Sem dados para exibir
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        ) : null}
       </div>
     </div>
   );

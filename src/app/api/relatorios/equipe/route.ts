@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
 import { requirePermission } from "@/lib/rbac";
 import prisma from "@/lib/prisma";
+import { Prisma } from "@prisma/client";
 
 export const dynamic = "force-dynamic";
 
@@ -12,40 +13,70 @@ export async function GET(request: NextRequest) {
     requirePermission(payload.role, "relatorios:view");
 
     const { searchParams } = new URL(request.url);
-    const de = searchParams.get("de") ? new Date(searchParams.get("de")!) : new Date(new Date().setMonth(new Date().getMonth() - 1));
-    const ate = searchParams.get("ate") ? new Date(searchParams.get("ate")!) : new Date();
+    const de = new Date(searchParams.get("de") || new Date(new Date().setDate(1)).toISOString().split("T")[0]);
+    const ate = new Date(searchParams.get("ate") || new Date().toISOString().split("T")[0]);
+    ate.setHours(23, 59, 59, 999);
 
     const vendedores = await prisma.user.findMany({
-      where: { deletedAt: null, ativo: true, role: { in: ["COMERCIAL", "GESTOR"] } },
+      where: { deletedAt: null, ativo: true, role: { in: ["COMERCIAL", "GESTOR", "ADMINISTRADOR"] } },
       select: { id: true, nome: true, avatar: true, role: true },
+      orderBy: { nome: "asc" },
     });
 
     const performance = await Promise.all(
       vendedores.map(async (v) => {
-        const [leads, opos, tarefas, ganhas] = await Promise.all([
-          prisma.lead.count({ where: { responsavelId: v.id, deletedAt: null, createdAt: { gte: de, lte: ate } } }),
-          prisma.oportunidade.count({ where: { responsavelId: v.id, deletedAt: null, status: "ABERTA" } }),
-          prisma.tarefa.count({ where: { responsavelId: v.id, deletedAt: null, status: "CONCLUIDA", dataConclusao: { gte: de, lte: ate } } }),
-          prisma.oportunidade.aggregate({
-            where: { responsavelId: v.id, deletedAt: null, status: "GANHA", dataFechamento: { gte: de, lte: ate } },
-            _sum: { valor: true },
-            _count: true,
+        const [leadsGerados, leadsAtivos, tarefasConcluidas, vendas] = await Promise.all([
+          prisma.lead.count({
+            where: { responsavelId: v.id, deletedAt: null, createdAt: { gte: de, lte: ate } },
           }),
+          prisma.lead.count({
+            where: {
+              responsavelId: v.id,
+              deletedAt: null,
+              estagio: { notIn: ["FECHADO_GANHO", "FECHADO_PERDIDO"] },
+            },
+          }),
+          prisma.tarefa.count({
+            where: {
+              responsavelId: v.id,
+              deletedAt: null,
+              status: "CONCLUIDA",
+              dataConclusao: { gte: de, lte: ate },
+            },
+          }),
+          prisma.$queryRaw<Array<{ total: number; receita: number }>>(
+            Prisma.sql`
+              SELECT COUNT(*)::int AS total,
+                COALESCE(SUM(COALESCE(c."valorOrcamento", l."valorEstimado")), 0)::float AS receita
+              FROM leads l
+              LEFT JOIN clientes c ON l."clienteId" = c.id AND c."deletedAt" IS NULL
+              WHERE l."deletedAt" IS NULL
+                AND l.estagio = 'FECHADO_GANHO'::"EstagioLead"
+                AND l."dataFechamento" >= ${de}
+                AND l."dataFechamento" <= ${ate}
+                AND l."responsavelId" = ${v.id}
+            `
+          ),
         ]);
+
+        const vendasFechadas = Number(vendas[0]?.total || 0);
+        const receitaGerada = Number(vendas[0]?.receita || 0);
 
         return {
           ...v,
-          leadsGerados: leads,
-          oportunidadesAbertas: opos,
-          tarefasConcluidas: tarefas,
-          vendasFechadas: ganhas._count,
-          receitaGerada: Number(ganhas._sum?.valor || 0),
+          leadsGerados,
+          leadsAtivos,
+          tarefasConcluidas,
+          vendasFechadas,
+          receitaGerada,
+          ticketMedio: vendasFechadas > 0 ? receitaGerada / vendasFechadas : 0,
         };
       })
     );
 
     return NextResponse.json({ data: performance });
-  } catch {
+  } catch (err) {
+    console.error(err);
     return NextResponse.json({ error: "Erro ao gerar relatório de equipe" }, { status: 500 });
   }
 }

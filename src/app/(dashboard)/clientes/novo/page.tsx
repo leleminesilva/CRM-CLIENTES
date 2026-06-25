@@ -96,6 +96,24 @@ export default function NovoClientePage() {
     setValue("servicoBuscado", novo.join(",") || undefined);
   }
 
+  function handleFormEnter(e: React.KeyboardEvent<HTMLFormElement>) {
+    if (e.key !== "Enter") return;
+    const target = e.target as HTMLElement;
+    // Permite Enter em botões e textareas normalmente
+    if (target.tagName === "BUTTON" || target.tagName === "TEXTAREA") return;
+    e.preventDefault();
+    // Move o foco para o próximo campo focalizável
+    const focusables = Array.from(
+      e.currentTarget.querySelectorAll<HTMLElement>(
+        'input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), button:not([disabled])'
+      )
+    );
+    const idx = focusables.indexOf(target);
+    if (idx >= 0 && idx < focusables.length - 1) {
+      focusables[idx + 1].focus();
+    }
+  }
+
   async function buscarCEP(cep: string) {
     const digits = cep.replace(/\D/g, "");
     if (digits.length !== 8) return;
@@ -135,7 +153,7 @@ export default function NovoClientePage() {
         </p>
       </div>
 
-      <form onSubmit={handleSubmit((data) => mutation.mutate(data))} className="space-y-6">
+      <form onSubmit={handleSubmit((data) => mutation.mutate(data))} onKeyDown={handleFormEnter} className="space-y-6">
 
         {/* Dados pessoais */}
         <Card>

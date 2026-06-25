@@ -88,11 +88,11 @@ export default function DashboardPage() {
   const { user } = useAuth();
   const isGestor = user?.role === "ADMINISTRADOR" || user?.role === "GESTOR";
 
-  // Gera lista dos últimos 24 meses
+  // Gera lista: 3 meses anteriores + atual + próximo (cresce automaticamente)
   const mesesDisponiveis = useMemo(() => {
     const now = new Date();
     const opts: { value: string; label: string }[] = [];
-    for (let i = 23; i >= 0; i--) {
+    for (let i = 3; i >= -1; i--) {
       const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
       const value = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
       const label = d.toLocaleDateString("pt-BR", { month: "long", year: "numeric" });

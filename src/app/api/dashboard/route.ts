@@ -3,18 +3,18 @@ import { getCurrentUser } from "@/lib/auth";
 import { buildWhereClause } from "@/lib/rbac";
 import prisma from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
+import { startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, endOfYear } from "date-fns";
 
 export const dynamic = "force-dynamic";
-import { startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, endOfYear } from "date-fns";
 
 function getPeriodRange(periodo: string) {
   const now = new Date();
   switch (periodo) {
-    case "hoje": return { de: startOfDay(now), ate: endOfDay(now) };
+    case "hoje":   return { de: startOfDay(now),  ate: endOfDay(now) };
     case "semana": return { de: startOfWeek(now, { weekStartsOn: 1 }), ate: endOfWeek(now, { weekStartsOn: 1 }) };
-    case "mes": return { de: startOfMonth(now), ate: endOfMonth(now) };
-    case "ano": return { de: startOfYear(now), ate: endOfYear(now) };
-    default: return { de: startOfMonth(now), ate: endOfMonth(now) };
+    case "mes":    return { de: startOfMonth(now), ate: endOfMonth(now) };
+    case "ano":    return { de: startOfYear(now),  ate: endOfYear(now) };
+    default:       return { de: startOfMonth(now), ate: endOfMonth(now) };
   }
 }
 
@@ -27,6 +27,12 @@ export async function GET(request: NextRequest) {
     const periodo = searchParams.get("periodo") || "mes";
     const { de, ate } = getPeriodRange(periodo);
     const userFilter = buildWhereClause(payload.role, payload.userId);
+    const canViewAllUsers = payload.role === "ADMINISTRADOR" || payload.role === "GESTOR";
+
+    // Filtro SQL para queries de leads (tabela com alias "l")
+    const leadsUserFilterSql = canViewAllUsers
+      ? Prisma.empty
+      : Prisma.sql`AND l."responsavelId" = ${payload.userId}`;
 
     const [
       totalClientes,
@@ -38,12 +44,11 @@ export async function GET(request: NextRequest) {
       receitaFechadaPeriodo,
       leadsTotal,
       leadsConvertidos,
-      vendasPorVendedorRaw,
     ] = await Promise.all([
-      // Total clientes
+      // Total de clientes ativos
       prisma.cliente.count({ where: { deletedAt: null, ...userFilter } }),
 
-      // Leads ativos (não fechados) — exclui os de clientes deletados
+      // Leads ativos (não fechados)
       prisma.lead.count({
         where: {
           deletedAt: null,
@@ -53,17 +58,21 @@ export async function GET(request: NextRequest) {
         },
       }),
 
-      // Funil de vendas
-      prisma.lead.groupBy({
-        by: ["estagio"],
-        where: {
-          deletedAt: null,
-          OR: [{ clienteId: null }, { cliente: { deletedAt: null } }],
-          ...userFilter,
-        },
-        _count: { _all: true },
-        _sum: { valorEstimado: true },
-      }),
+      // Funil de vendas — valor usa COALESCE(c.valorOrcamento, l.valorEstimado)
+      prisma.$queryRaw<Array<{ estagio: string; total: number; valor: number }>>(
+        Prisma.sql`
+          SELECT
+            l.estagio::text AS estagio,
+            COUNT(*)::int AS total,
+            COALESCE(SUM(COALESCE(c."valorOrcamento", l."valorEstimado")), 0)::float AS valor
+          FROM leads l
+          LEFT JOIN clientes c ON l."clienteId" = c.id AND c."deletedAt" IS NULL
+          WHERE l."deletedAt" IS NULL
+            AND (l."clienteId" IS NULL OR c.id IS NOT NULL)
+            ${leadsUserFilterSql}
+          GROUP BY l.estagio
+        `
+      ),
 
       // Leads por origem no período
       prisma.lead.groupBy({
@@ -77,7 +86,7 @@ export async function GET(request: NextRequest) {
         _count: { _all: true },
       }),
 
-      // Leads ganhos no período
+      // Leads ganhos no período (para kpis.leadsGanhos)
       prisma.lead.count({
         where: {
           deletedAt: null,
@@ -88,7 +97,7 @@ export async function GET(request: NextRequest) {
         },
       }),
 
-      // Valor em negociação — lê direto de cliente.valorOrcamento (fonte de verdade)
+      // Valor em negociação — soma de valorOrcamento de clientes pendentes (fonte de verdade)
       prisma.cliente.aggregate({
         where: {
           deletedAt: null,
@@ -99,7 +108,7 @@ export async function GET(request: NextRequest) {
         _sum: { valorOrcamento: true },
       }),
 
-      // Receita fechada no período — clientes com statusOrcamento APROVADO
+      // Receita fechada — clientes com statusOrcamento APROVADO
       prisma.cliente.aggregate({
         where: {
           deletedAt: null,
@@ -111,7 +120,7 @@ export async function GET(request: NextRequest) {
         _count: { _all: true },
       }),
 
-      // Total de leads criados no período
+      // Total de leads criados no período (para taxa de conversão)
       prisma.lead.count({
         where: {
           deletedAt: null,
@@ -121,7 +130,7 @@ export async function GET(request: NextRequest) {
         },
       }),
 
-      // Leads convertidos no período
+      // Leads convertidos no período (para taxa de conversão)
       prisma.lead.count({
         where: {
           deletedAt: null,
@@ -131,62 +140,59 @@ export async function GET(request: NextRequest) {
           ...userFilter,
         },
       }),
-
-      // Vendas por vendedor
-      prisma.lead.groupBy({
-        by: ["responsavelId"],
-        where: {
-          deletedAt: null,
-          estagio: "FECHADO_GANHO",
-          dataFechamento: { gte: de, lte: ate },
-          OR: [{ clienteId: null }, { cliente: { deletedAt: null } }],
-          ...buildWhereClause(payload.role, payload.userId),
-        },
-        _count: { _all: true },
-        _sum: { valorEstimado: true },
-        orderBy: { _sum: { valorEstimado: "desc" } },
-        take: 5,
-      }),
     ]);
 
-    const receitaFechada = Number(receitaFechadaPeriodo._sum?.valorOrcamento || 0);
-    const vendasFechadas = receitaFechadaPeriodo._count?._all || 0;
-    const ticketMedio = vendasFechadas > 0 ? receitaFechada / vendasFechadas : 0;
-    const taxaConversao = leadsTotal > 0 ? (leadsConvertidos / leadsTotal) * 100 : 0;
+    const receitaFechada  = Number(receitaFechadaPeriodo._sum?.valorOrcamento || 0);
+    const vendasFechadas  = receitaFechadaPeriodo._count?._all || 0;
+    const ticketMedio     = vendasFechadas > 0 ? receitaFechada / vendasFechadas : 0;
+    const taxaConversao   = leadsTotal > 0 ? (leadsConvertidos / leadsTotal) * 100 : 0;
 
     const funnelFormatted = funnelData.map((f) => ({
       estagio: f.estagio,
-      total: f._count._all,
-      valor: Number(f._sum?.valorEstimado || 0),
+      total:   Number(f.total),
+      valor:   Number(f.valor),
     }));
 
-    // Nomes dos vendedores para o gráfico
+    // Performance por vendedor — usa COALESCE(c.valorOrcamento, l.valorEstimado)
+    const vendasPorVendedorRaw = await prisma.$queryRaw<Array<{ responsavelId: string; total: number; valor: number }>>(
+      Prisma.sql`
+        SELECT
+          l."responsavelId",
+          COUNT(*)::int AS total,
+          COALESCE(SUM(COALESCE(c."valorOrcamento", l."valorEstimado")), 0)::float AS valor
+        FROM leads l
+        LEFT JOIN clientes c ON l."clienteId" = c.id AND c."deletedAt" IS NULL
+        WHERE l."deletedAt" IS NULL
+          AND l.estagio = 'FECHADO_GANHO'::"EstagioLead"
+          AND l."dataFechamento" >= ${de}
+          AND l."dataFechamento" <= ${ate}
+          AND (l."clienteId" IS NULL OR c.id IS NOT NULL)
+          ${leadsUserFilterSql}
+        GROUP BY l."responsavelId"
+        ORDER BY valor DESC
+        LIMIT 5
+      `
+    );
+
     const vendedorIds = vendasPorVendedorRaw.map((v) => v.responsavelId).filter(Boolean) as string[];
-    const vendedores = await prisma.user.findMany({
+    const vendedores  = await prisma.user.findMany({
       where: { id: { in: vendedorIds } },
       select: { id: true, nome: true },
     });
-
     const vendasPorVendedor = vendasPorVendedorRaw.map((v) => ({
       vendedor: vendedores.find((u) => u.id === v.responsavelId)?.nome || "N/A",
-      total: v._count._all,
-      valor: Number(v._sum?.valorEstimado || 0),
+      total:    Number(v.total),
+      valor:    Number(v.valor),
     }));
-
-    // Vendas por mês (últimos 6 meses) — baseado em leads FECHADO_GANHO, com filtro de usuário
-    const canViewAllUsers = payload.role === "ADMINISTRADOR" || payload.role === "GESTOR";
-    const userFilterSql = canViewAllUsers
-      ? Prisma.empty
-      : Prisma.sql`AND "responsavelId" = ${payload.userId}`;
 
     // Serviços mais solicitados — só para admins/gestores
     let servicosMaisSolicitados: Array<{ servico: string; total: number }> = [];
     if (canViewAllUsers) {
       servicosMaisSolicitados = await prisma.$queryRaw<Array<{ servico: string; total: number }>>(
         Prisma.sql`
-          SELECT servico, COUNT(*)::int as total
+          SELECT servico, COUNT(*)::int AS total
           FROM (
-            SELECT trim(unnest(string_to_array("servicoBuscado", ','))) as servico
+            SELECT trim(unnest(string_to_array("servicoBuscado", ','))) AS servico
             FROM clientes
             WHERE "deletedAt" IS NULL
               AND "servicoBuscado" IS NOT NULL
@@ -200,19 +206,22 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    // Vendas por mês (últimos 6 meses) — usa COALESCE(c.valorOrcamento, l.valorEstimado)
     const vendasMesRaw = await prisma.$queryRaw<Array<{ mes: string; mes_num: number; total: number; valor: number }>>(
       Prisma.sql`
         SELECT
-          TO_CHAR("dataFechamento", 'Mon') as mes,
-          EXTRACT(MONTH FROM "dataFechamento") as mes_num,
-          COUNT(*)::int as total,
-          COALESCE(SUM("valorEstimado"), 0)::float as valor
-        FROM leads
-        WHERE "deletedAt" IS NULL
-          AND estagio = 'FECHADO_GANHO'::"EstagioLead"
-          AND "dataFechamento" >= NOW() - INTERVAL '6 months'
-          ${userFilterSql}
-        GROUP BY TO_CHAR("dataFechamento", 'Mon'), EXTRACT(MONTH FROM "dataFechamento")
+          TO_CHAR(l."dataFechamento", 'Mon') AS mes,
+          EXTRACT(MONTH FROM l."dataFechamento") AS mes_num,
+          COUNT(*)::int AS total,
+          COALESCE(SUM(COALESCE(c."valorOrcamento", l."valorEstimado")), 0)::float AS valor
+        FROM leads l
+        LEFT JOIN clientes c ON l."clienteId" = c.id AND c."deletedAt" IS NULL
+        WHERE l."deletedAt" IS NULL
+          AND l.estagio = 'FECHADO_GANHO'::"EstagioLead"
+          AND l."dataFechamento" >= NOW() - INTERVAL '6 months'
+          AND (l."clienteId" IS NULL OR c.id IS NOT NULL)
+          ${leadsUserFilterSql}
+        GROUP BY TO_CHAR(l."dataFechamento", 'Mon'), EXTRACT(MONTH FROM l."dataFechamento")
         ORDER BY mes_num
       `
     );
@@ -225,17 +234,14 @@ export async function GET(request: NextRequest) {
           oportunidadesAbertas: leadsAtivos,
           valorNegociacao: Number(valorNegociacaoAtual._sum?.valorOrcamento || 0),
           vendasFechadas,
-          taxaConversao: Math.round(taxaConversao * 10) / 10,
-          ticketMedio: Math.round(ticketMedio),
+          taxaConversao:      Math.round(taxaConversao * 10) / 10,
+          ticketMedio:        Math.round(ticketMedio),
           faturamentoPrevisto: receitaFechada,
-          leadsGanhos: leadsGanhosPeriodo,
+          leadsGanhos:        leadsGanhosPeriodo,
         },
-        funil: funnelFormatted,
-        vendasMes: vendasMesRaw,
-        leadsPorOrigem: leadsPorOrigem.map((l) => ({
-          origem: l.origem,
-          total: l._count._all,
-        })),
+        funil:             funnelFormatted,
+        vendasMes:         vendasMesRaw,
+        leadsPorOrigem:    leadsPorOrigem.map((l) => ({ origem: l.origem, total: l._count._all })),
         vendasPorVendedor,
         servicosMaisSolicitados,
       },

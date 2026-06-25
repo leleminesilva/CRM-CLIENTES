@@ -88,28 +88,26 @@ export async function GET(request: NextRequest) {
         },
       }),
 
-      // Valor em negociação
-      prisma.lead.aggregate({
+      // Valor em negociação — lê direto de cliente.valorOrcamento (fonte de verdade)
+      prisma.cliente.aggregate({
         where: {
           deletedAt: null,
-          estagio: { notIn: ["FECHADO_GANHO", "FECHADO_PERDIDO"] },
-          valorEstimado: { not: null },
-          OR: [{ clienteId: null }, { cliente: { deletedAt: null } }],
+          statusOrcamento: { notIn: ["APROVADO", "NAO_APROVADO"] },
+          valorOrcamento: { not: null },
           ...userFilter,
         },
-        _sum: { valorEstimado: true },
+        _sum: { valorOrcamento: true },
       }),
 
-      // Receita fechada no período
-      prisma.lead.aggregate({
+      // Receita fechada no período — clientes com statusOrcamento APROVADO
+      prisma.cliente.aggregate({
         where: {
           deletedAt: null,
-          estagio: "FECHADO_GANHO",
-          dataFechamento: { gte: de, lte: ate },
-          OR: [{ clienteId: null }, { cliente: { deletedAt: null } }],
+          statusOrcamento: "APROVADO",
+          valorOrcamento: { not: null },
           ...userFilter,
         },
-        _sum: { valorEstimado: true },
+        _sum: { valorOrcamento: true },
         _count: { _all: true },
       }),
 
@@ -151,7 +149,7 @@ export async function GET(request: NextRequest) {
       }),
     ]);
 
-    const receitaFechada = Number(receitaFechadaPeriodo._sum?.valorEstimado || 0);
+    const receitaFechada = Number(receitaFechadaPeriodo._sum?.valorOrcamento || 0);
     const vendasFechadas = receitaFechadaPeriodo._count?._all || 0;
     const ticketMedio = vendasFechadas > 0 ? receitaFechada / vendasFechadas : 0;
     const taxaConversao = leadsTotal > 0 ? (leadsConvertidos / leadsTotal) * 100 : 0;
@@ -225,7 +223,7 @@ export async function GET(request: NextRequest) {
           totalClientes,
           leadsAtivos,
           oportunidadesAbertas: leadsAtivos,
-          valorNegociacao: Number(valorNegociacaoAtual._sum?.valorEstimado || 0),
+          valorNegociacao: Number(valorNegociacaoAtual._sum?.valorOrcamento || 0),
           vendasFechadas,
           taxaConversao: Math.round(taxaConversao * 10) / 10,
           ticketMedio: Math.round(ticketMedio),

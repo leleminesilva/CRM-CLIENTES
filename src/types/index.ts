@@ -12,6 +12,7 @@ export type OrigemCliente =
 export type EstagioLead =
   | "NOVO_LEAD"
   | "CONTATO_INICIAL"
+  | "PRIMEIRO_ORCAMENTO"
   | "QUALIFICACAO"
   | "PROPOSTA_ENVIADA"
   | "NEGOCIACAO"

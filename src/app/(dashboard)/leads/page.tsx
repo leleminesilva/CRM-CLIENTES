@@ -40,6 +40,7 @@ import type { EstagioLead, Lead } from "@/types";
 const ESTAGIOS: EstagioLead[] = [
   "NOVO_LEAD",
   "CONTATO_INICIAL",
+  "PRIMEIRO_ORCAMENTO",
   "QUALIFICACAO",
   "PROPOSTA_ENVIADA",
   "NEGOCIACAO",
@@ -48,23 +49,25 @@ const ESTAGIOS: EstagioLead[] = [
 ];
 
 const ESTAGIO_COLORS: Record<EstagioLead, string> = {
-  NOVO_LEAD: "bg-slate-100 border-slate-300 dark:bg-slate-800 dark:border-slate-600",
-  CONTATO_INICIAL: "bg-blue-50 border-blue-200 dark:bg-blue-950 dark:border-blue-800",
-  QUALIFICACAO: "bg-violet-50 border-violet-200 dark:bg-violet-950 dark:border-violet-800",
-  PROPOSTA_ENVIADA: "bg-amber-50 border-amber-200 dark:bg-amber-950 dark:border-amber-800",
-  NEGOCIACAO: "bg-orange-50 border-orange-200 dark:bg-orange-950 dark:border-orange-800",
-  FECHADO_GANHO: "bg-emerald-50 border-emerald-200 dark:bg-emerald-950 dark:border-emerald-800",
-  FECHADO_PERDIDO: "bg-red-50 border-red-200 dark:bg-red-950 dark:border-red-800",
+  NOVO_LEAD:           "bg-slate-100 border-slate-300 dark:bg-slate-800 dark:border-slate-600",
+  CONTATO_INICIAL:     "bg-blue-50 border-blue-200 dark:bg-blue-950 dark:border-blue-800",
+  PRIMEIRO_ORCAMENTO:  "bg-indigo-50 border-indigo-200 dark:bg-indigo-950 dark:border-indigo-800",
+  QUALIFICACAO:        "bg-violet-50 border-violet-200 dark:bg-violet-950 dark:border-violet-800",
+  PROPOSTA_ENVIADA:    "bg-amber-50 border-amber-200 dark:bg-amber-950 dark:border-amber-800",
+  NEGOCIACAO:          "bg-orange-50 border-orange-200 dark:bg-orange-950 dark:border-orange-800",
+  FECHADO_GANHO:       "bg-emerald-50 border-emerald-200 dark:bg-emerald-950 dark:border-emerald-800",
+  FECHADO_PERDIDO:     "bg-red-50 border-red-200 dark:bg-red-950 dark:border-red-800",
 };
 
 const ESTAGIO_HEADER_COLORS: Record<EstagioLead, string> = {
-  NOVO_LEAD: "bg-slate-500",
-  CONTATO_INICIAL: "bg-blue-500",
-  QUALIFICACAO: "bg-violet-500",
-  PROPOSTA_ENVIADA: "bg-amber-500",
-  NEGOCIACAO: "bg-orange-500",
-  FECHADO_GANHO: "bg-emerald-500",
-  FECHADO_PERDIDO: "bg-red-500",
+  NOVO_LEAD:           "bg-slate-500",
+  CONTATO_INICIAL:     "bg-blue-500",
+  PRIMEIRO_ORCAMENTO:  "bg-indigo-500",
+  QUALIFICACAO:        "bg-violet-500",
+  PROPOSTA_ENVIADA:    "bg-amber-500",
+  NEGOCIACAO:          "bg-orange-500",
+  FECHADO_GANHO:       "bg-emerald-500",
+  FECHADO_PERDIDO:     "bg-red-500",
 };
 
 function TemperaturaIcon({ temperatura }: { temperatura: string }) {

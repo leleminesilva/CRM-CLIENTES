@@ -2,6 +2,7 @@
 
 import { useParams, useRouter } from "next/navigation";
 import { useState } from "react";
+import { useAuth } from "@/contexts/AuthContext";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
 import { toast } from "sonner";
@@ -34,12 +35,13 @@ import { formatCurrency, formatCPFCNPJ, formatPhone, ORIGEM_LABELS, PORTE_LABELS
 import { cn } from "@/lib/utils/cn";
 import type { Cliente } from "@/types";
 
-type EstagioLead = "NOVO_LEAD" | "CONTATO_INICIAL" | "QUALIFICACAO" | "PROPOSTA_ENVIADA" | "NEGOCIACAO" | "FECHADO_GANHO" | "FECHADO_PERDIDO";
+type EstagioLead = "NOVO_LEAD" | "CONTATO_INICIAL" | "PRIMEIRO_ORCAMENTO" | "QUALIFICACAO" | "PROPOSTA_ENVIADA" | "NEGOCIACAO" | "FECHADO_GANHO" | "FECHADO_PERDIDO";
 
 const ETAPAS: { estagio: EstagioLead; label: string; icon: React.ElementType }[] = [
-  { estagio: "NOVO_LEAD",        label: "Entrar em Contato",  icon: PhoneCall },
-  { estagio: "CONTATO_INICIAL",  label: "Contato Feito",      icon: MessageCircle },
-  { estagio: "QUALIFICACAO",     label: "Visita / Medição",   icon: ClipboardList },
+  { estagio: "NOVO_LEAD",           label: "Entrar em Contato",   icon: PhoneCall },
+  { estagio: "CONTATO_INICIAL",     label: "Contato Feito",       icon: MessageCircle },
+  { estagio: "PRIMEIRO_ORCAMENTO",  label: "Primeiro Orçamento",  icon: FileText },
+  { estagio: "QUALIFICACAO",        label: "Visita / Medição",    icon: ClipboardList },
   { estagio: "PROPOSTA_ENVIADA", label: "Orçamento Enviado",  icon: FileCheck },
   { estagio: "NEGOCIACAO",       label: "Em Negociação",      icon: Handshake },
 ];
@@ -366,6 +368,8 @@ export default function ClienteDetalhePage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const qc = useQueryClient();
+  const { user } = useAuth();
+  const isAdmin = user?.role === "ADMINISTRADOR";
 
   const { data: cliente, isLoading } = useQuery({
     queryKey: ["cliente", id],
@@ -577,12 +581,14 @@ export default function ClienteDetalhePage() {
       />
 
       {/* Tabs */}
-      <Tabs defaultValue="historico">
+      <Tabs defaultValue={isAdmin ? "historico" : "leads"}>
         <TabsList>
-          <TabsTrigger value="historico">
-            <Clock className="w-4 h-4 mr-2" />
-            Histórico ({(cliente.atividades || []).length})
-          </TabsTrigger>
+          {isAdmin && (
+            <TabsTrigger value="historico">
+              <Clock className="w-4 h-4 mr-2" />
+              Histórico ({(cliente.atividades || []).length})
+            </TabsTrigger>
+          )}
           <TabsTrigger value="leads">
             <TrendingUp className="w-4 h-4 mr-2" />
             Leads ({(cliente.leads || []).length})
@@ -597,23 +603,25 @@ export default function ClienteDetalhePage() {
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="historico" className="mt-4">
-          <div className="space-y-3">
-            {(cliente.atividades || []).length === 0 ? (
-              <p className="text-muted-foreground text-sm">Nenhuma atividade registrada</p>
-            ) : (
-              cliente.atividades.map(a => (
-                <div key={a.id} className="flex gap-3 items-start">
-                  <div className="w-2 h-2 rounded-full bg-indigo-500 mt-2 shrink-0" />
-                  <div className="flex-1">
-                    <p className="text-sm">{a.descricao}</p>
-                    <p className="text-xs text-muted-foreground">{a.user.nome} · {formatDateTime(a.createdAt)}</p>
+        {isAdmin && (
+          <TabsContent value="historico" className="mt-4">
+            <div className="space-y-3">
+              {(cliente.atividades || []).length === 0 ? (
+                <p className="text-muted-foreground text-sm">Nenhuma atividade registrada</p>
+              ) : (
+                cliente.atividades.map(a => (
+                  <div key={a.id} className="flex gap-3 items-start">
+                    <div className="w-2 h-2 rounded-full bg-indigo-500 mt-2 shrink-0" />
+                    <div className="flex-1">
+                      <p className="text-sm">{a.descricao}</p>
+                      <p className="text-xs text-muted-foreground">{a.user.nome} · {formatDateTime(a.createdAt)}</p>
+                    </div>
                   </div>
-                </div>
-              ))
-            )}
-          </div>
-        </TabsContent>
+                ))
+              )}
+            </div>
+          </TabsContent>
+        )}
 
         <TabsContent value="leads" className="mt-4">
           <div className="space-y-2">

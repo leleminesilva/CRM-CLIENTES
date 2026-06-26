@@ -84,6 +84,7 @@ export function truncateText(text: string, maxLength: number): string {
 export const ESTAGIO_LABELS: Record<string, string> = {
   NOVO_LEAD: "Novo Lead",
   CONTATO_INICIAL: "Contato Inicial",
+  PRIMEIRO_ORCAMENTO: "Primeiro Orçamento",
   QUALIFICACAO: "Qualificação",
   PROPOSTA_ENVIADA: "Proposta Enviada",
   NEGOCIACAO: "Negociação",

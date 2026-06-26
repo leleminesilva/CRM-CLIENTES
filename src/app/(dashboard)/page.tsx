@@ -43,9 +43,10 @@ const PERIOD_OPTIONS = [
 
 // Cores distintas por estágio do funil (alta legibilidade em light e dark)
 const FUNIL_COLORS: Record<string, string> = {
-  NOVO_LEAD:        "#3b82f6", // blue
-  CONTATO_INICIAL:  "#8b5cf6", // violet
-  QUALIFICACAO:     "#a855f7", // purple
+  NOVO_LEAD:           "#3b82f6", // blue
+  CONTATO_INICIAL:     "#8b5cf6", // violet
+  PRIMEIRO_ORCAMENTO:  "#6366f1", // indigo
+  QUALIFICACAO:        "#a855f7", // purple
   PROPOSTA_ENVIADA: "#f59e0b", // amber
   NEGOCIACAO:       "#f97316", // orange
   FECHADO_GANHO:    "#10b981", // emerald
@@ -158,7 +159,7 @@ export default function DashboardPage() {
   const vendasPorVendedor = data?.vendasPorVendedor || [];
   const servicosMaisSolicitados: Array<{ servico: string; total: number }> = data?.servicosMaisSolicitados || [];
 
-  const funnelOrdem = ["NOVO_LEAD", "CONTATO_INICIAL", "QUALIFICACAO", "PROPOSTA_ENVIADA", "NEGOCIACAO", "FECHADO_GANHO"];
+  const funnelOrdem = ["NOVO_LEAD", "CONTATO_INICIAL", "PRIMEIRO_ORCAMENTO", "QUALIFICACAO", "PROPOSTA_ENVIADA", "NEGOCIACAO", "FECHADO_GANHO"];
   const funnelOrdenado = funnelOrdem.map((e) => funil.find((f: { estagio: string; total: number; valor: number }) => f.estagio === e)).filter(Boolean);
 
   return (

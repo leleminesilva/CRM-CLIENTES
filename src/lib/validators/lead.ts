@@ -7,6 +7,7 @@ export const leadSchema = z.object({
     .enum([
       "NOVO_LEAD",
       "CONTATO_INICIAL",
+      "PRIMEIRO_ORCAMENTO",
       "QUALIFICACAO",
       "PROPOSTA_ENVIADA",
       "NEGOCIACAO",

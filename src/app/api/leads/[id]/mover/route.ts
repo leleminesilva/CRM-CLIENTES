@@ -10,6 +10,7 @@ const moverSchema = z.object({
   estagio: z.enum([
     "NOVO_LEAD",
     "CONTATO_INICIAL",
+    "PRIMEIRO_ORCAMENTO",
     "QUALIFICACAO",
     "PROPOSTA_ENVIADA",
     "NEGOCIACAO",

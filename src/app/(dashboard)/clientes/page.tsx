@@ -45,8 +45,9 @@ import type { Cliente } from "@/types";
 
 const ETAPA_CONFIG: Record<string, { label: string; color: string }> = {
   NOVO_LEAD:        { label: "Entrar em Contato",  color: "bg-red-500/15 text-red-400 border-red-500/30" },
-  CONTATO_INICIAL:  { label: "Contato Feito",      color: "bg-blue-500/15 text-blue-400 border-blue-500/30" },
-  QUALIFICACAO:     { label: "Visita / Medição",   color: "bg-violet-500/15 text-violet-400 border-violet-500/30" },
+  CONTATO_INICIAL:     { label: "Contato Feito",       color: "bg-blue-500/15 text-blue-400 border-blue-500/30" },
+  PRIMEIRO_ORCAMENTO: { label: "Primeiro Orçamento",  color: "bg-indigo-500/15 text-indigo-400 border-indigo-500/30" },
+  QUALIFICACAO:        { label: "Visita / Medição",   color: "bg-violet-500/15 text-violet-400 border-violet-500/30" },
   PROPOSTA_ENVIADA: { label: "Orçamento Enviado",  color: "bg-amber-500/15 text-amber-400 border-amber-500/30" },
   NEGOCIACAO:       { label: "Em Negociação",      color: "bg-orange-500/15 text-orange-400 border-orange-500/30" },
   FECHADO_GANHO:    { label: "Confirmado",         color: "bg-green-500/15 text-green-400 border-green-500/30" },

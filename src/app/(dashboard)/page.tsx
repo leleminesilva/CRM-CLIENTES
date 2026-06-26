@@ -41,7 +41,18 @@ const PERIOD_OPTIONS = [
   { label: "Ano", value: "ano" },
 ];
 
-const COLORS = ["#6366f1", "#8b5cf6", "#a78bfa", "#c4b5fd", "#ddd6fe", "#ede9fe"];
+// Cores distintas por estágio do funil (alta legibilidade em light e dark)
+const FUNIL_COLORS: Record<string, string> = {
+  NOVO_LEAD:        "#3b82f6", // blue
+  CONTATO_INICIAL:  "#8b5cf6", // violet
+  QUALIFICACAO:     "#a855f7", // purple
+  PROPOSTA_ENVIADA: "#f59e0b", // amber
+  NEGOCIACAO:       "#f97316", // orange
+  FECHADO_GANHO:    "#10b981", // emerald
+};
+
+const SERVICE_COLORS = ["#6366f1","#3b82f6","#10b981","#f59e0b","#f97316","#ec4899","#8b5cf6","#14b8a6"];
+const VENDOR_COLORS  = ["#6366f1","#10b981","#f59e0b","#3b82f6","#f97316","#ec4899"];
 
 const PIE_COLORS = ["#6366f1", "#8b5cf6", "#ec4899", "#f59e0b", "#10b981", "#3b82f6"];
 
@@ -56,23 +67,24 @@ interface KPICardProps {
 
 function KPICard({ title, value, icon, variacao, prefix = "", color = "bg-indigo-500" }: KPICardProps) {
   return (
-    <Card className="hover:shadow-md transition-shadow">
-      <CardContent className="p-4 md:p-6">
+    <Card className="hover:shadow-lg transition-all duration-200 hover:-translate-y-0.5 overflow-hidden">
+      {/* Accent strip */}
+      <div className={`h-1 w-full ${color}`} />
+      <CardContent className="p-4 md:p-5">
         <div className="flex items-start justify-between gap-2">
-          <div className="space-y-1 md:space-y-2 min-w-0">
-            <p className="text-xs md:text-sm text-muted-foreground font-medium leading-tight">{title}</p>
-            <p className="text-xl md:text-2xl font-bold truncate">
+          <div className="space-y-1 min-w-0 flex-1">
+            <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide leading-tight">{title}</p>
+            <p className="text-2xl md:text-3xl font-bold truncate leading-none mt-1.5">
               {prefix}{typeof value === "number" ? value.toLocaleString("pt-BR") : value}
             </p>
             {variacao !== undefined && (
-              <div className={`flex items-center gap-1 text-xs ${variacao >= 0 ? "text-emerald-600" : "text-red-500"}`}>
+              <div className={`flex items-center gap-1 text-xs font-medium mt-1 ${variacao >= 0 ? "text-emerald-500" : "text-red-500"}`}>
                 {variacao >= 0 ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />}
-                <span className="hidden sm:inline">{Math.abs(variacao)}% vs anterior</span>
-                <span className="sm:hidden">{Math.abs(variacao)}%</span>
+                {Math.abs(variacao)}% vs anterior
               </div>
             )}
           </div>
-          <div className={`${color} p-2 md:p-3 rounded-xl shrink-0`}>
+          <div className={`${color} p-2.5 rounded-xl shrink-0 opacity-90`}>
             {icon}
           </div>
         </div>
@@ -274,24 +286,24 @@ export default function DashboardPage() {
           <CardContent>
             {funnelOrdenado.length > 0 ? (
               <div className="space-y-2">
-                {funnelOrdenado.map((f: { estagio: string; total: number; valor: number } | undefined, i: number) => {
+                {funnelOrdenado.map((f: { estagio: string; total: number; valor: number } | undefined) => {
                   if (!f) return null;
                   const max = Math.max(...funnelOrdenado.map((x: { total: number } | undefined) => x?.total || 0));
                   const pct = max > 0 ? (f.total / max) * 100 : 0;
+                  const barColor = FUNIL_COLORS[f.estagio] ?? "#6366f1";
                   return (
                     <div key={f.estagio} className="space-y-1">
                       <div className="flex justify-between text-sm">
-                        <span className="font-medium">{ESTAGIO_LABELS[f.estagio] || f.estagio}</span>
-                        <span className="text-muted-foreground">{f.total} leads</span>
+                        <div className="flex items-center gap-2">
+                          <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: barColor }} />
+                          <span className="font-medium">{ESTAGIO_LABELS[f.estagio] || f.estagio}</span>
+                        </div>
+                        <span className="text-muted-foreground text-xs">{f.total} leads</span>
                       </div>
-                      <div className="h-8 bg-muted rounded-lg overflow-hidden">
+                      <div className="h-9 bg-muted/60 rounded-lg overflow-hidden">
                         <div
-                          className="h-full rounded-lg flex items-center pl-3 text-white text-xs font-medium transition-all"
-                          style={{
-                            width: `${pct}%`,
-                            backgroundColor: COLORS[i % COLORS.length],
-                            minWidth: "40px",
-                          }}
+                          className="h-full rounded-lg flex items-center pl-3 text-white text-xs font-semibold transition-all duration-500"
+                          style={{ width: `${Math.max(pct, 3)}%`, backgroundColor: barColor, minWidth: "50px" }}
                         >
                           {f.total > 0 && formatCurrency(f.valor)}
                         </div>
@@ -327,16 +339,16 @@ export default function DashboardPage() {
               return acumulado.length > 0 ? (
                 <ResponsiveContainer width="100%" height={200}>
                   <LineChart data={acumulado} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                    <XAxis dataKey="dia" tick={{ fontSize: 11 }} />
-                    <YAxis tickFormatter={(v: number) => `${(v / 1000).toFixed(0)}k`} tick={{ fontSize: 11 }} domain={[0, Math.max(META_MES, ...acumulado.map(d => d.acumulado)) * 1.1]} />
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.6} />
+                    <XAxis dataKey="dia" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} />
+                    <YAxis tickFormatter={(v: number) => `${(v / 1000).toFixed(0)}k`} tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} domain={[0, Math.max(META_MES, ...acumulado.map(d => d.acumulado)) * 1.1]} width={36} />
                     <RechartTooltip
                       formatter={(v: number, name: string) => [formatCurrency(v), name === "acumulado" ? "Acumulado" : "No dia"]}
                       labelFormatter={(l) => `Dia ${l}`}
-                      contentStyle={{ borderRadius: "8px", border: "1px solid hsl(var(--border))" }}
+                      contentStyle={{ borderRadius: "8px", border: "1px solid hsl(var(--border))", backgroundColor: "hsl(var(--card))", color: "hsl(var(--card-foreground))" }}
                     />
-                    <ReferenceLine y={META_MES} stroke="#f59e0b" strokeDasharray="5 3" label={{ value: "Meta 100k", position: "insideTopRight", fontSize: 11, fill: "#f59e0b" }} />
-                    <Line type="monotone" dataKey="acumulado" stroke="#6366f1" strokeWidth={2.5} dot={{ fill: "#6366f1", r: 4, strokeWidth: 0 }} activeDot={{ r: 6 }} />
+                    <ReferenceLine y={META_MES} stroke="#f59e0b" strokeDasharray="5 3" strokeWidth={1.5} label={{ value: "Meta 100k", position: "insideTopRight", fontSize: 11, fill: "#f59e0b" }} />
+                    <Line type="monotone" dataKey="acumulado" stroke="#6366f1" strokeWidth={3} dot={{ fill: "#6366f1", r: 5, strokeWidth: 2, stroke: "#fff" }} activeDot={{ r: 7, stroke: "#6366f1", strokeWidth: 2, fill: "#fff" }} />
                   </LineChart>
                 </ResponsiveContainer>
               ) : (
@@ -360,19 +372,23 @@ export default function DashboardPage() {
               {vendasPorVendedor.map((v: { vendedor: string; total: number; valor: number }, i: number) => {
                 const max = Math.max(...vendasPorVendedor.map((x: { valor: number }) => x.valor));
                 const pct = max > 0 ? (v.valor / max) * 100 : 0;
+                const barColor = VENDOR_COLORS[i % VENDOR_COLORS.length];
                 return (
-                  <div key={v.vendedor} className="space-y-1.5">
+                  <div key={v.vendedor} className="space-y-2">
                     <div className="flex justify-between text-sm">
-                      <span className="font-medium">{v.vendedor}</span>
+                      <div className="flex items-center gap-2">
+                        <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: barColor }} />
+                        <span className="font-medium">{v.vendedor}</span>
+                      </div>
                       <div className="text-right">
-                        <span className="text-muted-foreground">{v.total} vendas</span>
-                        <span className="ml-2 font-semibold">{formatCurrency(v.valor)}</span>
+                        <span className="text-muted-foreground text-xs">{v.total} {v.total === 1 ? "venda" : "vendas"}</span>
+                        <span className="ml-2 font-bold">{formatCurrency(v.valor)}</span>
                       </div>
                     </div>
-                    <div className="h-2 bg-muted rounded-full overflow-hidden">
+                    <div className="h-3 bg-muted/60 rounded-full overflow-hidden">
                       <div
-                        className="h-full rounded-full transition-all"
-                        style={{ width: `${pct}%`, backgroundColor: COLORS[i % COLORS.length] }}
+                        className="h-full rounded-full transition-all duration-500"
+                        style={{ width: `${Math.max(pct, 1)}%`, backgroundColor: barColor }}
                       />
                     </div>
                   </div>
@@ -449,13 +465,16 @@ export default function DashboardPage() {
                     return (
                       <div key={s.servico} className="space-y-1">
                         <div className="flex justify-between text-sm">
-                          <span className="font-medium">{s.servico}</span>
-                          <span className="text-muted-foreground">{s.total} {s.total === 1 ? "cliente" : "clientes"} · {pctReal}%</span>
+                          <div className="flex items-center gap-2">
+                            <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: SERVICE_COLORS[i % SERVICE_COLORS.length] }} />
+                            <span className="font-medium">{s.servico}</span>
+                          </div>
+                          <span className="text-muted-foreground text-xs">{s.total} {s.total === 1 ? "cliente" : "clientes"} · {pctReal}%</span>
                         </div>
-                        <div className="h-7 bg-muted rounded-lg overflow-hidden">
+                        <div className="h-8 bg-muted/60 rounded-lg overflow-hidden">
                           <div
-                            className="h-full rounded-lg flex items-center pl-3 text-white text-xs font-medium transition-all"
-                            style={{ width: `${Math.max(pct, 4)}%`, backgroundColor: COLORS[i % COLORS.length] }}
+                            className="h-full rounded-lg flex items-center pl-3 text-white text-xs font-semibold transition-all duration-500"
+                            style={{ width: `${Math.max(pct, 4)}%`, backgroundColor: SERVICE_COLORS[i % SERVICE_COLORS.length] }}
                           >
                             {pct > 15 && s.servico}
                           </div>

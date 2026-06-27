@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useTheme } from "next-themes";
-import { Moon, Sun, Monitor, Bell, User, Building2, Lock, Eye, EyeOff } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Moon, Sun, Monitor, Bell, User, Building2, Lock, Eye, EyeOff, Download, Upload, Database } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -14,6 +14,7 @@ import { ROLE_LABELS } from "@/lib/utils/formatters";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
 import { toast } from "sonner";
+import * as XLSX from "xlsx";
 
 interface Prefs {
   leadNovo: boolean;
@@ -38,6 +39,50 @@ export default function ConfiguracoesPage() {
   const [novaSenha, setNovaSenha] = useState("");
   const [confirmarSenha, setConfirmarSenha] = useState("");
   const [mostrarSenhas, setMostrarSenhas] = useState(false);
+  const [exportando, setExportando] = useState(false);
+  const [importando, setImportando] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const isAdmin = user?.role === "ADMINISTRADOR";
+
+  async function handleExport() {
+    setExportando(true);
+    try {
+      const { data } = await axios.get("/api/admin/backup");
+      const ws = XLSX.utils.json_to_sheet(data.data);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Clientes");
+      const date = new Date().toISOString().split("T")[0];
+      XLSX.writeFile(wb, `clientes-backup-${date}.xlsx`);
+      toast.success(`${data.total} clientes exportados com sucesso`);
+    } catch {
+      toast.error("Erro ao exportar dados");
+    } finally {
+      setExportando(false);
+    }
+  }
+
+  async function handleImport(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setImportando(true);
+    try {
+      const buffer = await file.arrayBuffer();
+      const wb = XLSX.read(buffer, { type: "array" });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json<Record<string, string>>(ws, { defval: "" });
+
+      if (rows.length === 0) { toast.error("Arquivo vazio ou formato inválido"); return; }
+
+      const { data } = await axios.post("/api/admin/backup", { rows });
+      toast.success(`Importação concluída: ${data.criados} criados, ${data.ignorados} ignorados`);
+      if (data.erros?.length > 0) toast.error(`${data.erros.length} erro(s) ao importar`);
+    } catch {
+      toast.error("Erro ao importar arquivo");
+    } finally {
+      setImportando(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  }
 
   const mudarSenhaMutation = useMutation({
     mutationFn: () => axios.post("/api/usuarios/mudar-senha", { senhaAtual, novaSenha }),
@@ -241,6 +286,53 @@ export default function ConfiguracoesPage() {
           ))}
         </CardContent>
       </Card>
+
+      {/* Backup — Admin only */}
+      {isAdmin && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <Database className="w-4 h-4" />
+              Backup de Dados
+            </CardTitle>
+            <CardDescription>
+              Exporte todos os clientes para Excel ou importe uma planilha para cadastrar em lote.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex flex-col sm:flex-row gap-3">
+              <Button
+                className="flex-1 bg-indigo-600 hover:bg-indigo-700"
+                onClick={handleExport}
+                disabled={exportando}
+              >
+                <Download className="w-4 h-4 mr-2" />
+                {exportando ? "Exportando..." : "Baixar cópia (Excel)"}
+              </Button>
+
+              <Button
+                variant="outline"
+                className="flex-1"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={importando}
+              >
+                <Upload className="w-4 h-4 mr-2" />
+                {importando ? "Importando..." : "Importar planilha"}
+              </Button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".xlsx,.xls,.csv"
+                className="hidden"
+                onChange={handleImport}
+              />
+            </div>
+            <p className="text-xs text-muted-foreground">
+              O arquivo de importação deve seguir o mesmo formato da exportação. Clientes duplicados (mesmo nome + telefone) serão ignorados automaticamente.
+            </p>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Sistema */}
       <Card>

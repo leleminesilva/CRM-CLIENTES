@@ -17,6 +17,7 @@ import {
   Edit,
   Trash2,
   MessageCircle,
+  X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -39,7 +40,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Card } from "@/components/ui/card";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   Select,
   SelectContent,
@@ -49,6 +50,17 @@ import {
 } from "@/components/ui/select";
 import { ORIGEM_LABELS } from "@/lib/utils/formatters";
 import type { Cliente } from "@/types";
+
+const TEMP_CONFIG: Record<string, { label: string; color: string; icon: string }> = {
+  QUENTE: { label: "Quente", color: "text-red-400",    icon: "🔥" },
+  MORNO:  { label: "Morno",  color: "text-amber-400",  icon: "🌡️" },
+  FRIO:   { label: "Frio",   color: "text-blue-400",   icon: "❄️" },
+};
+
+const SERVICOS = [
+  "Box de banheiro", "Espelho", "Janela de vidro", "Porta de vidro",
+  "Fachada", "Guarda-corpo", "Pergolado de vidro", "Vitrine", "Divisória", "Outros",
+];
 
 const ETAPA_CONFIG: Record<string, { label: string; color: string }> = {
   NOVO_LEAD:        { label: "Entrar em Contato",  color: "bg-red-500/15 text-red-400 border-red-500/30" },
@@ -66,9 +78,22 @@ export default function ClientesPage() {
   const [page, setPage] = useState(1);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [responsavelId, setResponsavelId] = useState("");
+  const [temperatura, setTemperatura] = useState("");
+  const [servico, setServico] = useState("");
+  const [estagio, setEstagio] = useState("");
   const qc = useQueryClient();
   const { user } = useAuth();
   const isAdmin = user?.role === "ADMINISTRADOR";
+
+  const hasActiveFilters = !!(responsavelId || temperatura || servico || estagio);
+
+  function clearFilters() {
+    setResponsavelId("");
+    setTemperatura("");
+    setServico("");
+    setEstagio("");
+    setPage(1);
+  }
 
   const { data: vendedoresData } = useQuery({
     queryKey: ["usuarios-ativos"],
@@ -80,11 +105,14 @@ export default function ClientesPage() {
   });
 
   const { data, isLoading } = useQuery({
-    queryKey: ["clientes", page, search, responsavelId],
+    queryKey: ["clientes", page, search, responsavelId, temperatura, servico, estagio],
     queryFn: async () => {
       const params = new URLSearchParams({ page: String(page), limit: "15" });
       if (search) params.set("search", search);
       if (responsavelId) params.set("responsavelId", responsavelId);
+      if (temperatura) params.set("temperatura", temperatura);
+      if (servico) params.set("servico", servico);
+      if (estagio) params.set("estagio", estagio);
       const { data } = await axios.get(`/api/clientes?${params}`);
       return data;
     },
@@ -144,8 +172,8 @@ export default function ClientesPage() {
       </div>
 
       {/* Filtros */}
-      <div className="flex items-center gap-3 flex-wrap">
-        <div className="relative flex-1 min-w-[200px]">
+      <div className="space-y-2">
+        <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
             placeholder="Buscar cliente..."
@@ -154,22 +182,68 @@ export default function ClientesPage() {
             className="pl-9"
           />
         </div>
-        {isAdmin && (
-          <Select
-            value={responsavelId || "all"}
-            onValueChange={(v) => { setResponsavelId(v === "all" ? "" : v); setPage(1); }}
-          >
-            <SelectTrigger className="w-[180px] shrink-0">
-              <SelectValue placeholder="Todos vendedores" />
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Temperatura */}
+          <Select value={temperatura || "all"} onValueChange={(v) => { setTemperatura(v === "all" ? "" : v); setPage(1); }}>
+            <SelectTrigger className="w-[140px] shrink-0">
+              <SelectValue placeholder="Temperatura" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">Todos vendedores</SelectItem>
-              {(vendedoresData ?? []).map((u) => (
-                <SelectItem key={u.id} value={u.id}>{u.nome}</SelectItem>
+              <SelectItem value="all">Temperatura</SelectItem>
+              <SelectItem value="QUENTE">🔥 Quente</SelectItem>
+              <SelectItem value="MORNO">🌡️ Morno</SelectItem>
+              <SelectItem value="FRIO">❄️ Frio</SelectItem>
+            </SelectContent>
+          </Select>
+
+          {/* Tipo de serviço */}
+          <Select value={servico || "all"} onValueChange={(v) => { setServico(v === "all" ? "" : v); setPage(1); }}>
+            <SelectTrigger className="w-[170px] shrink-0">
+              <SelectValue placeholder="Tipo de serviço" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Tipo de serviço</SelectItem>
+              {SERVICOS.map((s) => (
+                <SelectItem key={s} value={s}>{s}</SelectItem>
               ))}
             </SelectContent>
           </Select>
-        )}
+
+          {/* Funcionário — apenas admin */}
+          {isAdmin && (
+            <Select value={responsavelId || "all"} onValueChange={(v) => { setResponsavelId(v === "all" ? "" : v); setPage(1); }}>
+              <SelectTrigger className="w-[160px] shrink-0">
+                <SelectValue placeholder="Funcionário" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Funcionário</SelectItem>
+                {(vendedoresData ?? []).map((u) => (
+                  <SelectItem key={u.id} value={u.id}>{u.nome}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+
+          {/* Etapa */}
+          <Select value={estagio || "all"} onValueChange={(v) => { setEstagio(v === "all" ? "" : v); setPage(1); }}>
+            <SelectTrigger className="w-[180px] shrink-0">
+              <SelectValue placeholder="Etapa" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Etapa</SelectItem>
+              {Object.entries(ETAPA_CONFIG).map(([key, cfg]) => (
+                <SelectItem key={key} value={key}>{cfg.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          {/* Limpar filtros */}
+          {hasActiveFilters && (
+            <Button variant="ghost" size="sm" onClick={clearFilters} className="text-muted-foreground hover:text-foreground shrink-0">
+              <X className="w-3.5 h-3.5 mr-1" />Limpar filtros
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Mobile: Cards */}
@@ -196,6 +270,10 @@ export default function ClientesPage() {
                   <div className="flex items-center gap-2 mt-1 flex-wrap">
                     {c.telefone && <span className="text-xs text-muted-foreground">{c.telefone}</span>}
                     <Badge variant="secondary" className="text-xs">{ORIGEM_LABELS[c.origem] || c.origem}</Badge>
+                    {(() => {
+                      const cfg = c.temperatura ? TEMP_CONFIG[c.temperatura] : null;
+                      return cfg ? <span className={`text-xs font-medium ${cfg.color}`}>{cfg.icon} {cfg.label}</span> : null;
+                    })()}
                   </div>
                 </div>
               </Link>
@@ -214,6 +292,7 @@ export default function ClientesPage() {
                 <th className="text-left p-4 font-medium text-muted-foreground">Cliente</th>
                 <th className="text-left p-4 font-medium text-muted-foreground">Contato</th>
                 <th className="text-left p-4 font-medium text-muted-foreground">Serviço Buscado</th>
+                <th className="text-left p-4 font-medium text-muted-foreground">Temperatura</th>
                 <th className="text-left p-4 font-medium text-muted-foreground">Etapa</th>
                 <th className="text-left p-4 font-medium text-muted-foreground">Responsável</th>
                 <th className="p-4" />
@@ -223,14 +302,14 @@ export default function ClientesPage() {
               {isLoading ? (
                 [...Array(5)].map((_, i) => (
                   <tr key={i} className="border-b">
-                    {[...Array(6)].map((_, j) => (
+                    {[...Array(7)].map((_, j) => (
                       <td key={j} className="p-4"><div className="h-4 bg-muted animate-pulse rounded" /></td>
                     ))}
                   </tr>
                 ))
               ) : clientes.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="p-12 text-center text-muted-foreground">
+                  <td colSpan={7} className="p-12 text-center text-muted-foreground">
                     <Building2 className="w-8 h-8 mx-auto mb-3 opacity-40" />
                     <p>Nenhum cliente encontrado</p>
                     <Link href="/clientes/novo">
@@ -273,6 +352,14 @@ export default function ClientesPage() {
                   </td>
                   <td className="p-4">
                     {(() => {
+                      const cfg = c.temperatura ? TEMP_CONFIG[c.temperatura] : null;
+                      return cfg
+                        ? <span className={`inline-flex items-center gap-1 text-xs font-medium ${cfg.color}`}><span>{cfg.icon}</span>{cfg.label}</span>
+                        : <span className="text-muted-foreground text-xs">—</span>;
+                    })()}
+                  </td>
+                  <td className="p-4">
+                    {(() => {
                       const estagio = (c as unknown as { leads?: { estagio: string }[] }).leads?.[0]?.estagio;
                       const cfg = estagio ? ETAPA_CONFIG[estagio] : null;
                       return cfg
@@ -284,6 +371,7 @@ export default function ClientesPage() {
                     {c.responsavel ? (
                       <div className="flex items-center gap-2">
                         <Avatar className="w-6 h-6">
+                          {c.responsavel.avatar && <AvatarImage src={c.responsavel.avatar} alt={c.responsavel.nome} />}
                           <AvatarFallback className="text-xs bg-violet-100 text-violet-600">
                             {c.responsavel.nome.slice(0, 2).toUpperCase()}
                           </AvatarFallback>

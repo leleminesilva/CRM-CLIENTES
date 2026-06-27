@@ -1,17 +1,19 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
+import { AvatarCropDialog } from "@/components/ui/avatar-crop-dialog";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
 import { toast } from "sonner";
 import {
   Plus, Shield, Pencil, Trash2, MoreVertical,
-  Users, UserCheck, UserX, Search,
+  Users, UserCheck, UserX, Search, Camera,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { useAuth } from "@/contexts/AuthContext";
 import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -156,8 +158,47 @@ function UserFormDialog({
 
 export default function UsuariosPage() {
   const qc = useQueryClient();
+  const { user: me, refreshUser } = useAuth();
+  const isAdmin = me?.role === "ADMINISTRADOR";
   const [search, setSearch] = useState("");
   const [deleteTarget, setDeleteTarget] = useState<UserWithCount | null>(null);
+  const [uploadingUserId, setUploadingUserId] = useState<string | null>(null);
+  const [cropSrc, setCropSrc] = useState<string | null>(null);
+  const avatarInputRef = useRef<HTMLInputElement>(null);
+  const avatarTargetRef = useRef<string | null>(null);
+
+  function handleAvatarClick(userId: string) {
+    avatarTargetRef.current = userId;
+    avatarInputRef.current?.click();
+  }
+
+  function handleAvatarSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setCropSrc(URL.createObjectURL(file));
+    if (avatarInputRef.current) avatarInputRef.current.value = "";
+  }
+
+  async function handleCropConfirm(blob: Blob) {
+    const userId = avatarTargetRef.current;
+    if (!userId) return;
+    setUploadingUserId(userId);
+    try {
+      const fd = new FormData();
+      fd.append("file", new File([blob], "avatar.jpg", { type: "image/jpeg" }));
+      fd.append("userId", userId);
+      await axios.post("/api/usuarios/avatar", fd);
+      qc.invalidateQueries({ queryKey: ["usuarios"] });
+      if (userId === me?.id) await refreshUser();
+      toast.success("Foto atualizada!");
+      setCropSrc(null);
+    } catch (err) {
+      const msg = axios.isAxiosError(err) ? err.response?.data?.error ?? "Erro ao enviar foto" : "Erro ao enviar foto";
+      toast.error(msg);
+    } finally {
+      setUploadingUserId(null);
+    }
+  }
 
   const { data, isLoading } = useQuery({
     queryKey: ["usuarios"],
@@ -287,11 +328,27 @@ export default function UsuariosPage() {
               {/* Top row */}
               <div className="flex items-start justify-between gap-2">
                 <div className="flex items-center gap-3 min-w-0">
-                  <Avatar className="w-11 h-11 shrink-0">
-                    <AvatarFallback className="bg-indigo-100 dark:bg-indigo-900 text-indigo-700 font-bold text-sm">
-                      {u.nome.slice(0, 2).toUpperCase()}
-                    </AvatarFallback>
-                  </Avatar>
+                  <div
+                    className={`relative shrink-0 ${isAdmin ? "cursor-pointer group" : ""}`}
+                    onClick={() => isAdmin && handleAvatarClick(u.id)}
+                    title={isAdmin ? "Clique para alterar foto" : undefined}
+                  >
+                    <Avatar className="w-11 h-11">
+                      {u.avatar && <AvatarImage src={u.avatar} alt={u.nome} />}
+                      <AvatarFallback className="bg-indigo-100 dark:bg-indigo-900 text-indigo-700 font-bold text-sm">
+                        {u.nome.slice(0, 2).toUpperCase()}
+                      </AvatarFallback>
+                    </Avatar>
+                    {isAdmin && (
+                      <div className="absolute inset-0 bg-black/40 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                        {uploadingUserId === u.id ? (
+                          <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        ) : (
+                          <Camera className="w-3.5 h-3.5 text-white" />
+                        )}
+                      </div>
+                    )}
+                  </div>
                   <div className="min-w-0">
                     <p className="font-semibold text-sm truncate">{u.nome}</p>
                     <p className="text-xs text-muted-foreground truncate">{u.email}</p>
@@ -361,6 +418,15 @@ export default function UsuariosPage() {
         </div>
       )}
 
+      {/* Hidden file input for avatar upload */}
+      <input
+        ref={avatarInputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={handleAvatarSelect}
+      />
+
       {/* Delete Confirm */}
       <AlertDialog open={!!deleteTarget} onOpenChange={v => !v && setDeleteTarget(null)}>
         <AlertDialogContent>
@@ -381,6 +447,16 @@ export default function UsuariosPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {cropSrc && (
+        <AvatarCropDialog
+          open={!!cropSrc}
+          imageSrc={cropSrc}
+          onClose={() => setCropSrc(null)}
+          onConfirm={handleCropConfirm}
+          loading={!!uploadingUserId}
+        />
+      )}
 
       {/* Permissions Table */}
       <div>

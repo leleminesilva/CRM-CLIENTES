@@ -2,7 +2,8 @@
 
 import { useRef, useState } from "react";
 import { useTheme } from "next-themes";
-import { Moon, Sun, Monitor, Bell, User, Building2, Lock, Eye, EyeOff, Download, Upload, Database } from "lucide-react";
+import { AvatarCropDialog } from "@/components/ui/avatar-crop-dialog";
+import { Moon, Sun, Monitor, Bell, User, Building2, Lock, Eye, EyeOff, Download, Upload, Database, Camera } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -32,7 +33,7 @@ const NOTIF_OPTIONS: { key: keyof Prefs; label: string; desc: string }[] = [
 
 export default function ConfiguracoesPage() {
   const { theme, setTheme } = useTheme();
-  const { user } = useAuth();
+  const { user, refreshUser } = useAuth();
   const qc = useQueryClient();
 
   const [senhaAtual, setSenhaAtual] = useState("");
@@ -43,8 +44,36 @@ export default function ConfiguracoesPage() {
   const [importando, setImportando] = useState(false);
   const [periodoDE, setPeriodoDE] = useState("");
   const [periodoATE, setPeriodoATE] = useState("");
+  const [avatarUploading, setAvatarUploading] = useState(false);
+  const [cropSrc, setCropSrc] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const avatarInputRef = useRef<HTMLInputElement>(null);
   const isAdmin = user?.role === "ADMINISTRADOR";
+
+  function handleAvatarSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const url = URL.createObjectURL(file);
+    setCropSrc(url);
+    if (avatarInputRef.current) avatarInputRef.current.value = "";
+  }
+
+  async function handleCropConfirm(blob: Blob) {
+    setAvatarUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", new File([blob], "avatar.jpg", { type: "image/jpeg" }));
+      await axios.post("/api/usuarios/avatar", fd);
+      await refreshUser();
+      toast.success("Foto atualizada!");
+      setCropSrc(null);
+    } catch (err) {
+      const msg = axios.isAxiosError(err) ? err.response?.data?.error ?? "Erro ao enviar foto" : "Erro ao enviar foto";
+      toast.error(msg);
+    } finally {
+      setAvatarUploading(false);
+    }
+  }
 
   async function handleExport(de?: string, ate?: string) {
     setExportando(true);
@@ -165,15 +194,51 @@ export default function ConfiguracoesPage() {
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex items-center gap-4">
-            <div className="w-16 h-16 bg-indigo-600 rounded-full flex items-center justify-center text-white text-2xl font-bold">
-              {user?.nome?.slice(0, 2).toUpperCase()}
+            <div
+              className="relative group cursor-pointer shrink-0"
+              onClick={() => avatarInputRef.current?.click()}
+              title="Clique para alterar foto"
+            >
+              {user?.avatar ? (
+                <img
+                  src={user.avatar}
+                  alt={user.nome}
+                  className="w-16 h-16 rounded-full object-cover"
+                />
+              ) : (
+                <div className="w-16 h-16 bg-indigo-600 rounded-full flex items-center justify-center text-white text-2xl font-bold">
+                  {user?.nome?.slice(0, 2).toUpperCase()}
+                </div>
+              )}
+              <div className="absolute inset-0 bg-black/40 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                {avatarUploading ? (
+                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <Camera className="w-5 h-5 text-white" />
+                )}
+              </div>
             </div>
             <div>
               <p className="font-semibold text-lg">{user?.nome}</p>
               <p className="text-muted-foreground">{user?.email}</p>
               <p className="text-sm text-indigo-600 font-medium">{ROLE_LABELS[user?.role || ""]}</p>
+              <button
+                type="button"
+                onClick={() => avatarInputRef.current?.click()}
+                className="text-xs text-muted-foreground hover:text-foreground transition-colors mt-0.5"
+                disabled={avatarUploading}
+              >
+                {avatarUploading ? "Enviando..." : "Alterar foto"}
+              </button>
             </div>
           </div>
+          <input
+            ref={avatarInputRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={handleAvatarSelect}
+          />
         </CardContent>
       </Card>
 
@@ -380,6 +445,16 @@ export default function ConfiguracoesPage() {
             </div>
           </CardContent>
         </Card>
+      )}
+
+      {cropSrc && (
+        <AvatarCropDialog
+          open={!!cropSrc}
+          imageSrc={cropSrc}
+          onClose={() => setCropSrc(null)}
+          onConfirm={handleCropConfirm}
+          loading={avatarUploading}
+        />
       )}
 
       {/* Sistema */}

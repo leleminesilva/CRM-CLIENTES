@@ -33,6 +33,9 @@ export async function GET(request: NextRequest) {
     const search = searchParams.get("search") || "";
     const origem = searchParams.get("origem") || undefined;
     const responsavelIdParam = searchParams.get("responsavelId") || undefined;
+    const temperatura = searchParams.get("temperatura") || undefined;
+    const servico = searchParams.get("servico") || undefined;
+    const estagio = searchParams.get("estagio") || undefined;
 
     const where: Record<string, unknown> = {
       deletedAt: null,
@@ -48,6 +51,9 @@ export async function GET(request: NextRequest) {
     }
     if (origem) where.origem = origem;
     if (canViewAll && responsavelIdParam) where.responsavelId = responsavelIdParam;
+    if (temperatura) where.temperatura = temperatura;
+    if (servico) where.servicoBuscado = { contains: servico, mode: "insensitive" };
+    if (estagio) where.leads = { some: { estagio, deletedAt: null } };
 
     const [data, total] = await Promise.all([
       prisma.cliente.findMany({

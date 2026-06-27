@@ -12,6 +12,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -324,6 +325,25 @@ export default function NovoClientePage() {
                   <Plus className="w-4 h-4" />
                 </Button>
               </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Observações */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm flex items-center gap-2">
+              <ClipboardList className="w-4 h-4" />Observações
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-1.5">
+              <Label>Medidas, detalhes do ambiente, referências e outras observações</Label>
+              <Textarea
+                {...register("observacoes")}
+                placeholder="Ex: Janela 1,20m x 0,90m, ambiente úmido, cliente quer vidro fumê, acesso pelo fundo..."
+                rows={5}
+              />
             </div>
           </CardContent>
         </Card>

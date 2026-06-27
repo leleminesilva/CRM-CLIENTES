@@ -13,6 +13,7 @@ import Link from "next/link";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend,
+  LineChart, Line, ReferenceLine,
 } from "recharts";
 import { formatCurrency, ROLE_LABELS, ORIGEM_LABELS, ESTAGIO_LABELS } from "@/lib/utils/formatters";
 
@@ -407,24 +408,82 @@ export default function RelatoriosPage() {
               {/* Receita por mês */}
               {receitaPorMes.length > 0 && (
                 <Card>
-                  <CardHeader><CardTitle className="text-sm">Receita por Mês</CardTitle></CardHeader>
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-sm">Receita por Mês</CardTitle>
+                      <span className="text-xs text-amber-500 font-medium">Meta: {formatCurrency(100000)}/mês</span>
+                    </div>
+                  </CardHeader>
                   <CardContent>
-                    <ResponsiveContainer width="100%" height={240}>
-                      <BarChart data={receitaPorMes}>
-                        <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                        <XAxis dataKey="mes" tick={{ fontSize: 11 }} />
-                        <YAxis tickFormatter={(v: number) => `${(v / 1000).toFixed(0)}k`} tick={{ fontSize: 11 }} />
-                        <Tooltip
-                          formatter={(v: number, name: string) => [
-                            name === "receita" ? formatCurrency(v) : v,
-                            name === "receita" ? "Receita" : "Vendas",
-                          ]}
-                        />
-                        <Legend formatter={(v) => v === "receita" ? "Receita" : "Vendas"} />
-                        <Bar dataKey="receita" fill="#6366f1" name="receita" radius={[4, 4, 0, 0]} />
-                        <Bar dataKey="total" fill="#10b981" name="total" radius={[4, 4, 0, 0]} />
-                      </BarChart>
-                    </ResponsiveContainer>
+                    {(() => {
+                      const META = 100000;
+                      const acumulado: Array<{ mes: string; receita: number; acumulado: number; total: number }> = [];
+                      receitaPorMes.forEach((item, i) => {
+                        const prev = i > 0 ? acumulado[i - 1].acumulado : 0;
+                        acumulado.push({ ...item, acumulado: prev + item.receita });
+                      });
+                      const maxVal = Math.max(META, ...acumulado.map((d) => d.acumulado)) * 1.1;
+                      return (
+                        <ResponsiveContainer width="100%" height={240}>
+                          <LineChart data={acumulado} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+                            <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.6} />
+                            <XAxis
+                              dataKey="mes"
+                              tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
+                              axisLine={false}
+                              tickLine={false}
+                            />
+                            <YAxis
+                              tickFormatter={(v: number) => `${(v / 1000).toFixed(0)}k`}
+                              tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
+                              axisLine={false}
+                              tickLine={false}
+                              domain={[0, maxVal]}
+                              width={36}
+                            />
+                            <Tooltip
+                              formatter={(v: number, name: string) => [
+                                formatCurrency(v),
+                                name === "acumulado" ? "Acumulado" : "No mês",
+                              ]}
+                              labelFormatter={(l) => `Mês ${l}`}
+                              contentStyle={{
+                                borderRadius: "8px",
+                                border: "1px solid hsl(var(--border))",
+                                backgroundColor: "hsl(var(--card))",
+                                color: "hsl(var(--card-foreground))",
+                              }}
+                            />
+                            <ReferenceLine
+                              y={META}
+                              stroke="#f59e0b"
+                              strokeDasharray="5 3"
+                              strokeWidth={1.5}
+                              label={{ value: "Meta 100k", position: "insideTopRight", fontSize: 11, fill: "#f59e0b" }}
+                            />
+                            <Line
+                              type="monotone"
+                              dataKey="acumulado"
+                              stroke="#6366f1"
+                              strokeWidth={3}
+                              dot={{ fill: "#6366f1", r: 5, strokeWidth: 2, stroke: "#fff" }}
+                              activeDot={{ r: 7, stroke: "#6366f1", strokeWidth: 2, fill: "#fff" }}
+                              name="acumulado"
+                            />
+                            <Line
+                              type="monotone"
+                              dataKey="receita"
+                              stroke="#10b981"
+                              strokeWidth={2}
+                              strokeDasharray="4 2"
+                              dot={{ fill: "#10b981", r: 4, strokeWidth: 2, stroke: "#fff" }}
+                              activeDot={{ r: 6, stroke: "#10b981", strokeWidth: 2, fill: "#fff" }}
+                              name="receita"
+                            />
+                          </LineChart>
+                        </ResponsiveContainer>
+                      );
+                    })()}
                   </CardContent>
                 </Card>
               )}

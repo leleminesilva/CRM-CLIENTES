@@ -59,6 +59,7 @@ export async function GET(request: NextRequest) {
       receitaFechadaPeriodo,
       leadsTotal,
       leadsConvertidos,
+      canceladosPeriodo,
     ] = await Promise.all([
       // Total de clientes ativos
       prisma.cliente.count({ where: { deletedAt: null, ...userFilter } }),
@@ -150,6 +151,17 @@ export async function GET(request: NextRequest) {
         where: {
           deletedAt: null,
           estagio: "FECHADO_GANHO",
+          dataFechamento: { gte: de, lte: ate },
+          OR: [{ clienteId: null }, { cliente: { deletedAt: null } }],
+          ...userFilter,
+        },
+      }),
+
+      // Cancelamentos no período
+      prisma.lead.count({
+        where: {
+          deletedAt: null,
+          estagio: "FECHADO_PERDIDO",
           dataFechamento: { gte: de, lte: ate },
           OR: [{ clienteId: null }, { cliente: { deletedAt: null } }],
           ...userFilter,
@@ -254,6 +266,7 @@ export async function GET(request: NextRequest) {
           ticketMedio:        Math.round(ticketMedio),
           faturamentoPrevisto: receitaFechada,
           leadsGanhos:        leadsGanhosPeriodo,
+          canceladosPeriodo,
         },
         funil:             funnelFormatted,
         vendasMes:         vendasMesRaw,

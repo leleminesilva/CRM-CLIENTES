@@ -14,6 +14,7 @@ import {
   BarChart2,
   ArrowUp,
   ArrowDown,
+  XCircle,
 } from "lucide-react";
 import {
   LineChart,
@@ -275,6 +276,14 @@ export default function DashboardPage() {
           icon={<Receipt className="w-5 h-5 text-white" />}
           color="bg-rose-500"
         />
+        {isGestor && (
+          <KPICard
+            title="Cancelamentos"
+            value={kpis.canceladosPeriodo ?? 0}
+            icon={<XCircle className="w-5 h-5 text-white" />}
+            color="bg-red-500"
+          />
+        )}
       </div>
 
       {/* Charts Row 1 */}

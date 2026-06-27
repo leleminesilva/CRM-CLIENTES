@@ -21,6 +21,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -55,14 +62,15 @@ function PipelineTracker({
   estagio: EstagioLead;
   onUpdate: () => void;
 }) {
+  const [cancelDialog, setCancelDialog] = useState(false);
+  const [motivoCancelamento, setMotivoCancelamento] = useState("");
+
   const mutation = useMutation({
-    mutationFn: async (novoEstagio: EstagioLead) => {
-      // Atualiza o lead
+    mutationFn: async ({ novoEstagio, motivoPerda }: { novoEstagio: EstagioLead; motivoPerda?: string }) => {
       await (leadId
-        ? axios.patch(`/api/leads/${leadId}/mover`, { estagio: novoEstagio })
+        ? axios.patch(`/api/leads/${leadId}/mover`, { estagio: novoEstagio, motivoPerda })
         : axios.post("/api/leads", { titulo: clienteNome, estagio: novoEstagio, origem: "OUTROS", clienteId }));
 
-      // Sincroniza statusOrcamento do cliente com o estágio do pipeline
       const statusMap: Partial<Record<EstagioLead, string>> = {
         FECHADO_GANHO:   "APROVADO",
         FECHADO_PERDIDO: "NAO_APROVADO",
@@ -74,72 +82,116 @@ function PipelineTracker({
     onError: () => toast.error("Erro ao atualizar etapa"),
   });
 
+  function confirmarCancelamento() {
+    if (!motivoCancelamento.trim()) {
+      toast.error("Informe o motivo do cancelamento");
+      return;
+    }
+    mutation.mutate({ novoEstagio: "FECHADO_PERDIDO", motivoPerda: motivoCancelamento.trim() });
+    setCancelDialog(false);
+    setMotivoCancelamento("");
+  }
+
   const isFechado = estagio === "FECHADO_GANHO" || estagio === "FECHADO_PERDIDO";
   const currentIdx = ETAPAS.findIndex(e => e.estagio === estagio);
 
   return (
-    <div className="bg-card border rounded-xl p-4">
-      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-3">Processo de Venda</p>
-      <div className="flex items-center gap-1 flex-wrap">
-        {ETAPAS.map((etapa, idx) => {
-          const Icon = etapa.icon;
-          const isPast   = !isFechado && idx < currentIdx;
-          const isActive = !isFechado && idx === currentIdx;
+    <>
+      <div className="bg-card border rounded-xl p-4">
+        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-3">Processo de Venda</p>
+        <div className="flex items-center gap-1 flex-wrap">
+          {ETAPAS.map((etapa, idx) => {
+            const Icon = etapa.icon;
+            const isPast   = !isFechado && idx < currentIdx;
+            const isActive = !isFechado && idx === currentIdx;
 
-          return (
-            <div key={etapa.estagio} className="flex items-center gap-1">
-              <button
-                type="button"
-                disabled={mutation.isPending}
-                onClick={() => mutation.mutate(etapa.estagio)}
-                className={cn(
-                  "flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all border",
-                  isActive && "bg-indigo-600 text-white border-indigo-600 shadow-sm",
-                  isPast   && "bg-indigo-600/20 text-indigo-400 border-indigo-600/30 hover:bg-indigo-600/30",
-                  !isActive && !isPast && "bg-muted text-muted-foreground border-border hover:bg-accent hover:text-accent-foreground",
+            return (
+              <div key={etapa.estagio} className="flex items-center gap-1">
+                <button
+                  type="button"
+                  disabled={mutation.isPending}
+                  onClick={() => mutation.mutate({ novoEstagio: etapa.estagio })}
+                  className={cn(
+                    "flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all border",
+                    isActive && "bg-indigo-600 text-white border-indigo-600 shadow-sm",
+                    isPast   && "bg-indigo-600/20 text-indigo-400 border-indigo-600/30 hover:bg-indigo-600/30",
+                    !isActive && !isPast && "bg-muted text-muted-foreground border-border hover:bg-accent hover:text-accent-foreground",
+                  )}
+                >
+                  <Icon className="w-3 h-3" />
+                  {etapa.label}
+                </button>
+                {idx < ETAPAS.length - 1 && (
+                  <ChevronRight className="w-3 h-3 text-muted-foreground shrink-0" />
                 )}
-              >
-                <Icon className="w-3 h-3" />
-                {etapa.label}
-              </button>
-              {idx < ETAPAS.length - 1 && (
-                <ChevronRight className="w-3 h-3 text-muted-foreground shrink-0" />
-              )}
-            </div>
-          );
-        })}
+              </div>
+            );
+          })}
 
-        <ChevronRight className="w-3 h-3 text-muted-foreground shrink-0" />
+          <ChevronRight className="w-3 h-3 text-muted-foreground shrink-0" />
 
-        <button
-          type="button"
-          disabled={mutation.isPending}
-          onClick={() => mutation.mutate("FECHADO_GANHO")}
-          className={cn(
-            "flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all border",
-            estagio === "FECHADO_GANHO"
-              ? "bg-emerald-600 text-white border-emerald-600 shadow-sm"
-              : "bg-emerald-600/10 text-emerald-500 border-emerald-600/30 hover:bg-emerald-600/20",
-          )}
-        >
-          <ThumbsUp className="w-3 h-3" /> Confirmado
-        </button>
+          <button
+            type="button"
+            disabled={mutation.isPending}
+            onClick={() => mutation.mutate({ novoEstagio: "FECHADO_GANHO" })}
+            className={cn(
+              "flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all border",
+              estagio === "FECHADO_GANHO"
+                ? "bg-emerald-600 text-white border-emerald-600 shadow-sm"
+                : "bg-emerald-600/10 text-emerald-500 border-emerald-600/30 hover:bg-emerald-600/20",
+            )}
+          >
+            <ThumbsUp className="w-3 h-3" /> Confirmado
+          </button>
 
-        <button
-          type="button"
-          disabled={mutation.isPending}
-          onClick={() => mutation.mutate("FECHADO_PERDIDO")}
-          className={cn(
-            "flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all border",
-            estagio === "FECHADO_PERDIDO"
-              ? "bg-red-600 text-white border-red-600 shadow-sm"
-              : "bg-red-600/10 text-red-500 border-red-600/30 hover:bg-red-600/20",
-          )}
-        >
-          <ThumbsDown className="w-3 h-3" /> Cancelado
-        </button>
+          <button
+            type="button"
+            disabled={mutation.isPending}
+            onClick={() => setCancelDialog(true)}
+            className={cn(
+              "flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all border",
+              estagio === "FECHADO_PERDIDO"
+                ? "bg-red-600 text-white border-red-600 shadow-sm"
+                : "bg-red-600/10 text-red-500 border-red-600/30 hover:bg-red-600/20",
+            )}
+          >
+            <ThumbsDown className="w-3 h-3" /> Cancelado
+          </button>
+        </div>
       </div>
-    </div>
+
+      <Dialog open={cancelDialog} onOpenChange={(open) => { setCancelDialog(open); if (!open) setMotivoCancelamento(""); }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-500">
+              <ThumbsDown className="w-4 h-4" /> Cancelar atendimento
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2 py-2">
+            <p className="text-sm text-muted-foreground">Qual o motivo do cancelamento?</p>
+            <Textarea
+              placeholder="Ex: Cliente optou por outro fornecedor, preço acima do orçamento..."
+              value={motivoCancelamento}
+              onChange={(e) => setMotivoCancelamento(e.target.value)}
+              rows={4}
+              autoFocus
+            />
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => { setCancelDialog(false); setMotivoCancelamento(""); }}>
+              Voltar
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={!motivoCancelamento.trim() || mutation.isPending}
+              onClick={confirmarCancelamento}
+            >
+              Confirmar cancelamento
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
 

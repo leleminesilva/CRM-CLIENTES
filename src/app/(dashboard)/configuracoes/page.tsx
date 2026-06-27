@@ -41,18 +41,23 @@ export default function ConfiguracoesPage() {
   const [mostrarSenhas, setMostrarSenhas] = useState(false);
   const [exportando, setExportando] = useState(false);
   const [importando, setImportando] = useState(false);
+  const [periodoDE, setPeriodoDE] = useState("");
+  const [periodoATE, setPeriodoATE] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const isAdmin = user?.role === "ADMINISTRADOR";
 
-  async function handleExport() {
+  async function handleExport(de?: string, ate?: string) {
     setExportando(true);
     try {
-      const { data } = await axios.get("/api/admin/backup");
+      const params = new URLSearchParams();
+      if (de) params.set("de", de);
+      if (ate) params.set("ate", ate);
+      const { data } = await axios.get(`/api/admin/backup?${params}`);
       const ws = XLSX.utils.json_to_sheet(data.data);
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, "Clientes");
-      const date = new Date().toISOString().split("T")[0];
-      XLSX.writeFile(wb, `clientes-backup-${date}.xlsx`);
+      const suffix = de && ate ? `${de}_${ate}` : de ? `a-partir-${de}` : ate ? `ate-${ate}` : new Date().toISOString().split("T")[0];
+      XLSX.writeFile(wb, `clientes-${suffix}.xlsx`);
       toast.success(`${data.total} clientes exportados com sucesso`);
     } catch {
       toast.error("Erro ao exportar dados");
@@ -296,28 +301,71 @@ export default function ConfiguracoesPage() {
               Backup de Dados
             </CardTitle>
             <CardDescription>
-              Exporte todos os clientes para Excel ou importe uma planilha para cadastrar em lote.
+              Exporte clientes para Excel ou importe uma planilha para cadastrar em lote.
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex flex-col sm:flex-row gap-3">
+          <CardContent className="space-y-5">
+
+            {/* Exportar completo */}
+            <div className="space-y-2">
+              <p className="text-sm font-medium">Exportar tudo</p>
               <Button
-                className="flex-1 bg-indigo-600 hover:bg-indigo-700"
-                onClick={handleExport}
+                className="w-full bg-indigo-600 hover:bg-indigo-700"
+                onClick={() => handleExport()}
                 disabled={exportando}
               >
                 <Download className="w-4 h-4 mr-2" />
-                {exportando ? "Exportando..." : "Baixar cópia (Excel)"}
+                {exportando ? "Exportando..." : "Baixar cópia completa (Excel)"}
               </Button>
+            </div>
 
+            <Separator />
+
+            {/* Exportar por período */}
+            <div className="space-y-3">
+              <p className="text-sm font-medium">Exportar por período</p>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-muted-foreground">De</Label>
+                  <Input
+                    type="date"
+                    value={periodoDE}
+                    onChange={(e) => setPeriodoDE(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-muted-foreground">Até</Label>
+                  <Input
+                    type="date"
+                    value={periodoATE}
+                    onChange={(e) => setPeriodoATE(e.target.value)}
+                  />
+                </div>
+              </div>
               <Button
                 variant="outline"
-                className="flex-1"
+                className="w-full"
+                onClick={() => handleExport(periodoDE || undefined, periodoATE || undefined)}
+                disabled={exportando || (!periodoDE && !periodoATE)}
+              >
+                <Download className="w-4 h-4 mr-2" />
+                {exportando ? "Exportando..." : "Baixar período selecionado"}
+              </Button>
+            </div>
+
+            <Separator />
+
+            {/* Importar */}
+            <div className="space-y-2">
+              <p className="text-sm font-medium">Importar planilha</p>
+              <Button
+                variant="outline"
+                className="w-full"
                 onClick={() => fileInputRef.current?.click()}
                 disabled={importando}
               >
                 <Upload className="w-4 h-4 mr-2" />
-                {importando ? "Importando..." : "Importar planilha"}
+                {importando ? "Importando..." : "Selecionar arquivo (.xlsx / .csv)"}
               </Button>
               <input
                 ref={fileInputRef}
@@ -326,10 +374,10 @@ export default function ConfiguracoesPage() {
                 className="hidden"
                 onChange={handleImport}
               />
+              <p className="text-xs text-muted-foreground">
+                Use o mesmo formato da exportação. Clientes com mesmo nome + telefone serão ignorados automaticamente.
+              </p>
             </div>
-            <p className="text-xs text-muted-foreground">
-              O arquivo de importação deve seguir o mesmo formato da exportação. Clientes duplicados (mesmo nome + telefone) serão ignorados automaticamente.
-            </p>
           </CardContent>
         </Card>
       )}

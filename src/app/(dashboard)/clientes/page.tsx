@@ -5,6 +5,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
 import Link from "next/link";
 import { toast } from "sonner";
+import { useAuth } from "@/contexts/AuthContext";
 import {
   Plus,
   Search,
@@ -15,7 +16,6 @@ import {
   Eye,
   Edit,
   Trash2,
-  Filter,
   MessageCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -40,6 +40,13 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Card } from "@/components/ui/card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { ORIGEM_LABELS } from "@/lib/utils/formatters";
 import type { Cliente } from "@/types";
 
@@ -58,13 +65,26 @@ export default function ClientesPage() {
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [responsavelId, setResponsavelId] = useState("");
   const qc = useQueryClient();
+  const { user } = useAuth();
+  const isAdmin = user?.role === "ADMINISTRADOR";
+
+  const { data: vendedoresData } = useQuery({
+    queryKey: ["usuarios-ativos"],
+    queryFn: async () => {
+      const { data } = await axios.get("/api/usuarios/ativos");
+      return data.data as Array<{ id: string; nome: string }>;
+    },
+    enabled: isAdmin,
+  });
 
   const { data, isLoading } = useQuery({
-    queryKey: ["clientes", page, search],
+    queryKey: ["clientes", page, search, responsavelId],
     queryFn: async () => {
       const params = new URLSearchParams({ page: String(page), limit: "15" });
       if (search) params.set("search", search);
+      if (responsavelId) params.set("responsavelId", responsavelId);
       const { data } = await axios.get(`/api/clientes?${params}`);
       return data;
     },
@@ -124,8 +144,8 @@ export default function ClientesPage() {
       </div>
 
       {/* Filtros */}
-      <div className="flex items-center gap-3">
-        <div className="relative flex-1">
+      <div className="flex items-center gap-3 flex-wrap">
+        <div className="relative flex-1 min-w-[200px]">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
             placeholder="Buscar cliente..."
@@ -134,9 +154,22 @@ export default function ClientesPage() {
             className="pl-9"
           />
         </div>
-        <Button variant="outline" size="icon" className="shrink-0">
-          <Filter className="w-4 h-4" />
-        </Button>
+        {isAdmin && (
+          <Select
+            value={responsavelId || "all"}
+            onValueChange={(v) => { setResponsavelId(v === "all" ? "" : v); setPage(1); }}
+          >
+            <SelectTrigger className="w-[180px] shrink-0">
+              <SelectValue placeholder="Todos vendedores" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos vendedores</SelectItem>
+              {(vendedoresData ?? []).map((u) => (
+                <SelectItem key={u.id} value={u.id}>{u.nome}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
       </div>
 
       {/* Mobile: Cards */}

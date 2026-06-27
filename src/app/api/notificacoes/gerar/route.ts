@@ -54,8 +54,8 @@ export async function POST(request: NextRequest) {
       });
 
       for (const lead of leadsNovos) {
-        const link = `/leads`;
-        const already = await notifExists(payload.userId, "LEAD_NOVO", link + `?id=${lead.id}`, 7 * 24 * 60 * 60 * 1000);
+        const linkUrl = `/leads?id=${lead.id}`;
+        const already = await notifExists(payload.userId, "LEAD_NOVO", linkUrl, 7 * 24 * 60 * 60 * 1000);
         if (!already) {
           await prisma.notificacao.create({
             data: {
@@ -63,7 +63,7 @@ export async function POST(request: NextRequest) {
               tipo: "LEAD_NOVO",
               titulo: "Novo lead atribuído",
               mensagem: `O lead "${lead.titulo}" foi atribuído a você.`,
-              linkUrl: `/leads`,
+              linkUrl,
             },
           });
           created.push("LEAD_NOVO:" + lead.id);
@@ -86,8 +86,8 @@ export async function POST(request: NextRequest) {
       });
 
       for (const t of tarefas) {
-        const link = `/tarefas`;
-        const already = await notifExists(payload.userId, "TAREFA_VENCENDO", link + `?id=${t.id}`, 20 * 60 * 60 * 1000);
+        const linkUrl = `/tarefas?id=${t.id}`;
+        const already = await notifExists(payload.userId, "TAREFA_VENCENDO", linkUrl, 20 * 60 * 60 * 1000);
         if (!already) {
           const hora = t.dataVencimento.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
           await prisma.notificacao.create({
@@ -96,7 +96,7 @@ export async function POST(request: NextRequest) {
               tipo: "TAREFA_VENCENDO",
               titulo: "Tarefa vencendo em breve",
               mensagem: `"${t.titulo}" vence hoje às ${hora}. Não esqueça!`,
-              linkUrl: `/tarefas`,
+              linkUrl,
             },
           });
           created.push("TAREFA_VENCENDO:" + t.id);
@@ -119,8 +119,8 @@ export async function POST(request: NextRequest) {
       });
 
       for (const opp of opps) {
-        const link = `/oportunidades?id=${opp.id}`;
-        const already = await notifExists(payload.userId, "OPORTUNIDADE_PARADA", link, 24 * 60 * 60 * 1000);
+        const linkUrl = `/oportunidades?id=${opp.id}`;
+        const already = await notifExists(payload.userId, "OPORTUNIDADE_PARADA", linkUrl, 24 * 60 * 60 * 1000);
         if (!already) {
           const days = Math.floor((Date.now() - opp.updatedAt.getTime()) / (24 * 60 * 60 * 1000));
           await prisma.notificacao.create({
@@ -129,7 +129,7 @@ export async function POST(request: NextRequest) {
               tipo: "OPORTUNIDADE_PARADA",
               titulo: "Oportunidade sem movimentação",
               mensagem: `"${opp.titulo}" está parada há ${days} dias sem atualização.`,
-              linkUrl: `/oportunidades`,
+              linkUrl,
             },
           });
           created.push("OPORTUNIDADE_PARADA:" + opp.id);

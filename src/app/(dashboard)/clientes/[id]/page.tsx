@@ -63,7 +63,10 @@ function PipelineTracker({
   onUpdate: () => void;
 }) {
   const [cancelDialog, setCancelDialog] = useState(false);
+  const [motivoCategoria, setMotivoCategoria] = useState("");
   const [motivoCancelamento, setMotivoCancelamento] = useState("");
+
+  const MOTIVOS_CANCELAMENTO = ["Prazo", "Preço", "Distância", "Não Realizamos", "Outros"];
 
   const mutation = useMutation({
     mutationFn: async ({ novoEstagio, motivoPerda }: { novoEstagio: EstagioLead; motivoPerda?: string }) => {
@@ -83,12 +86,16 @@ function PipelineTracker({
   });
 
   function confirmarCancelamento() {
-    if (!motivoCancelamento.trim()) {
-      toast.error("Informe o motivo do cancelamento");
+    if (!motivoCategoria) {
+      toast.error("Selecione o motivo do cancelamento");
       return;
     }
-    mutation.mutate({ novoEstagio: "FECHADO_PERDIDO", motivoPerda: motivoCancelamento.trim() });
+    const motivoPerda = motivoCancelamento.trim()
+      ? `${motivoCategoria} — ${motivoCancelamento.trim()}`
+      : motivoCategoria;
+    mutation.mutate({ novoEstagio: "FECHADO_PERDIDO", motivoPerda });
     setCancelDialog(false);
+    setMotivoCategoria("");
     setMotivoCancelamento("");
   }
 
@@ -160,30 +167,51 @@ function PipelineTracker({
         </div>
       </div>
 
-      <Dialog open={cancelDialog} onOpenChange={(open) => { setCancelDialog(open); if (!open) setMotivoCancelamento(""); }}>
+      <Dialog open={cancelDialog} onOpenChange={(open) => { setCancelDialog(open); if (!open) { setMotivoCategoria(""); setMotivoCancelamento(""); } }}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-red-500">
               <ThumbsDown className="w-4 h-4" /> Cancelar atendimento
             </DialogTitle>
           </DialogHeader>
-          <div className="space-y-2 py-2">
-            <p className="text-sm text-muted-foreground">Qual o motivo do cancelamento?</p>
-            <Textarea
-              placeholder="Ex: Cliente optou por outro fornecedor, preço acima do orçamento..."
-              value={motivoCancelamento}
-              onChange={(e) => setMotivoCancelamento(e.target.value)}
-              rows={4}
-              autoFocus
-            />
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <p className="text-sm font-medium">Motivo do cancelamento <span className="text-red-500">*</span></p>
+              <div className="flex flex-wrap gap-2">
+                {MOTIVOS_CANCELAMENTO.map((motivo) => (
+                  <button
+                    key={motivo}
+                    type="button"
+                    onClick={() => setMotivoCategoria(motivo)}
+                    className={cn(
+                      "px-3 py-1.5 rounded-full text-xs font-medium border transition-all",
+                      motivoCategoria === motivo
+                        ? "bg-red-600 text-white border-red-600 shadow-sm"
+                        : "bg-muted text-muted-foreground border-border hover:border-red-400 hover:text-red-500",
+                    )}
+                  >
+                    {motivo}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="space-y-2">
+              <p className="text-sm font-medium">Observação <span className="text-muted-foreground font-normal">(opcional)</span></p>
+              <Textarea
+                placeholder="Detalhes adicionais sobre o cancelamento..."
+                value={motivoCancelamento}
+                onChange={(e) => setMotivoCancelamento(e.target.value)}
+                rows={3}
+              />
+            </div>
           </div>
           <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => { setCancelDialog(false); setMotivoCancelamento(""); }}>
+            <Button variant="outline" onClick={() => { setCancelDialog(false); setMotivoCategoria(""); setMotivoCancelamento(""); }}>
               Voltar
             </Button>
             <Button
               variant="destructive"
-              disabled={!motivoCancelamento.trim() || mutation.isPending}
+              disabled={!motivoCategoria || mutation.isPending}
               onClick={confirmarCancelamento}
             >
               Confirmar cancelamento

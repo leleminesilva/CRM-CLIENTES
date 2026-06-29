@@ -140,6 +140,7 @@ export default function DashboardPage() {
       const { data } = await axios.get(`/api/dashboard?${params}`);
       return data.data;
     },
+    refetchInterval: 60000,
   });
 
   if (isLoading) {

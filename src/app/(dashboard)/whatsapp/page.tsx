@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { useSearchParams } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
 import { format, isToday, isYesterday } from "date-fns";
@@ -610,7 +611,24 @@ function PainelConfig({
 
 export default function WhatsAppPage() {
   const { user } = useAuth();
-  const isAdmin = user?.role === "ADMINISTRADOR" || user?.role === "GESTOR";
+  const searchParams = useSearchParams();
+  const phoneParam = useMemo(() => searchParams.get("phone"), [searchParams]);
+
+  if (user && user.role !== "ADMINISTRADOR") {
+    return (
+      <div className="flex flex-col items-center justify-center h-full gap-4 text-center">
+        <MessageCircle className="w-16 h-16 text-muted-foreground opacity-30" />
+        <div>
+          <h2 className="text-xl font-semibold">Acesso restrito</h2>
+          <p className="text-muted-foreground mt-1 text-sm">
+            O módulo WhatsApp está disponível apenas para administradores.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  const isAdmin = user?.role === "ADMINISTRADOR";
 
   const [instanciaId, setInstanciaId] = useState<string | null>(null);
   const [conversa, setConversa] = useState<Conversa | null>(null);
@@ -638,11 +656,35 @@ export default function WhatsAppPage() {
     refetchInterval: 5000,
   });
 
+  // Busca todas conversas quando vem via ?phone= para encontrar em qualquer instância
+  const { data: todasConversas = [] } = useQuery({
+    queryKey: ["wa-conversas-todas"],
+    queryFn: async () => {
+      const { data } = await axios.get("/api/whatsapp/conversas");
+      return data as Conversa[];
+    },
+    enabled: !!phoneParam,
+  });
+
   useEffect(() => {
     if (instancias.length > 0 && !instanciaId) {
       setInstanciaId(instancias[0].id);
     }
   }, [instancias, instanciaId]);
+
+  // Auto-abre conversa quando vem de /clientes via ?phone=
+  useEffect(() => {
+    if (!phoneParam || todasConversas.length === 0) return;
+    const tail = phoneParam.slice(-9);
+    const match = todasConversas.find((c) =>
+      c.contatoPhone.replace(/\D/g, "").endsWith(tail)
+    );
+    if (match) {
+      setInstanciaId(match.instanciaId);
+      setConversa(match);
+      setPainelConfig(false);
+    }
+  }, [phoneParam, todasConversas]);
 
   const deletarInstancia = useCallback(async (id: string) => {
     if (!confirm("Deseja remover este número? Todas as conversas serão excluídas.")) return;

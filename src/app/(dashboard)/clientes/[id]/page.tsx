@@ -550,10 +550,16 @@ export default function ClienteDetalhePage() {
                 <a href={`mailto:${cliente.email}`} className="hover:underline">{cliente.email}</a>
               </div>
             )}
-            {(cliente.telefone || cliente.whatsapp) && (
+            {cliente.telefone && (
               <div className="flex items-center gap-2 text-sm">
                 <Phone className="w-3.5 h-3.5 text-muted-foreground" />
-                <span>{formatPhone(cliente.telefone || cliente.whatsapp || "")}</span>
+                <span>{formatPhone(cliente.telefone)}</span>
+              </div>
+            )}
+            {isAdmin && cliente.whatsapp && (
+              <div className="flex items-center gap-2 text-sm">
+                <MessageCircle className="w-3.5 h-3.5 text-green-500" />
+                <span>{formatPhone(cliente.whatsapp)}</span>
               </div>
             )}
             {cliente.cpfCnpj && (

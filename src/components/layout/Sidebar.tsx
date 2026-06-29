@@ -18,12 +18,12 @@ import axios from "axios";
 
 type Role = "ADMINISTRADOR" | "GESTOR" | "COMERCIAL" | "OPERACIONAL";
 
-const navItems = [
+const navItems: { href: string; label: string; icon: React.ElementType; roles?: Role[] }[] = [
   { href: "/",           label: "Dashboard",  icon: LayoutDashboard },
   { href: "/clientes",   label: "Clientes",   icon: Users },
   { href: "/tarefas",    label: "Tarefas",    icon: CheckSquare },
   { href: "/agenda",     label: "Agenda",     icon: Calendar },
-  { href: "/whatsapp",   label: "WhatsApp",   icon: MessageCircle },
+  { href: "/whatsapp",   label: "WhatsApp",   icon: MessageCircle, roles: ["ADMINISTRADOR"] },
 ];
 
 const bottomNavItems: { href: string; label: string; icon: React.ElementType; roles?: Role[] }[] = [
@@ -110,6 +110,10 @@ function SidebarContent({ collapsed, onLinkClick }: { collapsed: boolean; onLink
 
   const hasNewClientes = !isOnClientes && (novosData?.count ?? 0) > 0;
 
+  const visibleTop = navItems.filter(
+    (item) => !item.roles || (!loading && item.roles.includes((user?.role ?? "") as Role))
+  );
+
   const visibleBottom = loading
     ? []
     : bottomNavItems.filter(
@@ -119,7 +123,7 @@ function SidebarContent({ collapsed, onLinkClick }: { collapsed: boolean; onLink
   return (
     <ScrollArea className="flex-1 py-4">
       <nav className="px-2 space-y-1">
-        {navItems.map((item) => {
+        {visibleTop.map((item) => {
           const active = pathname === item.href || (item.href !== "/" && pathname.startsWith(item.href));
           return (
             <NavLink

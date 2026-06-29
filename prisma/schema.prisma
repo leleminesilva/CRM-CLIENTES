@@ -435,3 +435,58 @@ model AuditLog {
 
   @@map("audit_logs")
 }
+
+// ==========================================
+// WHATSAPP BUSINESS API
+// ==========================================
+
+model WhatsAppInstancia {
+  id            String   @id @default(cuid())
+  nome          String
+  phoneNumberId String   @unique
+  accessToken   String
+  phoneNumber   String?
+  ativo         Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  conversas WhatsAppConversa[]
+
+  @@map("whatsapp_instancias")
+}
+
+model WhatsAppConversa {
+  id           String    @id @default(cuid())
+  instanciaId  String
+  contatoPhone String
+  contatoNome  String?
+  clienteId    String?
+  ultimaMsgEm  DateTime?
+  naoLidas     Int       @default(0)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  instancia WhatsAppInstancia @relation(fields: [instanciaId], references: [id], onDelete: Cascade)
+  mensagens WhatsAppMensagem[]
+
+  @@unique([instanciaId, contatoPhone])
+  @@index([instanciaId])
+  @@map("whatsapp_conversas")
+}
+
+model WhatsAppMensagem {
+  id         String   @id @default(cuid())
+  conversaId String
+  waId       String?  @unique
+  direcao    String   // 'entrada' | 'saida'
+  tipo       String   @default("texto")
+  conteudo   String
+  mediaUrl   String?
+  status     String   @default("enviada")
+  enviadaEm  DateTime @default(now())
+
+  conversa WhatsAppConversa @relation(fields: [conversaId], references: [id], onDelete: Cascade)
+
+  @@index([conversaId])
+  @@map("whatsapp_mensagens")
+}

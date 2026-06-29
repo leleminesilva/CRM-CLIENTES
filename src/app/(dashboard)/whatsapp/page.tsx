@@ -176,14 +176,12 @@ function PainelInstancias({
   selected,
   onSelect,
   onAdd,
-  onDelete,
   isAdmin,
 }: {
   instancias: Instancia[];
   selected: string | null;
   onSelect: (id: string) => void;
   onAdd: () => void;
-  onDelete: (id: string) => void;
   isAdmin: boolean;
 }) {
   return (
@@ -670,7 +668,6 @@ export default function WhatsAppPage() {
         selected={instanciaId}
         onSelect={(id) => { setInstanciaId(id); setConversa(null); setPainelConfig(false); }}
         onAdd={() => setModalAberto(true)}
-        onDelete={deletarInstancia}
         isAdmin={isAdmin}
       />
 

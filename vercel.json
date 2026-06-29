@@ -1,5 +1,9 @@
 {
   "regions": ["gru1"],
-  "buildCommand": "npm run build",
-  "installCommand": "npm install"
+  "builds": [
+    {
+      "src": "package.json",
+      "use": "@vercel/next"
+    }
+  ]
 }

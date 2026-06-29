@@ -613,21 +613,6 @@ export default function WhatsAppPage() {
   const { user } = useAuth();
   const searchParams = useSearchParams();
   const phoneParam = useMemo(() => searchParams.get("phone"), [searchParams]);
-
-  if (user && user.role !== "ADMINISTRADOR") {
-    return (
-      <div className="flex flex-col items-center justify-center h-full gap-4 text-center">
-        <MessageCircle className="w-16 h-16 text-muted-foreground opacity-30" />
-        <div>
-          <h2 className="text-xl font-semibold">Acesso restrito</h2>
-          <p className="text-muted-foreground mt-1 text-sm">
-            O módulo WhatsApp está disponível apenas para administradores.
-          </p>
-        </div>
-      </div>
-    );
-  }
-
   const isAdmin = user?.role === "ADMINISTRADOR";
 
   const [instanciaId, setInstanciaId] = useState<string | null>(null);
@@ -699,8 +684,21 @@ export default function WhatsAppPage() {
   }, [instanciaId, queryClient]);
 
   const instanciaAtual = instancias.find((i) => i.id === instanciaId);
-
   const painelChat = conversa !== null;
+
+  if (user && !isAdmin) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full gap-4 text-center">
+        <MessageCircle className="w-16 h-16 text-muted-foreground opacity-30" />
+        <div>
+          <h2 className="text-xl font-semibold">Acesso restrito</h2>
+          <p className="text-muted-foreground mt-1 text-sm">
+            O módulo WhatsApp está disponível apenas para administradores.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="h-full flex overflow-hidden rounded-xl border border-border bg-background shadow-sm -m-4 md:-m-6">

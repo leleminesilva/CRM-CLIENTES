@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
@@ -609,7 +609,7 @@ function PainelConfig({
 
 // ── Página principal ───────────────────────────────────────────────────────
 
-export default function WhatsAppPage() {
+function WhatsAppContent() {
   const { user } = useAuth();
   const searchParams = useSearchParams();
   const phoneParam = useMemo(() => searchParams.get("phone"), [searchParams]);
@@ -781,5 +781,13 @@ export default function WhatsAppPage() {
         onSaved={() => queryClient.invalidateQueries({ queryKey: ["wa-instancias"] })}
       />
     </div>
+  );
+}
+
+export default function WhatsAppPage() {
+  return (
+    <Suspense fallback={null}>
+      <WhatsAppContent />
+    </Suspense>
   );
 }

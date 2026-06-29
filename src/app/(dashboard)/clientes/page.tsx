@@ -336,8 +336,8 @@ export default function ClientesPage() {
                   </td>
                   <td className="p-4">
                     <div className="space-y-0.5">
-                      {isAdmin && c.whatsapp && <div className="flex items-center gap-1.5"><Link href={`/whatsapp?phone=${c.whatsapp.replace(/\D/g, "")}`} title="Abrir conversa no WhatsApp"><MessageCircle className="w-3.5 h-3.5 text-green-500 hover:text-green-400 transition-colors cursor-pointer" /></Link><span className="text-xs">{c.whatsapp}</span></div>}
-                      {(!isAdmin || !c.whatsapp) && c.telefone && <div className="flex items-center gap-1.5 text-muted-foreground"><Phone className="w-3 h-3" /><span className="text-xs">{c.telefone}</span></div>}
+                      {c.whatsapp && <div className="flex items-center gap-1.5"><a href={`https://wa.me/55${c.whatsapp.replace(/\D/g, "")}`} target="_blank" rel="noreferrer" title="Abrir no WhatsApp"><MessageCircle className="w-3.5 h-3.5 text-green-500 hover:text-green-400 transition-colors cursor-pointer" /></a><span className="text-xs">{c.whatsapp}</span></div>}
+                      {!c.whatsapp && c.telefone && <div className="flex items-center gap-1.5 text-muted-foreground"><Phone className="w-3 h-3" /><span className="text-xs">{c.telefone}</span></div>}
                       {c.email && <div className="flex items-center gap-1.5 text-muted-foreground"><Mail className="w-3 h-3" /><span className="text-xs">{c.email}</span></div>}
                     </div>
                   </td>

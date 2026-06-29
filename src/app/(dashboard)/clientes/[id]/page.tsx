@@ -556,10 +556,12 @@ export default function ClienteDetalhePage() {
                 <span>{formatPhone(cliente.telefone)}</span>
               </div>
             )}
-            {isAdmin && cliente.whatsapp && (
+            {cliente.whatsapp && (
               <div className="flex items-center gap-2 text-sm">
-                <MessageCircle className="w-3.5 h-3.5 text-green-500" />
-                <span>{formatPhone(cliente.whatsapp)}</span>
+                <a href={`https://wa.me/55${cliente.whatsapp.replace(/\D/g, "")}`} target="_blank" rel="noreferrer" title="Abrir no WhatsApp" className="flex items-center gap-2 hover:opacity-80">
+                  <MessageCircle className="w-3.5 h-3.5 text-green-500 shrink-0" />
+                  <span>{formatPhone(cliente.whatsapp)}</span>
+                </a>
               </div>
             )}
             {cliente.cpfCnpj && (

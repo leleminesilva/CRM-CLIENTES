@@ -8,6 +8,66 @@ import type { EstagioLead, OrigemCliente, Temperatura } from "@prisma/client";
 
 export const dynamic = "force-dynamic";
 
+const FIELD_LABELS: Record<string, string> = {
+  nome: "Nome",
+  email: "E-mail",
+  telefone: "Telefone",
+  whatsapp: "WhatsApp",
+  temperatura: "Temperatura",
+  statusOrcamento: "Status do orçamento",
+  valorOrcamento: "Valor do orçamento",
+  servicoBuscado: "Serviço buscado",
+  observacoes: "Observações",
+  origem: "Origem",
+  numeroOrcamento: "Nº orçamento",
+  responsavelId: "Responsável",
+};
+
+const TEMP_LABELS: Record<string, string> = { QUENTE: "Quente", MORNO: "Morno", FRIO: "Frio" };
+const STATUS_LABELS: Record<string, string> = { PENDENTE: "Pendente", APROVADO: "Aprovado", NAO_APROVADO: "Não aprovado" };
+
+function formatFieldValue(key: string, value: unknown): string {
+  if (value === null || value === undefined || value === "") return "—";
+  if (key === "temperatura") return TEMP_LABELS[String(value)] ?? String(value);
+  if (key === "statusOrcamento") return STATUS_LABELS[String(value)] ?? String(value);
+  if (key === "valorOrcamento") return `R$ ${Number(value).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`;
+  if (key === "responsavelId") return null as unknown as string; // tratado separado
+  return String(value);
+}
+
+function descricaoAlteracoes(
+  old: Record<string, unknown>,
+  novo: Record<string, unknown>,
+  nomeCliente: string
+): string {
+  const changes: string[] = [];
+
+  for (const key of Object.keys(FIELD_LABELS)) {
+    if (!(key in novo)) continue;
+    const oldVal = old[key];
+    const newVal = novo[key];
+
+    const oldStr = String(oldVal ?? "");
+    const newStr = String(newVal ?? "");
+    if (oldStr === newStr) continue;
+
+    const label = FIELD_LABELS[key];
+
+    if (key === "responsavelId") {
+      changes.push("Responsável alterado");
+      continue;
+    }
+
+    const oldFormatted = formatFieldValue(key, oldVal);
+    const newFormatted = formatFieldValue(key, newVal);
+    if (oldFormatted === newFormatted) continue;
+
+    changes.push(`${label}: ${oldFormatted} → ${newFormatted}`);
+  }
+
+  return changes.length > 0 ? changes.join(" · ") : `Cliente ${nomeCliente} atualizado`;
+}
+
 function mapStatusToEstagio(
   statusOrcamento: string,
   valorOrcamento?: number | null
@@ -166,7 +226,11 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
     await prisma.atividade.create({
       data: {
         tipo: "EDICAO",
-        descricao: `Cliente ${cliente.nome} atualizado`,
+        descricao: descricaoAlteracoes(
+          old as unknown as Record<string, unknown>,
+          data as unknown as Record<string, unknown>,
+          cliente.nome
+        ),
         userId: payload.userId,
         clienteId: params.id,
       },
@@ -263,7 +327,11 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     await prisma.atividade.create({
       data: {
         tipo: "EDICAO",
-        descricao: `Cliente ${cliente.nome} atualizado`,
+        descricao: descricaoAlteracoes(
+          old as unknown as Record<string, unknown>,
+          updateData,
+          cliente.nome
+        ),
         userId: payload.userId,
         clienteId: params.id,
       },

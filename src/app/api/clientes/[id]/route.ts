@@ -169,6 +169,15 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
 
     const { dataInscricao, prazoOrcamento, valorOrcamento, ...rest } = data;
 
+    // Determina orcamentoEnviadoEm: grava quando budget é definido pela primeira vez, limpa quando removido ou finalizado
+    const statusFinal = rest.statusOrcamento === "APROVADO" || rest.statusOrcamento === "NAO_APROVADO";
+    let orcamentoEnviadoEm: Date | null = old.orcamentoEnviadoEm ?? null;
+    if (statusFinal || !valorOrcamento) {
+      orcamentoEnviadoEm = null;
+    } else if (valorOrcamento && !old.valorOrcamento) {
+      orcamentoEnviadoEm = new Date();
+    }
+
     const cliente = await prisma.cliente.update({
       where: { id: params.id },
       data: {
@@ -176,6 +185,7 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
         dataInscricao: dataInscricao ? new Date(dataInscricao) : null,
         prazoOrcamento: prazoOrcamento ? new Date(prazoOrcamento) : null,
         valorOrcamento: valorOrcamento ?? null,
+        orcamentoEnviadoEm,
       },
     });
 
@@ -267,6 +277,18 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     if ("prazoOrcamento"  in body) updateData.prazoOrcamento  = body.prazoOrcamento  ? new Date(body.prazoOrcamento) : null;
     if ("statusOrcamento" in body) updateData.statusOrcamento = body.statusOrcamento;
     if ("temperatura"     in body) updateData.temperatura     = body.temperatura;
+
+    // Atualiza orcamentoEnviadoEm conforme mudanças no orçamento
+    if ("valorOrcamento" in body || "statusOrcamento" in body) {
+      const novoStatus = (updateData.statusOrcamento ?? old.statusOrcamento) as string;
+      const novoValor = updateData.valorOrcamento as number | null;
+      const statusFinal = novoStatus === "APROVADO" || novoStatus === "NAO_APROVADO";
+      if (statusFinal || novoValor === null) {
+        updateData.orcamentoEnviadoEm = null;
+      } else if (novoValor && !old.valorOrcamento) {
+        updateData.orcamentoEnviadoEm = new Date();
+      }
+    }
 
     const cliente = await prisma.cliente.update({
       where: { id: params.id },

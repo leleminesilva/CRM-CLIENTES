@@ -50,6 +50,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ORIGEM_LABELS } from "@/lib/utils/formatters";
+import { cn } from "@/lib/utils/cn";
 import type { Cliente } from "@/types";
 
 const TEMP_CONFIG: Record<string, { label: string; color: string; icon: string }> = {
@@ -359,8 +360,14 @@ export default function ClientesPage() {
                     </Link>
                   </td>
                 </tr>
-              ) : clientes.map((c) => (
-                <tr key={c.id} className="border-b hover:bg-muted/30 transition-colors">
+              ) : clientes.map((c) => {
+                const orcamentoPendente2d =
+                  c.valorOrcamento &&
+                  c.statusOrcamento === "PENDENTE" &&
+                  c.orcamentoEnviadoEm &&
+                  new Date(c.orcamentoEnviadoEm) < new Date(Date.now() - 2 * 24 * 60 * 60 * 1000);
+                return (
+                <tr key={c.id} className={cn("border-b transition-colors", orcamentoPendente2d ? "bg-red-500/10 hover:bg-red-500/15" : "hover:bg-muted/30")}>
                   <td className="p-4">
                     <div className="flex items-center gap-3">
                       <Avatar className="w-8 h-8">
@@ -420,9 +427,17 @@ export default function ClientesPage() {
                       </div>
                     ) : <span className="text-muted-foreground text-sm">—</span>}
                   </td>
-                  <td className="p-4"><ActionMenu c={c} /></td>
+                  <td className="p-4">
+                    <div className="flex items-center gap-2">
+                      {orcamentoPendente2d && (
+                        <span title="Orçamento pendente há mais de 2 dias" className="text-red-500 text-xs font-semibold">⚠</span>
+                      )}
+                      <ActionMenu c={c} />
+                    </div>
+                  </td>
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
           </table>
         </div>

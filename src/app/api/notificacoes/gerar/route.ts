@@ -9,6 +9,7 @@ interface Prefs {
   tarefaVencendo?: boolean;
   oportunidadeParada?: boolean;
   clienteSemContato?: boolean;
+  orcamentoPendente?: boolean;
 }
 
 // Avoid duplicate notifications: check if one already exists in a given window
@@ -166,6 +167,43 @@ export async function POST(request: NextRequest) {
             },
           });
           created.push("CLIENTE_SEM_CONTATO:" + c.id);
+        }
+      }
+    }
+
+    // ── 5. ORCAMENTO_PENDENTE: orçamento sem resposta há mais de 2 dias ──────
+    if (prefs.orcamentoPendente !== false) {
+      const cutoff2d = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000);
+      const clientesPendentes = await prisma.cliente.findMany({
+        where: {
+          responsavelId: payload.userId,
+          deletedAt: null,
+          statusOrcamento: "PENDENTE",
+          valorOrcamento: { not: null },
+          orcamentoEnviadoEm: { not: null, lte: cutoff2d },
+        },
+        select: { id: true, nome: true, valorOrcamento: true, orcamentoEnviadoEm: true },
+        take: 10,
+      });
+
+      for (const c of clientesPendentes) {
+        const linkUrl = `/clientes/${c.id}`;
+        const already = await notifExists(payload.userId, "ORCAMENTO_PENDENTE", linkUrl, 24 * 60 * 60 * 1000);
+        if (!already) {
+          const days = Math.floor((Date.now() - c.orcamentoEnviadoEm!.getTime()) / (24 * 60 * 60 * 1000));
+          const valor = c.valorOrcamento
+            ? `R$ ${Number(c.valorOrcamento).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`
+            : "";
+          await prisma.notificacao.create({
+            data: {
+              userId: payload.userId,
+              tipo: "ORCAMENTO_PENDENTE",
+              titulo: "Orçamento pendente de aprovação",
+              mensagem: `${c.nome} tem orçamento${valor ? ` de ${valor}` : ""} aguardando resposta há ${days} dia${days !== 1 ? "s" : ""}.`,
+              linkUrl,
+            },
+          });
+          created.push("ORCAMENTO_PENDENTE:" + c.id);
         }
       }
     }

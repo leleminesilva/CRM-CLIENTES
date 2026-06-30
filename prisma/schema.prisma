@@ -103,6 +103,7 @@ enum TipoNotificacao {
   TAREFA_VENCENDO
   OPORTUNIDADE_PARADA
   CLIENTE_SEM_CONTATO
+  ORCAMENTO_PENDENTE
   SISTEMA
 }
 
@@ -226,9 +227,10 @@ model Cliente {
   dataInscricao   DateTime?
   servicoBuscado  String?
   numeroOrcamento String?
-  valorOrcamento  Decimal?               @db.Decimal(15, 2)
-  prazoOrcamento  DateTime?
-  statusOrcamento StatusOrcamentoCliente @default(PENDENTE)
+  valorOrcamento      Decimal?               @db.Decimal(15, 2)
+  prazoOrcamento      DateTime?
+  statusOrcamento     StatusOrcamentoCliente @default(PENDENTE)
+  orcamentoEnviadoEm  DateTime?
   temperatura     Temperatura            @default(MORNO)
   deletedAt       DateTime?
   createdAt       DateTime               @default(now())

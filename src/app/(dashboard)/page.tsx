@@ -15,6 +15,7 @@ import {
   ArrowUp,
   ArrowDown,
   XCircle,
+  TrendingDown,
 } from "lucide-react";
 import {
   LineChart,
@@ -284,9 +285,14 @@ export default function DashboardPage() {
         <KPICard
           title="Cancelamentos"
           value={kpis.canceladosPeriodo ?? 0}
-          subtitle={(kpis.canceladosValor ?? 0) > 0 ? `Total: ${formatCurrency(kpis.canceladosValor ?? 0)}` : undefined}
           icon={<XCircle className="w-5 h-5 text-white" />}
           color="bg-red-500"
+        />
+        <KPICard
+          title="Valor Cancelado"
+          value={formatCurrency(kpis.canceladosValor ?? 0)}
+          icon={<TrendingDown className="w-5 h-5 text-white" />}
+          color="bg-red-700"
         />
       </div>
 

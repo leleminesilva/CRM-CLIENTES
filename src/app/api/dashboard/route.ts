@@ -60,6 +60,7 @@ export async function GET(request: NextRequest) {
       leadsTotal,
       leadsConvertidos,
       canceladosPeriodo,
+      canceladosAggregate,
     ] = await Promise.all([
       // Total de clientes ativos
       prisma.cliente.count({ where: { deletedAt: null, ...userFilter } }),
@@ -157,7 +158,7 @@ export async function GET(request: NextRequest) {
         },
       }),
 
-      // Cancelamentos no período
+      // Cancelamentos no período — contagem
       prisma.lead.count({
         where: {
           deletedAt: null,
@@ -166,6 +167,17 @@ export async function GET(request: NextRequest) {
           OR: [{ clienteId: null }, { cliente: { deletedAt: null } }],
           ...userFilter,
         },
+      }),
+
+      // Cancelamentos — valor total (clientes com statusOrcamento NAO_APROVADO)
+      prisma.cliente.aggregate({
+        where: {
+          deletedAt: null,
+          statusOrcamento: "NAO_APROVADO",
+          valorOrcamento: { not: null },
+          ...userFilter,
+        },
+        _sum: { valorOrcamento: true },
       }),
     ]);
 
@@ -267,6 +279,7 @@ export async function GET(request: NextRequest) {
           faturamentoPrevisto: receitaFechada,
           leadsGanhos:        leadsGanhosPeriodo,
           canceladosPeriodo,
+          canceladosValor: Number(canceladosAggregate._sum?.valorOrcamento || 0),
         },
         funil:             funnelFormatted,
         vendasMes:         vendasMesRaw,

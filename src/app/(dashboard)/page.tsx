@@ -65,9 +65,10 @@ interface KPICardProps {
   variacao?: number;
   prefix?: string;
   color?: string;
+  subtitle?: string;
 }
 
-function KPICard({ title, value, icon, variacao, prefix = "", color = "bg-indigo-500" }: KPICardProps) {
+function KPICard({ title, value, icon, variacao, prefix = "", color = "bg-indigo-500", subtitle }: KPICardProps) {
   return (
     <Card className="hover:shadow-lg transition-all duration-200 hover:-translate-y-0.5 overflow-hidden">
       {/* Accent strip */}
@@ -79,6 +80,9 @@ function KPICard({ title, value, icon, variacao, prefix = "", color = "bg-indigo
             <p className="text-2xl md:text-3xl font-bold truncate leading-none mt-1.5">
               {prefix}{typeof value === "number" ? value.toLocaleString("pt-BR") : value}
             </p>
+            {subtitle && (
+              <p className="text-xs text-muted-foreground mt-1 truncate">{subtitle}</p>
+            )}
             {variacao !== undefined && (
               <div className={`flex items-center gap-1 text-xs font-medium mt-1 ${variacao >= 0 ? "text-emerald-500" : "text-red-500"}`}>
                 {variacao >= 0 ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />}
@@ -277,14 +281,13 @@ export default function DashboardPage() {
           icon={<Receipt className="w-5 h-5 text-white" />}
           color="bg-rose-500"
         />
-        {isGestor && (
-          <KPICard
-            title="Cancelamentos"
-            value={kpis.canceladosPeriodo ?? 0}
-            icon={<XCircle className="w-5 h-5 text-white" />}
-            color="bg-red-500"
-          />
-        )}
+        <KPICard
+          title="Cancelamentos"
+          value={kpis.canceladosPeriodo ?? 0}
+          subtitle={(kpis.canceladosValor ?? 0) > 0 ? `Total: ${formatCurrency(kpis.canceladosValor ?? 0)}` : undefined}
+          icon={<XCircle className="w-5 h-5 text-white" />}
+          color="bg-red-500"
+        />
       </div>
 
       {/* Charts Row 1 */}

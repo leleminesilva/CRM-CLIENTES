@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
 import Link from "next/link";
@@ -75,15 +75,25 @@ const ETAPA_CONFIG: Record<string, { label: string; color: string }> = {
 };
 
 export default function ClientesPage() {
-  const [search, setSearch] = useState("");
+  const ss = typeof window !== "undefined" ? sessionStorage : null;
+  const [search, setSearch] = useState(() => ss?.getItem("cf_search") ?? "");
   const [page, setPage] = useState(1);
   const [deleteId, setDeleteId] = useState<string | null>(null);
-  const [responsavelId, setResponsavelId] = useState("");
-  const [temperatura, setTemperatura] = useState("");
-  const [servico, setServico] = useState("");
-  const [estagio, setEstagio] = useState("");
-  const [dataInicio, setDataInicio] = useState("");
-  const [dataFim, setDataFim] = useState("");
+  const [responsavelId, setResponsavelId] = useState(() => ss?.getItem("cf_responsavelId") ?? "");
+  const [temperatura, setTemperatura] = useState(() => ss?.getItem("cf_temperatura") ?? "");
+  const [servico, setServico] = useState(() => ss?.getItem("cf_servico") ?? "");
+  const [estagio, setEstagio] = useState(() => ss?.getItem("cf_estagio") ?? "");
+  const [dataInicio, setDataInicio] = useState(() => ss?.getItem("cf_dataInicio") ?? "");
+  const [dataFim, setDataFim] = useState(() => ss?.getItem("cf_dataFim") ?? "");
+
+  // Persiste filtros no sessionStorage sempre que mudam
+  useEffect(() => { sessionStorage.setItem("cf_search", search); }, [search]);
+  useEffect(() => { sessionStorage.setItem("cf_responsavelId", responsavelId); }, [responsavelId]);
+  useEffect(() => { sessionStorage.setItem("cf_temperatura", temperatura); }, [temperatura]);
+  useEffect(() => { sessionStorage.setItem("cf_servico", servico); }, [servico]);
+  useEffect(() => { sessionStorage.setItem("cf_estagio", estagio); }, [estagio]);
+  useEffect(() => { sessionStorage.setItem("cf_dataInicio", dataInicio); }, [dataInicio]);
+  useEffect(() => { sessionStorage.setItem("cf_dataFim", dataFim); }, [dataFim]);
   const qc = useQueryClient();
   const { user } = useAuth();
   const isAdmin = user?.role === "ADMINISTRADOR";
@@ -91,6 +101,7 @@ export default function ClientesPage() {
   const hasActiveFilters = !!(responsavelId || temperatura || servico || estagio || dataInicio || dataFim);
 
   function clearFilters() {
+    setSearch("");
     setResponsavelId("");
     setTemperatura("");
     setServico("");
@@ -98,6 +109,8 @@ export default function ClientesPage() {
     setDataInicio("");
     setDataFim("");
     setPage(1);
+    ["cf_search","cf_responsavelId","cf_temperatura","cf_servico","cf_estagio","cf_dataInicio","cf_dataFim"]
+      .forEach((k) => sessionStorage.removeItem(k));
   }
 
   const { data: vendedoresData } = useQuery({

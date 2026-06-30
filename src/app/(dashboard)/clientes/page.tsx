@@ -11,6 +11,7 @@ import {
   Search,
   Building2,
   Phone,
+  CalendarDays,
   Mail,
   MoreHorizontal,
   Eye,
@@ -81,17 +82,21 @@ export default function ClientesPage() {
   const [temperatura, setTemperatura] = useState("");
   const [servico, setServico] = useState("");
   const [estagio, setEstagio] = useState("");
+  const [dataInicio, setDataInicio] = useState("");
+  const [dataFim, setDataFim] = useState("");
   const qc = useQueryClient();
   const { user } = useAuth();
   const isAdmin = user?.role === "ADMINISTRADOR";
 
-  const hasActiveFilters = !!(responsavelId || temperatura || servico || estagio);
+  const hasActiveFilters = !!(responsavelId || temperatura || servico || estagio || dataInicio || dataFim);
 
   function clearFilters() {
     setResponsavelId("");
     setTemperatura("");
     setServico("");
     setEstagio("");
+    setDataInicio("");
+    setDataFim("");
     setPage(1);
   }
 
@@ -105,7 +110,7 @@ export default function ClientesPage() {
   });
 
   const { data, isLoading } = useQuery({
-    queryKey: ["clientes", page, search, responsavelId, temperatura, servico, estagio],
+    queryKey: ["clientes", page, search, responsavelId, temperatura, servico, estagio, dataInicio, dataFim],
     queryFn: async () => {
       const params = new URLSearchParams({ page: String(page), limit: "15" });
       if (search) params.set("search", search);
@@ -113,6 +118,8 @@ export default function ClientesPage() {
       if (temperatura) params.set("temperatura", temperatura);
       if (servico) params.set("servico", servico);
       if (estagio) params.set("estagio", estagio);
+      if (dataInicio) params.set("dataInicio", dataInicio);
+      if (dataFim) params.set("dataFim", dataFim);
       const { data } = await axios.get(`/api/clientes?${params}`);
       return data;
     },
@@ -236,6 +243,26 @@ export default function ClientesPage() {
               ))}
             </SelectContent>
           </Select>
+
+          {/* Data de cadastro */}
+          <div className="flex items-center gap-1.5 shrink-0">
+            <CalendarDays className="w-4 h-4 text-muted-foreground shrink-0" />
+            <input
+              type="date"
+              value={dataInicio}
+              onChange={(e) => { setDataInicio(e.target.value); setPage(1); }}
+              className="h-9 rounded-md border border-input bg-background px-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring w-[135px]"
+              title="Data de início"
+            />
+            <span className="text-muted-foreground text-sm">até</span>
+            <input
+              type="date"
+              value={dataFim}
+              onChange={(e) => { setDataFim(e.target.value); setPage(1); }}
+              className="h-9 rounded-md border border-input bg-background px-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring w-[135px]"
+              title="Data de fim"
+            />
+          </div>
 
           {/* Limpar filtros */}
           {hasActiveFilters && (

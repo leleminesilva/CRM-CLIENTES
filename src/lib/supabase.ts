@@ -1,13 +1,41 @@
-import { createClient } from "@supabase/supabase-js";
+import { createClient, SupabaseClient } from "@supabase/supabase-js";
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+// Lazy singletons — not created at module load time so Next.js build doesn't fail
+// when env vars are only available at runtime.
+let _supabase: SupabaseClient | null = null;
+let _supabaseAdmin: SupabaseClient | null = null;
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+function getSupabase(): SupabaseClient {
+  if (!_supabase) {
+    _supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    );
+  }
+  return _supabase;
+}
 
-export const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
-  auth: { autoRefreshToken: false, persistSession: false },
+function getSupabaseAdmin(): SupabaseClient {
+  if (!_supabaseAdmin) {
+    _supabaseAdmin = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      { auth: { autoRefreshToken: false, persistSession: false } }
+    );
+  }
+  return _supabaseAdmin;
+}
+
+export const supabase = new Proxy({} as SupabaseClient, {
+  get(_target, prop) {
+    return (getSupabase() as unknown as Record<string | symbol, unknown>)[prop];
+  },
+});
+
+export const supabaseAdmin = new Proxy({} as SupabaseClient, {
+  get(_target, prop) {
+    return (getSupabaseAdmin() as unknown as Record<string | symbol, unknown>)[prop];
+  },
 });
 
 export async function uploadFile(
@@ -15,13 +43,13 @@ export async function uploadFile(
   path: string,
   file: File
 ): Promise<string> {
-  const { data, error } = await supabaseAdmin.storage
+  const { data, error } = await getSupabaseAdmin().storage
     .from(bucket)
     .upload(path, file, { upsert: true });
 
   if (error) throw new Error(error.message);
 
-  const { data: urlData } = supabaseAdmin.storage
+  const { data: urlData } = getSupabaseAdmin().storage
     .from(bucket)
     .getPublicUrl(data.path);
 
@@ -29,6 +57,6 @@ export async function uploadFile(
 }
 
 export async function deleteFile(bucket: string, path: string): Promise<void> {
-  const { error } = await supabaseAdmin.storage.from(bucket).remove([path]);
+  const { error } = await getSupabaseAdmin().storage.from(bucket).remove([path]);
   if (error) throw new Error(error.message);
 }

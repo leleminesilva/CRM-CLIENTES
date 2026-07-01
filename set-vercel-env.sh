@@ -33,5 +33,5 @@ if [ -n "$DIRECT_URL" ]; then
   printf '%s' "$DIRECT_URL" | vercel env add DIRECT_URL development
 fi
 
-echo "✅ Variáveis configuradas corretamente. Fazendo redeploy..."
-vercel --prod --force
+echo "✅ Variáveis configuradas corretamente."
+echo "O Vercel vai auto-deployar pelo GitHub automaticamente."

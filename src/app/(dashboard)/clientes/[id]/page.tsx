@@ -257,12 +257,13 @@ function TemperaturaSelect({
 }
 
 function OrcamentoCard({
-  clienteId, numeroOrcamento, valorOrcamento, prazoOrcamento, statusOrcamento, temperatura, onSaved,
+  clienteId, numeroOrcamento, valorOrcamento, prazoOrcamento, dataVenda, statusOrcamento, temperatura, onSaved,
 }: {
   clienteId: string;
   numeroOrcamento?: string | null;
   valorOrcamento?: number | null;
   prazoOrcamento?: string | null;
+  dataVenda?: string | null;
   statusOrcamento: string;
   temperatura: string;
   onSaved: () => void;
@@ -273,12 +274,16 @@ function OrcamentoCard({
   const [prazo, setPrazo] = useState(
     prazoOrcamento ? new Date(prazoOrcamento).toISOString().split("T")[0] : ""
   );
+  const [dataVendaState, setDataVendaState] = useState(
+    dataVenda ? new Date(dataVenda).toISOString().split("T")[0] : ""
+  );
 
   const mutation = useMutation({
     mutationFn: () => axios.patch(`/api/clientes/${clienteId}`, {
       numeroOrcamento: numero || null,
       valorOrcamento: valor ? Number(valor) : null,
       prazoOrcamento: prazo || null,
+      dataVenda: dataVendaState || null,
     }),
     onSuccess: () => { toast.success("Orçamento salvo!"); onSaved(); setEditando(false); },
     onError: () => toast.error("Erro ao salvar orçamento"),
@@ -288,6 +293,7 @@ function OrcamentoCard({
     setNumero(numeroOrcamento ?? "");
     setValor(valorOrcamento ? String(valorOrcamento) : "");
     setPrazo(prazoOrcamento ? new Date(prazoOrcamento).toISOString().split("T")[0] : "");
+    setDataVendaState(dataVenda ? new Date(dataVenda).toISOString().split("T")[0] : "");
     setEditando(true);
   };
 
@@ -350,6 +356,16 @@ function OrcamentoCard({
                 className="w-full text-sm bg-background border border-border rounded-md px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-ring"
               />
             </div>
+            <div className="space-y-1">
+              <label className="text-xs text-muted-foreground">Data da Venda</label>
+              <input
+                type="date"
+                value={dataVendaState}
+                onChange={e => setDataVendaState(e.target.value)}
+                className="w-full text-sm bg-background border border-border rounded-md px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-ring"
+              />
+              <p className="text-xs text-muted-foreground/70">Usada para atribuir a venda ao mês correto no dashboard.</p>
+            </div>
           </div>
         ) : (
           <>
@@ -367,6 +383,12 @@ function OrcamentoCard({
               <span className="text-muted-foreground">Prazo</span>
               <span className="font-medium">
                 {prazoOrcamento ? new Date(prazoOrcamento).toLocaleDateString("pt-BR") : "—"}
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Data da Venda</span>
+              <span className="font-medium">
+                {dataVenda ? new Date(dataVenda).toLocaleDateString("pt-BR") : "—"}
               </span>
             </div>
           </>
@@ -663,6 +685,7 @@ export default function ClienteDetalhePage() {
           numeroOrcamento={cliente.numeroOrcamento as string | null}
           valorOrcamento={cliente.valorOrcamento ? Number(cliente.valorOrcamento) : null}
           prazoOrcamento={cliente.prazoOrcamento as string | null}
+          dataVenda={cliente.dataVenda as string | null}
           statusOrcamento={cliente.statusOrcamento as string}
           temperatura={cliente.temperatura as string}
           onSaved={() => {

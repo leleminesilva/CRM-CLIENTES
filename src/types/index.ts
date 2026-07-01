@@ -136,6 +136,7 @@ export interface Cliente {
   numeroOrcamento?: string | null;
   valorOrcamento?: number | null;
   prazoOrcamento?: string | null;
+  dataVenda?: string | null;
   statusOrcamento: StatusOrcamentoCliente;
   orcamentoEnviadoEm?: string | null;
   temperatura: Temperatura;

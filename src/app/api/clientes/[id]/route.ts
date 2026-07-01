@@ -21,6 +21,7 @@ const FIELD_LABELS: Record<string, string> = {
   origem: "Origem",
   numeroOrcamento: "Nº orçamento",
   responsavelId: "Responsável",
+  dataVenda: "Data da venda",
 };
 
 const TEMP_LABELS: Record<string, string> = { QUENTE: "Quente", MORNO: "Morno", FRIO: "Frio" };
@@ -32,6 +33,10 @@ function formatFieldValue(key: string, value: unknown): string {
   if (key === "statusOrcamento") return STATUS_LABELS[String(value)] ?? String(value);
   if (key === "valorOrcamento") return `R$ ${Number(value).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`;
   if (key === "responsavelId") return null as unknown as string; // tratado separado
+  if (key === "dataVenda") {
+    const d = new Date(String(value));
+    return isNaN(d.getTime()) ? String(value) : d.toLocaleDateString("pt-BR");
+  }
   return String(value);
 }
 
@@ -275,6 +280,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     if ("numeroOrcamento" in body) updateData.numeroOrcamento = body.numeroOrcamento || null;
     if ("valorOrcamento"  in body) updateData.valorOrcamento  = body.valorOrcamento  ? Number(body.valorOrcamento) : null;
     if ("prazoOrcamento"  in body) updateData.prazoOrcamento  = body.prazoOrcamento  ? new Date(body.prazoOrcamento) : null;
+    if ("dataVenda"       in body) updateData.dataVenda       = body.dataVenda        ? new Date(body.dataVenda) : null;
     if ("statusOrcamento" in body) updateData.statusOrcamento = body.statusOrcamento;
     if ("temperatura"     in body) updateData.temperatura     = body.temperatura;
 
@@ -295,8 +301,8 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
       data: updateData,
     });
 
-    // Sincroniza lead se statusOrcamento ou valorOrcamento foram alterados
-    if ("statusOrcamento" in body || "valorOrcamento" in body) {
+    // Sincroniza lead se statusOrcamento, valorOrcamento ou dataVenda foram alterados
+    if ("statusOrcamento" in body || "valorOrcamento" in body || "dataVenda" in body) {
       const leadExistente = await prisma.lead.findFirst({ where: { clienteId: params.id, deletedAt: null } });
       const leadUpdate: Record<string, unknown> = {};
 
@@ -310,13 +316,23 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
         const status = updateData.statusOrcamento as string;
         if (status === "APROVADO") {
           leadUpdate.estagio = "FECHADO_GANHO";
-          leadUpdate.dataFechamento = leadExistente?.dataFechamento ?? new Date();
+          // dataVenda tem precedência; se não vier neste body, mantém data existente ou usa now
+          const dataVendaDate = updateData.dataVenda as Date | null | undefined;
+          leadUpdate.dataFechamento = dataVendaDate ?? leadExistente?.dataFechamento ?? new Date();
         } else if (status === "NAO_APROVADO") {
           leadUpdate.estagio = "FECHADO_PERDIDO";
           leadUpdate.dataFechamento = leadExistente?.dataFechamento ?? new Date();
         } else {
           // PENDENTE: não sobrescreve estagio do pipeline, apenas limpa dataFechamento
           leadUpdate.dataFechamento = null;
+        }
+      }
+
+      // Se dataVenda foi alterada e lead já está FECHADO_GANHO, sincroniza dataFechamento
+      if ("dataVenda" in body && !("statusOrcamento" in body)) {
+        const currentEstagio = leadExistente?.estagio;
+        if (currentEstagio === "FECHADO_GANHO") {
+          leadUpdate.dataFechamento = (updateData.dataVenda as Date | null) ?? leadExistente?.dataFechamento ?? new Date();
         }
       }
 

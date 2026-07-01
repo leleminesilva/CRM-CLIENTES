@@ -229,6 +229,7 @@ model Cliente {
   numeroOrcamento String?
   valorOrcamento      Decimal?               @db.Decimal(15, 2)
   prazoOrcamento      DateTime?
+  dataVenda           DateTime?
   statusOrcamento     StatusOrcamentoCliente @default(PENDENTE)
   orcamentoEnviadoEm  DateTime?
   temperatura     Temperatura            @default(MORNO)

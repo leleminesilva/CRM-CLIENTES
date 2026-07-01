@@ -125,17 +125,20 @@ export async function GET(request: NextRequest) {
         _sum: { valorOrcamento: true },
       }),
 
-      // Receita fechada — clientes com statusOrcamento APROVADO
-      prisma.cliente.aggregate({
-        where: {
-          deletedAt: null,
-          statusOrcamento: "APROVADO",
-          valorOrcamento: { not: null },
-          ...userFilter,
-        },
-        _sum: { valorOrcamento: true },
-        _count: { _all: true },
-      }),
+      // Receita fechada no período — via leads fechados com dataFechamento no range
+      prisma.$queryRaw<Array<{ count: number; valor: number }>>(Prisma.sql`
+        SELECT
+          COUNT(*)::int AS count,
+          COALESCE(SUM(COALESCE(c."valorOrcamento", l."valorEstimado")), 0)::float AS valor
+        FROM leads l
+        LEFT JOIN clientes c ON l."clienteId" = c.id AND c."deletedAt" IS NULL
+        WHERE l."deletedAt" IS NULL
+          AND l.estagio = 'FECHADO_GANHO'::"EstagioLead"
+          AND l."dataFechamento" >= ${de}
+          AND l."dataFechamento" <= ${ate}
+          AND (l."clienteId" IS NULL OR c.id IS NOT NULL)
+          ${leadsUserFilterSql}
+      `),
 
       // Total de leads criados no período (para taxa de conversão)
       prisma.lead.count({
@@ -169,21 +172,27 @@ export async function GET(request: NextRequest) {
         },
       }),
 
-      // Cancelamentos — valor total (clientes com statusOrcamento NAO_APROVADO)
-      prisma.cliente.aggregate({
-        where: {
-          deletedAt: null,
-          statusOrcamento: "NAO_APROVADO",
-          valorOrcamento: { not: null },
-          ...userFilter,
-        },
-        _sum: { valorOrcamento: true },
-      }),
+      // Cancelamentos — valor total no período via leads com dataFechamento no range
+      prisma.$queryRaw<Array<{ valor: number }>>(Prisma.sql`
+        SELECT
+          COALESCE(SUM(COALESCE(c."valorOrcamento", l."valorEstimado")), 0)::float AS valor
+        FROM leads l
+        LEFT JOIN clientes c ON l."clienteId" = c.id AND c."deletedAt" IS NULL
+        WHERE l."deletedAt" IS NULL
+          AND l.estagio = 'FECHADO_PERDIDO'::"EstagioLead"
+          AND l."dataFechamento" >= ${de}
+          AND l."dataFechamento" <= ${ate}
+          AND (l."clienteId" IS NULL OR c.id IS NOT NULL)
+          ${leadsUserFilterSql}
+      `),
     ]);
 
-    const receitaFechada  = Number(receitaFechadaPeriodo._sum?.valorOrcamento || 0);
-    const vendasFechadas  = receitaFechadaPeriodo._count?._all || 0;
+    const receitaFechadaRow = (receitaFechadaPeriodo as Array<{ count: number; valor: number }>)[0];
+    const receitaFechada  = receitaFechadaRow?.valor ?? 0;
+    const vendasFechadas  = receitaFechadaRow?.count ?? 0;
     const ticketMedio     = vendasFechadas > 0 ? receitaFechada / vendasFechadas : 0;
+    const canceladosValorRow = (canceladosAggregate as Array<{ valor: number }>)[0];
+    const canceladosValor = canceladosValorRow?.valor ?? 0;
     const taxaConversao   = leadsTotal > 0 ? (leadsConvertidos / leadsTotal) * 100 : 0;
 
     const funnelFormatted = funnelData.map((f) => ({
@@ -279,7 +288,7 @@ export async function GET(request: NextRequest) {
           faturamentoPrevisto: receitaFechada,
           leadsGanhos:        leadsGanhosPeriodo,
           canceladosPeriodo,
-          canceladosValor: Number(canceladosAggregate._sum?.valorOrcamento || 0),
+          canceladosValor,
         },
         funil:             funnelFormatted,
         vendasMes:         vendasMesRaw,

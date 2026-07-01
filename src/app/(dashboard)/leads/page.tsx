@@ -279,8 +279,7 @@ export default function LeadsKanbanPage() {
   }
 
   function confirmarCancelamentoKanban() {
-    if (!dataCancelamento || !motivoCategoria) return;
-    if (motivoCategoria === "Outros" && !motivoCancelamento.trim()) return;
+    if (!dataCancelamento || !motivoCategoria || !motivoCancelamento.trim()) return;
     const motivoPerda = motivoCancelamento.trim()
       ? `${motivoCategoria} — ${motivoCancelamento.trim()}`
       : motivoCategoria;
@@ -346,15 +345,13 @@ export default function LeadsKanbanPage() {
             </div>
             {motivoCategoria && (
               <div className="space-y-2">
-                <p className="text-sm font-medium">
-                  Observação{motivoCategoria === "Outros" ? <span className="text-red-500"> *</span> : <span className="text-muted-foreground font-normal"> (opcional)</span>}
-                </p>
+                <p className="text-sm font-medium">Observação <span className="text-red-500">*</span></p>
                 <Textarea
-                  placeholder={motivoCategoria === "Outros" ? "Descreva o motivo..." : "Detalhes adicionais..."}
+                  placeholder="Descreva o motivo do cancelamento..."
                   value={motivoCancelamento}
                   onChange={(e) => setMotivoCancelamento(e.target.value)}
                   rows={2}
-                  className={motivoCategoria === "Outros" && !motivoCancelamento.trim() ? "border-red-400" : ""}
+                  className={!motivoCancelamento.trim() ? "border-red-400" : ""}
                 />
               </div>
             )}
@@ -365,7 +362,7 @@ export default function LeadsKanbanPage() {
             </Button>
             <Button
               variant="destructive"
-              disabled={!dataCancelamento || !motivoCategoria || (motivoCategoria === "Outros" && !motivoCancelamento.trim()) || moveMutation.isPending}
+              disabled={!dataCancelamento || !motivoCategoria || !motivoCancelamento.trim() || moveMutation.isPending}
               onClick={confirmarCancelamentoKanban}
             >
               Confirmar cancelamento

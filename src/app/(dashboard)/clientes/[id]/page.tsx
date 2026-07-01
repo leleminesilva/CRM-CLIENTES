@@ -95,8 +95,8 @@ function PipelineTracker({
       toast.error("Selecione o motivo do cancelamento");
       return;
     }
-    if (motivoCategoria === "Outros" && !motivoCancelamento.trim()) {
-      toast.error("Descreva o motivo na observação quando selecionar \"Outros\"");
+    if (!motivoCancelamento.trim()) {
+      toast.error("A observação é obrigatória");
       return;
     }
     const motivoPerda = motivoCancelamento.trim()
@@ -216,18 +216,13 @@ function PipelineTracker({
               </div>
             </div>
             <div className="space-y-2">
-              <p className="text-sm font-medium">
-                Observação{" "}
-                {motivoCategoria === "Outros"
-                  ? <span className="text-red-500">*</span>
-                  : <span className="text-muted-foreground font-normal">(opcional)</span>}
-              </p>
+              <p className="text-sm font-medium">Observação <span className="text-red-500">*</span></p>
               <Textarea
-                placeholder={motivoCategoria === "Outros" ? "Obrigatório: descreva o motivo..." : "Detalhes adicionais sobre o cancelamento..."}
+                placeholder="Descreva o motivo do cancelamento..."
                 value={motivoCancelamento}
                 onChange={(e) => setMotivoCancelamento(e.target.value)}
                 rows={3}
-                className={motivoCategoria === "Outros" && !motivoCancelamento.trim() ? "border-red-400 focus-visible:ring-red-400" : ""}
+                className={motivoCategoria && !motivoCancelamento.trim() ? "border-red-400 focus-visible:ring-red-400" : ""}
               />
             </div>
           </div>
@@ -237,7 +232,7 @@ function PipelineTracker({
             </Button>
             <Button
               variant="destructive"
-              disabled={!dataCancelamento || !motivoCategoria || (motivoCategoria === "Outros" && !motivoCancelamento.trim()) || mutation.isPending}
+              disabled={!dataCancelamento || !motivoCategoria || !motivoCancelamento.trim() || mutation.isPending}
               onClick={confirmarCancelamento}
             >
               Confirmar cancelamento

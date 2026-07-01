@@ -31,8 +31,8 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     const body = await request.json();
     const { estagio, ordemKanban, motivoPerda, dataFechamento } = moverSchema.parse(body);
 
-    if (estagio === "FECHADO_PERDIDO" && !dataFechamento) {
-      return NextResponse.json({ error: "Data do cancelamento é obrigatória" }, { status: 400 });
+    if ((estagio === "FECHADO_PERDIDO" || estagio === "FECHADO_GANHO") && !dataFechamento) {
+      return NextResponse.json({ error: "Data de fechamento é obrigatória" }, { status: 400 });
     }
     const isFechamento = estagio === "FECHADO_GANHO" || estagio === "FECHADO_PERDIDO";
 

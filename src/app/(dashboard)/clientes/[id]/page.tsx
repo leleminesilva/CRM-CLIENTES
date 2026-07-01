@@ -62,15 +62,34 @@ function PipelineTracker({
   estagio: EstagioLead;
   onUpdate: () => void;
 }) {
+  const hoje = new Date().toISOString().slice(0, 10);
+
+  // Dialog cancelamento
   const [cancelDialog, setCancelDialog] = useState(false);
   const [motivoCategoria, setMotivoCategoria] = useState("");
   const [motivoCancelamento, setMotivoCancelamento] = useState("");
-  const [dataCancelamento, setDataCancelamento] = useState(() => new Date().toISOString().slice(0, 10));
+  const [dataCancelamento, setDataCancelamento] = useState(hoje);
+
+  // Dialog Primeiro Orçamento
+  const [orcDialog, setOrcDialog] = useState(false);
+  const [orcNumero, setOrcNumero] = useState("");
+  const [orcValor, setOrcValor] = useState("");
+  const [orcData, setOrcData] = useState(hoje);
+
+  // Dialog Confirmado (FECHADO_GANHO)
+  const [confDialog, setConfDialog] = useState(false);
+  const [confValor, setConfValor] = useState("");
+  const [confData, setConfData] = useState(hoje);
 
   const MOTIVOS_CANCELAMENTO = ["Prazo", "Preço", "Distância", "Não Realizamos", "Outros"];
 
   const mutation = useMutation({
-    mutationFn: async ({ novoEstagio, motivoPerda, dataFechamento }: { novoEstagio: EstagioLead; motivoPerda?: string; dataFechamento?: string }) => {
+    mutationFn: async ({ novoEstagio, motivoPerda, dataFechamento, clientePatch }: {
+      novoEstagio: EstagioLead;
+      motivoPerda?: string;
+      dataFechamento?: string;
+      clientePatch?: Record<string, unknown>;
+    }) => {
       await (leadId
         ? axios.patch(`/api/leads/${leadId}/mover`, { estagio: novoEstagio, motivoPerda, dataFechamento })
         : axios.post("/api/leads", { titulo: clienteNome, estagio: novoEstagio, origem: "OUTROS", clienteId }));
@@ -80,7 +99,7 @@ function PipelineTracker({
         FECHADO_PERDIDO: "NAO_APROVADO",
       };
       const novoStatus = statusMap[novoEstagio] ?? "PENDENTE";
-      await axios.patch(`/api/clientes/${clienteId}`, { statusOrcamento: novoStatus });
+      await axios.patch(`/api/clientes/${clienteId}`, { statusOrcamento: novoStatus, ...clientePatch });
     },
     onSuccess: () => { toast.success("Etapa atualizada!"); onUpdate(); },
     onError: () => toast.error("Erro ao atualizar etapa"),
@@ -127,7 +146,16 @@ function PipelineTracker({
                 <button
                   type="button"
                   disabled={mutation.isPending}
-                  onClick={() => mutation.mutate({ novoEstagio: etapa.estagio })}
+                  onClick={() => {
+                    if (etapa.estagio === "PRIMEIRO_ORCAMENTO") {
+                      setOrcData(hoje);
+                      setOrcNumero("");
+                      setOrcValor("");
+                      setOrcDialog(true);
+                    } else {
+                      mutation.mutate({ novoEstagio: etapa.estagio });
+                    }
+                  }}
                   className={cn(
                     "flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all border",
                     isActive && "bg-indigo-600 text-white border-indigo-600 shadow-sm",
@@ -150,7 +178,7 @@ function PipelineTracker({
           <button
             type="button"
             disabled={mutation.isPending}
-            onClick={() => mutation.mutate({ novoEstagio: "FECHADO_GANHO" })}
+            onClick={() => { setConfValor(""); setConfData(hoje); setConfDialog(true); }}
             className={cn(
               "flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all border",
               estagio === "FECHADO_GANHO"
@@ -240,6 +268,120 @@ function PipelineTracker({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Dialog Primeiro Orçamento */}
+      <Dialog open={orcDialog} onOpenChange={(o) => { if (!o) { setOrcDialog(false); } }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-indigo-500">
+              <FileText className="w-4 h-4" /> Primeiro Orçamento
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-1.5">
+              <p className="text-sm font-medium">Número do Orçamento <span className="text-red-500">*</span></p>
+              <input
+                value={orcNumero}
+                onChange={(e) => setOrcNumero(e.target.value)}
+                placeholder="Ex: 11241"
+                className={`w-full h-9 rounded-md border px-3 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring ${!orcNumero ? "border-red-400" : "border-input"}`}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <p className="text-sm font-medium">Valor (R$) <span className="text-red-500">*</span></p>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                value={orcValor}
+                onChange={(e) => setOrcValor(e.target.value)}
+                placeholder="0,00"
+                className={`w-full h-9 rounded-md border px-3 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring ${!orcValor ? "border-red-400" : "border-input"}`}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <p className="text-sm font-medium">Data do Orçamento <span className="text-red-500">*</span></p>
+              <input
+                type="date"
+                value={orcData}
+                max={hoje}
+                onChange={(e) => setOrcData(e.target.value)}
+                className={`w-full h-9 rounded-md border px-3 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring ${!orcData ? "border-red-400" : "border-input"}`}
+              />
+            </div>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setOrcDialog(false)}>Voltar</Button>
+            <Button
+              className="bg-indigo-600 hover:bg-indigo-700"
+              disabled={!orcNumero || !orcValor || !orcData || mutation.isPending}
+              onClick={async () => {
+                await axios.patch(`/api/clientes/${clienteId}`, {
+                  numeroOrcamento: orcNumero,
+                  valorOrcamento: Number(orcValor),
+                  orcamentoEnviadoEm: orcData,
+                });
+                mutation.mutate({ novoEstagio: "PRIMEIRO_ORCAMENTO" });
+                setOrcDialog(false);
+              }}
+            >
+              {mutation.isPending ? "Salvando..." : "Confirmar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog Confirmado (FECHADO_GANHO) */}
+      <Dialog open={confDialog} onOpenChange={(o) => { if (!o) setConfDialog(false); }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-emerald-500">
+              <ThumbsUp className="w-4 h-4" /> Confirmar venda
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-1.5">
+              <p className="text-sm font-medium">Valor (R$) <span className="text-red-500">*</span></p>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                value={confValor}
+                onChange={(e) => setConfValor(e.target.value)}
+                placeholder="0,00"
+                className={`w-full h-9 rounded-md border px-3 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring ${!confValor ? "border-red-400" : "border-input"}`}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <p className="text-sm font-medium">Data da Venda <span className="text-red-500">*</span></p>
+              <input
+                type="date"
+                value={confData}
+                max={hoje}
+                onChange={(e) => setConfData(e.target.value)}
+                className={`w-full h-9 rounded-md border px-3 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring ${!confData ? "border-red-400" : "border-input"}`}
+              />
+            </div>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setConfDialog(false)}>Voltar</Button>
+            <Button
+              className="bg-emerald-600 hover:bg-emerald-700"
+              disabled={!confValor || !confData || mutation.isPending}
+              onClick={() => {
+                mutation.mutate({
+                  novoEstagio: "FECHADO_GANHO",
+                  dataFechamento: confData,
+                  clientePatch: { valorOrcamento: Number(confValor), dataVenda: confData },
+                });
+                setConfDialog(false);
+              }}
+            >
+              {mutation.isPending ? "Salvando..." : "Confirmar venda"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
@@ -268,142 +410,47 @@ function TemperaturaSelect({
 }
 
 function OrcamentoCard({
-  clienteId, numeroOrcamento, valorOrcamento, prazoOrcamento, dataVenda, statusOrcamento, temperatura, onSaved,
+  clienteId, numeroOrcamento, valorOrcamento, orcamentoEnviadoEm, dataVenda, statusOrcamento, temperatura, onSaved,
 }: {
   clienteId: string;
   numeroOrcamento?: string | null;
   valorOrcamento?: number | null;
-  prazoOrcamento?: string | null;
+  orcamentoEnviadoEm?: string | null;
   dataVenda?: string | null;
   statusOrcamento: string;
   temperatura: string;
   onSaved: () => void;
 }) {
-  const [editando, setEditando] = useState(false);
-  const [numero, setNumero] = useState(numeroOrcamento ?? "");
-  const [valor, setValor] = useState(valorOrcamento ? String(valorOrcamento) : "");
-  const [prazo, setPrazo] = useState(
-    prazoOrcamento ? new Date(prazoOrcamento).toISOString().split("T")[0] : ""
-  );
-  const [dataVendaState, setDataVendaState] = useState(
-    dataVenda ? new Date(dataVenda).toISOString().split("T")[0] : ""
-  );
-
-  const mutation = useMutation({
-    mutationFn: () => axios.patch(`/api/clientes/${clienteId}`, {
-      numeroOrcamento: numero || null,
-      valorOrcamento: valor ? Number(valor) : null,
-      prazoOrcamento: prazo || null,
-      dataVenda: dataVendaState || null,
-    }),
-    onSuccess: () => { toast.success("Orçamento salvo!"); onSaved(); setEditando(false); },
-    onError: () => toast.error("Erro ao salvar orçamento"),
-  });
-
-  const handleEdit = () => {
-    setNumero(numeroOrcamento ?? "");
-    setValor(valorOrcamento ? String(valorOrcamento) : "");
-    setPrazo(prazoOrcamento ? new Date(prazoOrcamento).toISOString().split("T")[0] : "");
-    setDataVendaState(dataVenda ? new Date(dataVenda).toISOString().split("T")[0] : "");
-    setEditando(true);
-  };
-
   return (
     <Card className="p-4">
-      <div className="flex items-center justify-between mb-3">
+      <div className="flex items-center mb-3">
         <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide flex items-center gap-1.5">
           <FileText className="w-3.5 h-3.5" /> Orçamento
         </p>
-        {!editando ? (
-          <button onClick={handleEdit} className="text-muted-foreground hover:text-foreground transition-colors">
-            <Pencil className="w-3.5 h-3.5" />
-          </button>
-        ) : (
-          <div className="flex items-center gap-2">
-            <button onClick={() => setEditando(false)} className="text-muted-foreground hover:text-foreground">
-              <X className="w-4 h-4" />
-            </button>
-            <button
-              onClick={() => mutation.mutate()}
-              disabled={mutation.isPending}
-              className="text-indigo-500 hover:text-indigo-400 font-medium text-xs flex items-center gap-1"
-            >
-              <Check className="w-3.5 h-3.5" />
-              {mutation.isPending ? "Salvando..." : "Salvar"}
-            </button>
-          </div>
-        )}
       </div>
       <div className="space-y-2 text-sm">
-        {editando ? (
-          <div className="space-y-3">
-            <div className="space-y-1">
-              <label className="text-xs text-muted-foreground">Número do Orçamento</label>
-              <input
-                value={numero}
-                onChange={e => setNumero(e.target.value)}
-                placeholder="ORC-001"
-                className="w-full text-sm bg-background border border-border rounded-md px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-ring"
-              />
-            </div>
-            <div className="space-y-1">
-              <label className="text-xs text-muted-foreground">Valor (R$)</label>
-              <input
-                type="number"
-                step="0.01"
-                min="0"
-                value={valor}
-                onChange={e => setValor(e.target.value)}
-                placeholder="0,00"
-                className="w-full text-sm bg-background border border-border rounded-md px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-ring"
-              />
-            </div>
-            <div className="space-y-1">
-              <label className="text-xs text-muted-foreground">Prazo da Proposta</label>
-              <input
-                type="date"
-                value={prazo}
-                onChange={e => setPrazo(e.target.value)}
-                className="w-full text-sm bg-background border border-border rounded-md px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-ring"
-              />
-            </div>
-            <div className="space-y-1">
-              <label className="text-xs text-muted-foreground">Data da Venda</label>
-              <input
-                type="date"
-                value={dataVendaState}
-                onChange={e => setDataVendaState(e.target.value)}
-                className="w-full text-sm bg-background border border-border rounded-md px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-ring"
-              />
-              <p className="text-xs text-muted-foreground/70">Usada para atribuir a venda ao mês correto no dashboard.</p>
-            </div>
-          </div>
-        ) : (
-          <>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Número</span>
-              <span className="font-medium font-mono">{numeroOrcamento || "—"}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Valor</span>
-              <span className={valorOrcamento ? "font-semibold text-emerald-600" : "text-muted-foreground"}>
-                {valorOrcamento ? formatCurrency(Number(valorOrcamento)) : "—"}
-              </span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Prazo</span>
-              <span className="font-medium">
-                {prazoOrcamento ? new Date(prazoOrcamento).toLocaleDateString("pt-BR") : "—"}
-              </span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Data da Venda</span>
-              <span className="font-medium">
-                {dataVenda ? new Date(dataVenda).toLocaleDateString("pt-BR") : "—"}
-              </span>
-            </div>
-          </>
-        )}
+        <div className="flex justify-between">
+          <span className="text-muted-foreground">Número</span>
+          <span className="font-medium font-mono">{numeroOrcamento || "—"}</span>
+        </div>
+        <div className="flex justify-between">
+          <span className="text-muted-foreground">Valor</span>
+          <span className={valorOrcamento ? "font-semibold text-emerald-600" : "text-muted-foreground"}>
+            {valorOrcamento ? formatCurrency(Number(valorOrcamento)) : "—"}
+          </span>
+        </div>
+        <div className="flex justify-between">
+          <span className="text-muted-foreground">Data do Orçamento</span>
+          <span className="font-medium">
+            {orcamentoEnviadoEm ? new Date(orcamentoEnviadoEm).toLocaleDateString("pt-BR") : "—"}
+          </span>
+        </div>
+        <div className="flex justify-between">
+          <span className="text-muted-foreground">Data da Venda</span>
+          <span className="font-medium">
+            {dataVenda ? new Date(dataVenda).toLocaleDateString("pt-BR") : "—"}
+          </span>
+        </div>
         <div className="flex justify-between items-center pt-1 border-t border-border">
           <span className="text-muted-foreground">Status</span>
           <Badge variant={
@@ -695,7 +742,7 @@ export default function ClienteDetalhePage() {
           clienteId={id}
           numeroOrcamento={cliente.numeroOrcamento as string | null}
           valorOrcamento={cliente.valorOrcamento ? Number(cliente.valorOrcamento) : null}
-          prazoOrcamento={cliente.prazoOrcamento as string | null}
+          orcamentoEnviadoEm={cliente.orcamentoEnviadoEm as string | null}
           dataVenda={cliente.dataVenda as string | null}
           statusOrcamento={cliente.statusOrcamento as string}
           temperatura={cliente.temperatura as string}

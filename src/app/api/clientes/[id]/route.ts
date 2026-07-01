@@ -276,16 +276,18 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
 
     // Constrói o objeto de update apenas com os campos presentes no body
     const updateData: Record<string, unknown> = {};
-    if ("observacoes"     in body) updateData.observacoes     = body.observacoes     || null;
-    if ("numeroOrcamento" in body) updateData.numeroOrcamento = body.numeroOrcamento || null;
-    if ("valorOrcamento"  in body) updateData.valorOrcamento  = body.valorOrcamento  ? Number(body.valorOrcamento) : null;
-    if ("prazoOrcamento"  in body) updateData.prazoOrcamento  = body.prazoOrcamento  ? new Date(body.prazoOrcamento) : null;
-    if ("dataVenda"       in body) updateData.dataVenda       = body.dataVenda        ? new Date(body.dataVenda) : null;
-    if ("statusOrcamento" in body) updateData.statusOrcamento = body.statusOrcamento;
-    if ("temperatura"     in body) updateData.temperatura     = body.temperatura;
+    if ("observacoes"          in body) updateData.observacoes     = body.observacoes     || null;
+    if ("numeroOrcamento"      in body) updateData.numeroOrcamento = body.numeroOrcamento || null;
+    if ("valorOrcamento"       in body) updateData.valorOrcamento  = body.valorOrcamento  ? Number(body.valorOrcamento) : null;
+    if ("prazoOrcamento"       in body) updateData.prazoOrcamento  = body.prazoOrcamento  ? new Date(body.prazoOrcamento) : null;
+    if ("dataVenda"            in body) updateData.dataVenda       = body.dataVenda        ? new Date(body.dataVenda) : null;
+    if ("statusOrcamento"      in body) updateData.statusOrcamento = body.statusOrcamento;
+    if ("temperatura"          in body) updateData.temperatura     = body.temperatura;
+    // Quando enviado explicitamente (ex: dialog Primeiro Orçamento), usa a data do campo diretamente
+    if ("orcamentoEnviadoEm"   in body) updateData.orcamentoEnviadoEm = body.orcamentoEnviadoEm ? new Date(`${body.orcamentoEnviadoEm}T12:00:00`) : null;
 
-    // Atualiza orcamentoEnviadoEm conforme mudanças no orçamento
-    if ("valorOrcamento" in body || "statusOrcamento" in body) {
+    // Auto-gestão de orcamentoEnviadoEm quando não é enviado explicitamente
+    if (!("orcamentoEnviadoEm" in body) && ("valorOrcamento" in body || "statusOrcamento" in body)) {
       const novoStatus = (updateData.statusOrcamento ?? old.statusOrcamento) as string;
       const novoValor = updateData.valorOrcamento as number | null;
       const statusFinal = novoStatus === "APROVADO" || novoStatus === "NAO_APROVADO";

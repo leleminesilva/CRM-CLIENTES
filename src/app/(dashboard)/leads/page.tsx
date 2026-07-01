@@ -20,7 +20,7 @@ import {
   useSortable,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { Plus, Flame, Minus, Snowflake, DollarSign, User2 } from "lucide-react";
+import { Plus, Flame, Minus, Snowflake, DollarSign, User2, ThumbsDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -29,6 +29,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
+  DialogFooter,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -217,6 +218,12 @@ function NovoLeadDialog({ estagio, onSuccess }: { estagio: EstagioLead; onSucces
 export default function LeadsKanbanPage() {
   const qc = useQueryClient();
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [cancelPendente, setCancelPendente] = useState<{ id: string } | null>(null);
+  const [dataCancelamento, setDataCancelamento] = useState(() => new Date().toISOString().slice(0, 10));
+  const [motivoCategoria, setMotivoCategoria] = useState("");
+  const [motivoCancelamento, setMotivoCancelamento] = useState("");
+
+  const MOTIVOS = ["Prazo", "Preço", "Distância", "Não Realizamos", "Outros"];
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
@@ -231,8 +238,8 @@ export default function LeadsKanbanPage() {
   });
 
   const moveMutation = useMutation({
-    mutationFn: ({ id, estagio }: { id: string; estagio: EstagioLead }) =>
-      axios.patch(`/api/leads/${id}/mover`, { estagio }),
+    mutationFn: ({ id, estagio, dataFechamento, motivoPerda }: { id: string; estagio: EstagioLead; dataFechamento?: string; motivoPerda?: string }) =>
+      axios.patch(`/api/leads/${id}/mover`, { estagio, dataFechamento, motivoPerda }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["leads-kanban"] }),
     onError: () => toast.error("Erro ao mover lead"),
   });
@@ -258,8 +265,30 @@ export default function LeadsKanbanPage() {
     const targetEstagio = (overData?.estagio || over.id) as EstagioLead;
 
     if (activeData?.estagio !== targetEstagio && ESTAGIOS.includes(targetEstagio)) {
-      moveMutation.mutate({ id: active.id as string, estagio: targetEstagio });
+      if (targetEstagio === "FECHADO_PERDIDO") {
+        setCancelPendente({ id: active.id as string });
+        return;
+      }
+      const hoje = new Date().toISOString().slice(0, 10);
+      moveMutation.mutate({
+        id: active.id as string,
+        estagio: targetEstagio,
+        dataFechamento: targetEstagio === "FECHADO_GANHO" ? hoje : undefined,
+      });
     }
+  }
+
+  function confirmarCancelamentoKanban() {
+    if (!dataCancelamento || !motivoCategoria) return;
+    if (motivoCategoria === "Outros" && !motivoCancelamento.trim()) return;
+    const motivoPerda = motivoCancelamento.trim()
+      ? `${motivoCategoria} — ${motivoCancelamento.trim()}`
+      : motivoCategoria;
+    moveMutation.mutate({ id: cancelPendente!.id, estagio: "FECHADO_PERDIDO", dataFechamento: dataCancelamento, motivoPerda });
+    setCancelPendente(null);
+    setMotivoCategoria("");
+    setMotivoCancelamento("");
+    setDataCancelamento(new Date().toISOString().slice(0, 10));
   }
 
   const totalLeads = leads.length;
@@ -280,6 +309,70 @@ export default function LeadsKanbanPage() {
           Novo Lead
         </Button>
       </div>
+
+      {/* Dialog de cancelamento via drag */}
+      <Dialog open={!!cancelPendente} onOpenChange={(o) => { if (!o) { setCancelPendente(null); setMotivoCategoria(""); setMotivoCancelamento(""); } }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-500">
+              <ThumbsDown className="w-4 h-4" /> Cancelar lead
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <p className="text-sm font-medium">Data do cancelamento <span className="text-red-500">*</span></p>
+              <input
+                type="date"
+                value={dataCancelamento}
+                max={new Date().toISOString().slice(0, 10)}
+                onChange={(e) => setDataCancelamento(e.target.value)}
+                className={`w-full h-9 rounded-md border px-3 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring ${!dataCancelamento ? "border-red-400" : "border-input"}`}
+              />
+            </div>
+            <div className="space-y-2">
+              <p className="text-sm font-medium">Motivo <span className="text-red-500">*</span></p>
+              <div className="flex flex-wrap gap-2">
+                {MOTIVOS.map((m) => (
+                  <button
+                    key={m}
+                    type="button"
+                    onClick={() => setMotivoCategoria(m)}
+                    className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-all ${motivoCategoria === m ? "bg-red-600 text-white border-red-600" : "bg-muted text-muted-foreground border-border hover:border-red-400 hover:text-red-500"}`}
+                  >
+                    {m}
+                  </button>
+                ))}
+              </div>
+            </div>
+            {motivoCategoria && (
+              <div className="space-y-2">
+                <p className="text-sm font-medium">
+                  Observação{motivoCategoria === "Outros" ? <span className="text-red-500"> *</span> : <span className="text-muted-foreground font-normal"> (opcional)</span>}
+                </p>
+                <Textarea
+                  placeholder={motivoCategoria === "Outros" ? "Descreva o motivo..." : "Detalhes adicionais..."}
+                  value={motivoCancelamento}
+                  onChange={(e) => setMotivoCancelamento(e.target.value)}
+                  rows={2}
+                  className={motivoCategoria === "Outros" && !motivoCancelamento.trim() ? "border-red-400" : ""}
+                />
+              </div>
+            )}
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => { setCancelPendente(null); setMotivoCategoria(""); setMotivoCancelamento(""); }}>
+              Voltar
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={!dataCancelamento || !motivoCategoria || (motivoCategoria === "Outros" && !motivoCancelamento.trim()) || moveMutation.isPending}
+              onClick={confirmarCancelamentoKanban}
+            >
+              Confirmar cancelamento
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Kanban Board */}
       <div className="overflow-x-auto pb-4">

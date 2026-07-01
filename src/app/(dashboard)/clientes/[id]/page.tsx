@@ -65,13 +65,14 @@ function PipelineTracker({
   const [cancelDialog, setCancelDialog] = useState(false);
   const [motivoCategoria, setMotivoCategoria] = useState("");
   const [motivoCancelamento, setMotivoCancelamento] = useState("");
+  const [dataCancelamento, setDataCancelamento] = useState(() => new Date().toISOString().slice(0, 10));
 
   const MOTIVOS_CANCELAMENTO = ["Prazo", "Preço", "Distância", "Não Realizamos", "Outros"];
 
   const mutation = useMutation({
-    mutationFn: async ({ novoEstagio, motivoPerda }: { novoEstagio: EstagioLead; motivoPerda?: string }) => {
+    mutationFn: async ({ novoEstagio, motivoPerda, dataFechamento }: { novoEstagio: EstagioLead; motivoPerda?: string; dataFechamento?: string }) => {
       await (leadId
-        ? axios.patch(`/api/leads/${leadId}/mover`, { estagio: novoEstagio, motivoPerda })
+        ? axios.patch(`/api/leads/${leadId}/mover`, { estagio: novoEstagio, motivoPerda, dataFechamento })
         : axios.post("/api/leads", { titulo: clienteNome, estagio: novoEstagio, origem: "OUTROS", clienteId }));
 
       const statusMap: Partial<Record<EstagioLead, string>> = {
@@ -86,6 +87,10 @@ function PipelineTracker({
   });
 
   function confirmarCancelamento() {
+    if (!dataCancelamento) {
+      toast.error("Informe a data do cancelamento");
+      return;
+    }
     if (!motivoCategoria) {
       toast.error("Selecione o motivo do cancelamento");
       return;
@@ -97,10 +102,11 @@ function PipelineTracker({
     const motivoPerda = motivoCancelamento.trim()
       ? `${motivoCategoria} — ${motivoCancelamento.trim()}`
       : motivoCategoria;
-    mutation.mutate({ novoEstagio: "FECHADO_PERDIDO", motivoPerda });
+    mutation.mutate({ novoEstagio: "FECHADO_PERDIDO", motivoPerda, dataFechamento: dataCancelamento });
     setCancelDialog(false);
     setMotivoCategoria("");
     setMotivoCancelamento("");
+    setDataCancelamento(new Date().toISOString().slice(0, 10));
   }
 
   const isFechado = estagio === "FECHADO_GANHO" || estagio === "FECHADO_PERDIDO";
@@ -180,6 +186,16 @@ function PipelineTracker({
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="space-y-2">
+              <p className="text-sm font-medium">Data do cancelamento <span className="text-red-500">*</span></p>
+              <input
+                type="date"
+                value={dataCancelamento}
+                max={new Date().toISOString().slice(0, 10)}
+                onChange={(e) => setDataCancelamento(e.target.value)}
+                className={`w-full h-9 rounded-md border px-3 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring ${!dataCancelamento ? "border-red-400" : "border-input"}`}
+              />
+            </div>
+            <div className="space-y-2">
               <p className="text-sm font-medium">Motivo do cancelamento <span className="text-red-500">*</span></p>
               <div className="flex flex-wrap gap-2">
                 {MOTIVOS_CANCELAMENTO.map((motivo) => (
@@ -221,7 +237,7 @@ function PipelineTracker({
             </Button>
             <Button
               variant="destructive"
-              disabled={!motivoCategoria || (motivoCategoria === "Outros" && !motivoCancelamento.trim()) || mutation.isPending}
+              disabled={!dataCancelamento || !motivoCategoria || (motivoCategoria === "Outros" && !motivoCancelamento.trim()) || mutation.isPending}
               onClick={confirmarCancelamento}
             >
               Confirmar cancelamento

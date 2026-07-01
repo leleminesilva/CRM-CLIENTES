@@ -19,6 +19,7 @@ const moverSchema = z.object({
   ]),
   ordemKanban: z.number().optional(),
   motivoPerda: z.string().optional(),
+  dataFechamento: z.string().optional(), // YYYY-MM-DD, obrigatório no front para fechamentos
 });
 
 export async function PATCH(request: NextRequest, { params }: { params: { id: string } }) {
@@ -28,7 +29,12 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     requirePermission(payload.role, "leads:update");
 
     const body = await request.json();
-    const { estagio, ordemKanban, motivoPerda } = moverSchema.parse(body);
+    const { estagio, ordemKanban, motivoPerda, dataFechamento } = moverSchema.parse(body);
+
+    if (estagio === "FECHADO_PERDIDO" && !dataFechamento) {
+      return NextResponse.json({ error: "Data do cancelamento é obrigatória" }, { status: 400 });
+    }
+    const isFechamento = estagio === "FECHADO_GANHO" || estagio === "FECHADO_PERDIDO";
 
     const old = await prisma.lead.findFirst({ where: { id: params.id, deletedAt: null } });
     if (!old) return NextResponse.json({ error: "Lead não encontrado" }, { status: 404 });
@@ -39,10 +45,11 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
         estagio,
         ordemKanban: ordemKanban ?? old.ordemKanban,
         motivoPerda: motivoPerda ?? old.motivoPerda,
-        dataFechamento:
-          estagio === "FECHADO_GANHO" || estagio === "FECHADO_PERDIDO"
-            ? new Date()
-            : null,
+        dataFechamento: isFechamento
+          ? dataFechamento
+            ? new Date(`${dataFechamento}T12:00:00`)
+            : new Date()
+          : null,
       },
     });
 

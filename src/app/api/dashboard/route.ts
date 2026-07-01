@@ -65,17 +65,18 @@ export async function GET(request: NextRequest) {
       // Total de clientes cadastrados no período
       prisma.cliente.count({ where: { deletedAt: null, createdAt: { gte: de, lte: ate }, ...userFilter } }),
 
-      // Leads ativos (não fechados)
+      // Leads ativos no período (não fechados)
       prisma.lead.count({
         where: {
           deletedAt: null,
           estagio: { notIn: ["FECHADO_GANHO", "FECHADO_PERDIDO"] },
+          createdAt: { gte: de, lte: ate },
           OR: [{ clienteId: null }, { cliente: { deletedAt: null } }],
           ...userFilter,
         },
       }),
 
-      // Funil de vendas — valor usa COALESCE(c.valorOrcamento, l.valorEstimado)
+      // Funil de vendas no período — valor usa COALESCE(c.valorOrcamento, l.valorEstimado)
       prisma.$queryRaw<Array<{ estagio: string; total: number; valor: number }>>(
         Prisma.sql`
           SELECT
@@ -85,6 +86,8 @@ export async function GET(request: NextRequest) {
           FROM leads l
           LEFT JOIN clientes c ON l."clienteId" = c.id AND c."deletedAt" IS NULL
           WHERE l."deletedAt" IS NULL
+            AND l."createdAt" >= ${de}
+            AND l."createdAt" <= ${ate}
             AND (l."clienteId" IS NULL OR c.id IS NOT NULL)
             ${leadsUserFilterSql}
           GROUP BY l.estagio
@@ -114,12 +117,13 @@ export async function GET(request: NextRequest) {
         },
       }),
 
-      // Valor em negociação — soma de valorOrcamento de clientes pendentes (fonte de verdade)
+      // Valor em negociação no período — clientes pendentes criados no período
       prisma.cliente.aggregate({
         where: {
           deletedAt: null,
           statusOrcamento: { notIn: ["APROVADO", "NAO_APROVADO"] },
           valorOrcamento: { not: null },
+          createdAt: { gte: de, lte: ate },
           ...userFilter,
         },
         _sum: { valorOrcamento: true },
@@ -245,6 +249,8 @@ export async function GET(request: NextRequest) {
             WHERE "deletedAt" IS NULL
               AND "servicoBuscado" IS NOT NULL
               AND "servicoBuscado" != ''
+              AND "createdAt" >= ${de}
+              AND "createdAt" <= ${ate}
           ) sub
           WHERE servico != ''
           GROUP BY servico

@@ -32,7 +32,16 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const periodo = searchParams.get("periodo") || "mes";
     const mes = searchParams.get("mes");
-    const { de, ate } = getPeriodRange(periodo, mes);
+    const dataInicioParam = searchParams.get("dataInicio");
+    const dataFimParam = searchParams.get("dataFim");
+
+    let de: Date, ate: Date;
+    if (dataInicioParam && dataFimParam) {
+      de = startOfDay(new Date(dataInicioParam));
+      ate = endOfDay(new Date(dataFimParam));
+    } else {
+      ({ de, ate } = getPeriodRange(periodo, mes));
+    }
     const canViewAllUsers = payload.role === "ADMINISTRADOR" || payload.role === "GESTOR";
 
     // Filtro por vendedor específico — só Gestor/Admin pode solicitar

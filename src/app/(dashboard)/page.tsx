@@ -16,6 +16,8 @@ import {
   ArrowDown,
   XCircle,
   TrendingDown,
+  CalendarRange,
+  X,
 } from "lucide-react";
 import {
   LineChart,
@@ -104,6 +106,9 @@ export default function DashboardPage() {
   const [periodo, setPeriodo] = useState("mes");
   const [mesSelecionado, setMesSelecionado] = useState("");   // YYYY-MM
   const [vendedorId, setVendedorId] = useState("");           // UUID
+  const [dataInicio, setDataInicio] = useState("");            // YYYY-MM-DD
+  const [dataFim, setDataFim] = useState("");                  // YYYY-MM-DD
+  const usandoDataCustom = !!(dataInicio && dataFim);
   const { user } = useAuth();
   const isGestor = user?.role === "ADMINISTRADOR" || user?.role === "GESTOR";
 
@@ -143,10 +148,13 @@ export default function DashboardPage() {
   });
 
   const { data, isLoading } = useQuery({
-    queryKey: ["dashboard", periodo, mesSelecionado, vendedorId],
+    queryKey: ["dashboard", periodo, mesSelecionado, vendedorId, dataInicio, dataFim],
     queryFn: async () => {
       const params = new URLSearchParams();
-      if (mesSelecionado) {
+      if (usandoDataCustom) {
+        params.set("dataInicio", dataInicio);
+        params.set("dataFim", dataFim);
+      } else if (mesSelecionado) {
         params.set("mes", mesSelecionado);
       } else {
         params.set("periodo", periodo);
@@ -191,7 +199,7 @@ export default function DashboardPage() {
         {isGestor && (
           <div className="flex flex-wrap items-center gap-2">
             {/* Botões de período rápido */}
-            <div className="flex items-center gap-1 bg-muted p-1 rounded-lg">
+            <div className={`flex items-center gap-1 bg-muted p-1 rounded-lg transition-opacity ${usandoDataCustom ? "opacity-40 pointer-events-none" : ""}`}>
               {PERIOD_OPTIONS.map((opt) => (
                 <Button
                   key={opt.value}
@@ -209,10 +217,10 @@ export default function DashboardPage() {
             <Select
               value={mesSelecionado || "_none"}
               onValueChange={(v) => {
-                if (v === "_none") { setMesSelecionado(""); } else { setMesSelecionado(v); }
+                if (v === "_none") { setMesSelecionado(""); } else { setMesSelecionado(v); setDataInicio(""); setDataFim(""); }
               }}
             >
-              <SelectTrigger className={`h-9 w-44 text-sm ${mesSelecionado ? "border-indigo-500 text-indigo-600 dark:text-indigo-400" : ""}`}>
+              <SelectTrigger className={`h-9 w-44 text-sm ${usandoDataCustom ? "opacity-40 pointer-events-none" : ""} ${mesSelecionado ? "border-indigo-500 text-indigo-600 dark:text-indigo-400" : ""}`}>
                 <SelectValue placeholder="Selecionar mês..." />
               </SelectTrigger>
               <SelectContent>
@@ -222,6 +230,36 @@ export default function DashboardPage() {
                 ))}
               </SelectContent>
             </Select>
+
+            {/* Seletor de intervalo de datas customizado */}
+            <div className={`flex items-center gap-1.5 bg-muted px-2 py-1 rounded-lg border ${usandoDataCustom ? "border-indigo-500" : "border-transparent"}`}>
+              <CalendarRange className={`w-4 h-4 shrink-0 ${usandoDataCustom ? "text-indigo-500" : "text-muted-foreground"}`} />
+              <input
+                type="date"
+                value={dataInicio}
+                onChange={(e) => { setDataInicio(e.target.value); setMesSelecionado(""); }}
+                className="h-7 bg-transparent text-sm outline-none w-32 cursor-pointer"
+                title="Data início"
+              />
+              <span className="text-muted-foreground text-xs">até</span>
+              <input
+                type="date"
+                value={dataFim}
+                min={dataInicio || undefined}
+                onChange={(e) => { setDataFim(e.target.value); setMesSelecionado(""); }}
+                className="h-7 bg-transparent text-sm outline-none w-32 cursor-pointer"
+                title="Data fim"
+              />
+              {usandoDataCustom && (
+                <button
+                  onClick={() => { setDataInicio(""); setDataFim(""); }}
+                  className="ml-0.5 text-muted-foreground hover:text-foreground transition-colors"
+                  title="Limpar intervalo"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
 
             {/* Seletor de vendedor — Gestor/Admin */}
             <Select

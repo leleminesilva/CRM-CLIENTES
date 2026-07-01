@@ -107,9 +107,19 @@ export default function DashboardPage() {
   const { user } = useAuth();
   const isGestor = user?.role === "ADMINISTRADOR" || user?.role === "GESTOR";
 
-  // Começa em junho/2026 e cresce um mês a cada dia 1º
+  const { data: primeiroMesData } = useQuery({
+    queryKey: ["dashboard-primeiro-mes"],
+    queryFn: async () => {
+      const { data } = await axios.get("/api/dashboard/primeiro-mes");
+      return data.mes as string;
+    },
+    staleTime: Infinity,
+  });
+
   const mesesDisponiveis = useMemo(() => {
-    const inicio = new Date(2026, 5, 1); // junho 2026
+    const primeiromes = primeiroMesData ?? "2026-01";
+    const [anoI, mesI] = primeiromes.split("-").map(Number);
+    const inicio = new Date(anoI, mesI - 1, 1);
     const now = new Date();
     const atual = new Date(now.getFullYear(), now.getMonth(), 1);
     const opts: { value: string; label: string }[] = [];
@@ -120,8 +130,8 @@ export default function DashboardPage() {
       opts.push({ value, label: label.charAt(0).toUpperCase() + label.slice(1) });
       cursor.setMonth(cursor.getMonth() + 1);
     }
-    return opts;
-  }, []);
+    return opts.reverse(); // mais recente primeiro
+  }, [primeiroMesData]);
 
   const { data: vendedoresData } = useQuery({
     queryKey: ["usuarios-ativos-dashboard"],

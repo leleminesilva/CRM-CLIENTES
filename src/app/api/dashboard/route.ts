@@ -62,8 +62,8 @@ export async function GET(request: NextRequest) {
       canceladosPeriodo,
       canceladosAggregate,
     ] = await Promise.all([
-      // Total de clientes ativos
-      prisma.cliente.count({ where: { deletedAt: null, ...userFilter } }),
+      // Total de clientes cadastrados no período
+      prisma.cliente.count({ where: { deletedAt: null, createdAt: { gte: de, lte: ate }, ...userFilter } }),
 
       // Leads ativos (não fechados)
       prisma.lead.count({

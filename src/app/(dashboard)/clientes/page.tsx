@@ -315,6 +315,9 @@ export default function ClientesPage() {
                       const cfg = c.temperatura ? TEMP_CONFIG[c.temperatura] : null;
                       return cfg ? <span className={`text-xs font-medium ${cfg.color}`}>{cfg.icon} {cfg.label}</span> : null;
                     })()}
+                    <span className="text-xs text-muted-foreground">
+                      📅 {new Date(c.createdAt).toLocaleDateString("pt-BR")}
+                    </span>
                   </div>
                 </div>
               </Link>
@@ -335,6 +338,7 @@ export default function ClientesPage() {
                 <th className="text-left p-4 font-medium text-muted-foreground">Serviço Buscado</th>
                 <th className="text-left p-4 font-medium text-muted-foreground">Temperatura</th>
                 <th className="text-left p-4 font-medium text-muted-foreground">Etapa</th>
+                <th className="text-left p-4 font-medium text-muted-foreground">Inclusão</th>
                 <th className="text-left p-4 font-medium text-muted-foreground">Responsável</th>
                 <th className="p-4" />
               </tr>
@@ -350,7 +354,7 @@ export default function ClientesPage() {
                 ))
               ) : clientes.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="p-12 text-center text-muted-foreground">
+                  <td colSpan={8} className="p-12 text-center text-muted-foreground">
                     <Building2 className="w-8 h-8 mx-auto mb-3 opacity-40" />
                     <p>Nenhum cliente encontrado</p>
                     <Link href="/clientes/novo">
@@ -413,6 +417,11 @@ export default function ClientesPage() {
                         ? <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${cfg.color}`}>{cfg.label}</span>
                         : <span className="text-muted-foreground text-xs">—</span>;
                     })()}
+                  </td>
+                  <td className="p-4 whitespace-nowrap">
+                    <span className="text-xs text-muted-foreground">
+                      {new Date(c.createdAt).toLocaleDateString("pt-BR")}
+                    </span>
                   </td>
                   <td className="p-4">
                     {c.responsavel ? (

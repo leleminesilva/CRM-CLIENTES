@@ -76,7 +76,7 @@ export async function GET(request: NextRequest) {
             select: { estagio: true },
           },
         },
-        orderBy: { createdAt: "desc" },
+        orderBy: { updatedAt: "desc" },
         skip: (page - 1) * limit,
         take: limit,
       }),

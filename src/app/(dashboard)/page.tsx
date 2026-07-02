@@ -38,12 +38,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { formatCurrency, ORIGEM_LABELS, ESTAGIO_LABELS } from "@/lib/utils/formatters";
 import { useAuth } from "@/contexts/AuthContext";
 
-const PERIOD_OPTIONS = [
-  { label: "Hoje", value: "hoje" },
-  { label: "Semana", value: "semana" },
-  { label: "Mês", value: "mes" },
-  { label: "Ano", value: "ano" },
-];
 
 // Cores distintas por estágio do funil (alta legibilidade em light e dark)
 const FUNIL_COLORS: Record<string, string> = {
@@ -103,8 +97,10 @@ function KPICard({ title, value, icon, variacao, prefix = "", color = "bg-indigo
 }
 
 export default function DashboardPage() {
-  const [periodo, setPeriodo] = useState("mes");
-  const [mesSelecionado, setMesSelecionado] = useState("");   // YYYY-MM
+  const [mesSelecionado, setMesSelecionado] = useState(() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  }); // YYYY-MM ou "_ano"
   const [vendedorId, setVendedorId] = useState("");           // UUID
   const [dataInicio, setDataInicio] = useState("");            // YYYY-MM-DD
   const [dataFim, setDataFim] = useState("");                  // YYYY-MM-DD
@@ -148,16 +144,16 @@ export default function DashboardPage() {
   });
 
   const { data, isLoading } = useQuery({
-    queryKey: ["dashboard", periodo, mesSelecionado, vendedorId, dataInicio, dataFim],
+    queryKey: ["dashboard", mesSelecionado, vendedorId, dataInicio, dataFim],
     queryFn: async () => {
       const params = new URLSearchParams();
       if (usandoDataCustom) {
         params.set("dataInicio", dataInicio);
         params.set("dataFim", dataFim);
-      } else if (mesSelecionado) {
-        params.set("mes", mesSelecionado);
+      } else if (mesSelecionado === "_ano") {
+        params.set("periodo", "ano");
       } else {
-        params.set("periodo", periodo);
+        params.set("mes", mesSelecionado);
       }
       if (vendedorId) params.set("vendedorId", vendedorId);
       const { data } = await axios.get(`/api/dashboard?${params}`);
@@ -198,33 +194,16 @@ export default function DashboardPage() {
 
         {isGestor && (
           <div className="flex flex-wrap items-center gap-2">
-            {/* Botões de período rápido */}
-            <div className={`flex items-center gap-1 bg-muted p-1 rounded-lg transition-opacity ${usandoDataCustom ? "opacity-40 pointer-events-none" : ""}`}>
-              {PERIOD_OPTIONS.map((opt) => (
-                <Button
-                  key={opt.value}
-                  variant={!mesSelecionado && periodo === opt.value ? "default" : "ghost"}
-                  size="sm"
-                  onClick={() => { setPeriodo(opt.value); setMesSelecionado(""); }}
-                  className={!mesSelecionado && periodo === opt.value ? "bg-background shadow-sm" : ""}
-                >
-                  {opt.label}
-                </Button>
-              ))}
-            </div>
-
-            {/* Seletor de mês específico */}
+            {/* Seletor de período */}
             <Select
-              value={mesSelecionado || "_none"}
-              onValueChange={(v) => {
-                if (v === "_none") { setMesSelecionado(""); } else { setMesSelecionado(v); setDataInicio(""); setDataFim(""); }
-              }}
+              value={mesSelecionado}
+              onValueChange={(v) => { setMesSelecionado(v); setDataInicio(""); setDataFim(""); }}
             >
-              <SelectTrigger className={`h-9 w-44 text-sm ${usandoDataCustom ? "opacity-40 pointer-events-none" : ""} ${mesSelecionado ? "border-indigo-500 text-indigo-600 dark:text-indigo-400" : ""}`}>
-                <SelectValue placeholder="Selecionar mês..." />
+              <SelectTrigger className={`h-9 w-48 text-sm ${usandoDataCustom ? "opacity-40 pointer-events-none" : ""}`}>
+                <SelectValue placeholder="Selecionar período..." />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="_none">Período rápido</SelectItem>
+                <SelectItem value="_ano">📅 Ano completo</SelectItem>
                 {mesesDisponiveis.map((m) => (
                   <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
                 ))}

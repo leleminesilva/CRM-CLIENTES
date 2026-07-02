@@ -231,8 +231,11 @@ model Cliente {
   prazoOrcamento      DateTime?
   dataVenda           DateTime?
   statusOrcamento     StatusOrcamentoCliente @default(PENDENTE)
-  orcamentoEnviadoEm  DateTime?
-  revisadoEm          DateTime?
+  orcamentoEnviadoEm      DateTime?
+  revisadoEm              DateTime?
+  notificacaoMensagem     String?
+  notificacaoEm           DateTime?
+  notificacaoLida         Boolean   @default(false)
   temperatura     Temperatura            @default(MORNO)
   deletedAt       DateTime?
   createdAt       DateTime               @default(now())

@@ -140,6 +140,9 @@ export interface Cliente {
   statusOrcamento: StatusOrcamentoCliente;
   orcamentoEnviadoEm?: string | null;
   revisadoEm?: string | null;
+  notificacaoMensagem?: string | null;
+  notificacaoEm?: string | null;
+  notificacaoLida?: boolean;
   temperatura: Temperatura;
   createdAt: string;
   updatedAt: string;

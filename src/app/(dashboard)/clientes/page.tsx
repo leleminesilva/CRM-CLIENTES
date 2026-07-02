@@ -486,8 +486,14 @@ export default function ClientesPage() {
                   || c.statusOrcamento === "APROVADO" || c.statusOrcamento === "NAO_APROVADO";
                 const limite2d = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000);
                 const parado = !fechado && new Date(c.updatedAt) < limite2d && (!c.revisadoEm || new Date(c.revisadoEm) < limite2d);
+                const notificado = !c.notificacaoLida && !!c.notificacaoMensagem;
                 return (
-                <tr key={c.id} className={cn("border-b transition-colors", parado ? "bg-red-500/10 hover:bg-red-500/15" : "hover:bg-muted/30")}>
+                <tr key={c.id} className={cn(
+                  "border-b transition-colors",
+                  notificado ? "bg-amber-500/10 hover:bg-amber-500/15" :
+                  parado     ? "bg-red-500/10 hover:bg-red-500/15" :
+                               "hover:bg-muted/30"
+                )}>
                   <td className="p-4">
                     <div className="flex items-center gap-3">
                       <Avatar className="w-8 h-8">
@@ -554,7 +560,10 @@ export default function ClientesPage() {
                   </td>
                   <td className="p-4">
                     <div className="flex items-center gap-2">
-                      {parado && (
+                      {notificado && (
+                        <span title="Notificação não lida" className="text-amber-500 text-xs font-semibold">🔔</span>
+                      )}
+                      {parado && !notificado && (
                         <span title="Sem movimentação há mais de 2 dias" className="text-red-500 text-xs font-semibold">⚠</span>
                       )}
                       <ActionMenu c={c} />

@@ -103,10 +103,10 @@ export async function GET(request: NextRequest) {
           },
         },
         orderBy: sort === "createdAt_asc"
-          ? { createdAt: "asc" as const }
+          ? [{ notificacaoEm: { sort: "desc" as const, nulls: "last" as const } }, { createdAt: "asc" as const }]
           : sort === "createdAt_desc"
-          ? { createdAt: "desc" as const }
-          : { updatedAt: "desc" as const },
+          ? [{ notificacaoEm: { sort: "desc" as const, nulls: "last" as const } }, { createdAt: "desc" as const }]
+          : [{ notificacaoEm: { sort: "desc" as const, nulls: "last" as const } }, { updatedAt: "desc" as const }],
         skip: (page - 1) * limit,
         take: limit,
       }),

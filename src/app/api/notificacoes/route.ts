@@ -9,31 +9,25 @@ export async function GET(request: NextRequest) {
     const payload = await getCurrentUser(request);
     if (!payload) return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
 
-    const notificacoes = await prisma.notificacao.findMany({
-      where: { userId: payload.userId },
-      orderBy: [{ lida: "asc" }, { createdAt: "desc" }],
-      take: 50,
+    const clientes = await prisma.cliente.findMany({
+      where: {
+        responsavelId: payload.userId,
+        notificacaoLida: false,
+        notificacaoMensagem: { not: null },
+        deletedAt: null,
+      },
+      select: {
+        id: true,
+        nome: true,
+        notificacaoMensagem: true,
+        notificacaoEm: true,
+      },
+      orderBy: { notificacaoEm: "desc" },
     });
 
-    const naoLidas = notificacoes.filter((n) => !n.lida).length;
-    return NextResponse.json({ data: notificacoes, naoLidas });
-  } catch {
+    return NextResponse.json({ data: clientes });
+  } catch (error) {
+    console.error(error);
     return NextResponse.json({ error: "Erro ao buscar notificações" }, { status: 500 });
-  }
-}
-
-export async function PATCH(request: NextRequest) {
-  try {
-    const payload = await getCurrentUser(request);
-    if (!payload) return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
-
-    await prisma.notificacao.updateMany({
-      where: { userId: payload.userId, lida: false },
-      data: { lida: true },
-    });
-
-    return NextResponse.json({ message: "Todas marcadas como lidas" });
-  } catch {
-    return NextResponse.json({ error: "Erro ao atualizar notificações" }, { status: 500 });
   }
 }

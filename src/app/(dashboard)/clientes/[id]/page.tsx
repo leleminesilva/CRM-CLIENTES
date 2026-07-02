@@ -12,7 +12,7 @@ import {
   Clock, MessageSquare, TrendingUp, CheckSquare, ExternalLink,
   ClipboardList, FileText, Flame, Minus, Snowflake,
   PhoneCall, MessageCircle, FileCheck, Handshake, ThumbsUp, ThumbsDown, ChevronRight,
-  Pencil, X, Check,
+  Pencil, X, Check, Bell,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -570,6 +570,20 @@ export default function ClienteDetalhePage() {
     onError: () => toast.error("Erro ao marcar Em Processo"),
   });
 
+  const [notifDialog, setNotifDialog] = useState(false);
+  const [notifMensagem, setNotifMensagem] = useState("");
+
+  const notifMutation = useMutation({
+    mutationFn: (mensagem: string) => axios.post(`/api/clientes/${id}/notificar`, { mensagem }),
+    onSuccess: () => {
+      toast.success("Responsável notificado!");
+      setNotifDialog(false);
+      setNotifMensagem("");
+      qc.invalidateQueries({ queryKey: ["cliente", id] });
+    },
+    onError: () => toast.error("Erro ao enviar notificação"),
+  });
+
   const limite2d = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000);
   const leadEstagio = cliente?.leads?.[0]?.estagio as string | undefined;
   const fechado = leadEstagio === "FECHADO_GANHO" || leadEstagio === "FECHADO_PERDIDO"
@@ -603,6 +617,16 @@ export default function ClienteDetalhePage() {
           {cliente.nomeFantasia && <p className="text-muted-foreground">{cliente.nomeFantasia}</p>}
         </div>
         <div className="flex gap-2 shrink-0 flex-wrap justify-end">
+          {isAdmin && cliente.responsavelId && (
+            <Button
+              size="sm"
+              className="bg-amber-500 hover:bg-amber-600 text-white"
+              onClick={() => { setNotifMensagem(""); setNotifDialog(true); }}
+            >
+              <Bell className="w-4 h-4 mr-2" />
+              Notificar
+            </Button>
+          )}
           {clienteParado && (
             <Button
               size="sm"
@@ -783,6 +807,63 @@ export default function ClienteDetalhePage() {
         observacoes={cliente.observacoes as string | null}
         onSaved={() => qc.invalidateQueries({ queryKey: ["cliente", id] })}
       />
+
+      {/* Card de Notificação — só aparece quando há notificação ativa */}
+      {cliente.notificacaoMensagem && (
+        <Card className="p-4 border-amber-500/50 bg-amber-500/5">
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-xs text-amber-400 font-medium uppercase tracking-wide flex items-center gap-1.5">
+              <Bell className="w-3.5 h-3.5" /> Notificação
+            </p>
+            {!cliente.notificacaoLida && (
+              <span className="text-xs bg-amber-500 text-white px-2 py-0.5 rounded-full font-medium">Não lida</span>
+            )}
+            {cliente.notificacaoLida && (
+              <span className="text-xs text-muted-foreground">Lida</span>
+            )}
+          </div>
+          <p className="text-sm leading-relaxed whitespace-pre-wrap">{cliente.notificacaoMensagem}</p>
+          {cliente.notificacaoEm && (
+            <p className="text-xs text-muted-foreground mt-2">
+              Enviada em {new Date(cliente.notificacaoEm).toLocaleString("pt-BR")}
+            </p>
+          )}
+        </Card>
+      )}
+
+      {/* Dialog Notificar Responsável */}
+      <Dialog open={notifDialog} onOpenChange={(o) => { if (!o) setNotifDialog(false); }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-amber-500">
+              <Bell className="w-4 h-4" /> Notificar Responsável
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <p className="text-sm text-muted-foreground">
+              Esta mensagem será exibida para <strong className="text-foreground">{cliente.responsavel?.nome}</strong> ao acessar o sistema.
+            </p>
+            <Textarea
+              placeholder="Digite a mensagem para o responsável..."
+              value={notifMensagem}
+              onChange={(e) => setNotifMensagem(e.target.value)}
+              rows={4}
+              className={!notifMensagem.trim() ? "border-amber-400/50 focus-visible:ring-amber-400" : ""}
+              autoFocus
+            />
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setNotifDialog(false)}>Cancelar</Button>
+            <Button
+              className="bg-amber-500 hover:bg-amber-600 text-white"
+              disabled={!notifMensagem.trim() || notifMutation.isPending}
+              onClick={() => notifMutation.mutate(notifMensagem)}
+            >
+              {notifMutation.isPending ? "Enviando..." : "Enviar notificação"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Tabs */}
       <Tabs defaultValue={isAdmin ? "historico" : "leads"}>

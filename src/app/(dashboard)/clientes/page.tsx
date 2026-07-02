@@ -91,9 +91,18 @@ export default function ClientesPage() {
   const [dataFim, setDataFim] = useState(() => ss?.getItem("cf_dataFim") ?? "");
   // 0 = padrão (updatedAt desc), 1 = inclusão asc, 2 = inclusão desc
   const [sortMode, setSortMode] = useState(0);
+  // 0 = desativado, 1 = etapa asc (pipeline), 2 = etapa desc
+  const [etapaSort, setEtapaSort] = useState(0);
 
   function cycleSortMode() {
+    setEtapaSort(0);
     setSortMode((prev) => (prev + 1) % 3);
+    setPage(1);
+  }
+
+  function cycleSortEtapa() {
+    setSortMode(0);
+    setEtapaSort((prev) => (prev + 1) % 3);
     setPage(1);
   }
 
@@ -162,7 +171,21 @@ export default function ClientesPage() {
     onError: () => toast.error("Erro ao remover cliente"),
   });
 
-  const clientes: Cliente[] = data?.data || [];
+  const ESTAGIO_ORDER: Record<string, number> = {
+    NOVO_LEAD: 0, CONTATO_INICIAL: 1, PRIMEIRO_ORCAMENTO: 2, QUALIFICACAO: 3,
+    PROPOSTA_ENVIADA: 4, NEGOCIACAO: 5, FECHADO_GANHO: 6, FECHADO_PERDIDO: 7,
+  };
+
+  const clientesRaw: Cliente[] = data?.data || [];
+  const clientes = etapaSort === 0
+    ? clientesRaw
+    : [...clientesRaw].sort((a, b) => {
+        const ea = (a as unknown as { leads?: { estagio: string }[] }).leads?.[0]?.estagio ?? "";
+        const eb = (b as unknown as { leads?: { estagio: string }[] }).leads?.[0]?.estagio ?? "";
+        const oa = ESTAGIO_ORDER[ea] ?? 99;
+        const ob = ESTAGIO_ORDER[eb] ?? 99;
+        return etapaSort === 1 ? oa - ob : ob - oa;
+      });
   const total = data?.total || 0;
   const totalPages = data?.totalPages || 1;
 
@@ -349,7 +372,18 @@ export default function ClientesPage() {
                 <th className="text-left p-4 font-medium text-muted-foreground">Contato</th>
                 <th className="text-left p-4 font-medium text-muted-foreground">Serviço Buscado</th>
                 <th className="text-left p-4 font-medium text-muted-foreground">Temperatura</th>
-                <th className="text-left p-4 font-medium text-muted-foreground">Etapa</th>
+                <th className="p-4">
+                  <button
+                    type="button"
+                    onClick={cycleSortEtapa}
+                    className="flex items-center gap-1 text-muted-foreground hover:text-foreground font-medium transition-colors group"
+                  >
+                    Etapa
+                    {etapaSort === 0 && <ArrowUpDown className="w-3.5 h-3.5 opacity-40 group-hover:opacity-70" />}
+                    {etapaSort === 1 && <ArrowUp className="w-3.5 h-3.5 text-indigo-400" />}
+                    {etapaSort === 2 && <ArrowDown className="w-3.5 h-3.5 text-indigo-400" />}
+                  </button>
+                </th>
                 <th className="p-4">
                   <button
                     type="button"

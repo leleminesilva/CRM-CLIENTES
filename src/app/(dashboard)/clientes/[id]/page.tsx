@@ -53,6 +53,17 @@ const ETAPAS: { estagio: EstagioLead; label: string; icon: React.ElementType }[]
   { estagio: "NEGOCIACAO",       label: "Em Negociação",      icon: Handshake },
 ];
 
+// Interpreta valores em formato brasileiro (4.562,98) ou americano (4562.98)
+function parseBRL(raw: string): number {
+  const s = raw.trim();
+  if (!s) return 0;
+  const hasDot   = s.includes(".");
+  const hasComma = s.includes(",");
+  if (hasDot && hasComma) return parseFloat(s.replace(/\./g, "").replace(",", "."));
+  if (hasComma)           return parseFloat(s.replace(",", "."));
+  return parseFloat(s);
+}
+
 function PipelineTracker({
   leadId, clienteId, clienteNome, estagio, onUpdate,
 }: {
@@ -293,13 +304,12 @@ function PipelineTracker({
             <div className="space-y-1.5">
               <p className="text-sm font-medium">Valor (R$) <span className="text-red-500">*</span></p>
               <input
-                type="number"
-                step="0.01"
-                min="0"
+                type="text"
+                inputMode="decimal"
                 value={orcValor}
                 onChange={(e) => setOrcValor(e.target.value)}
-                placeholder="0,00"
-                className={`w-full h-9 rounded-md border px-3 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring ${!orcValor ? "border-red-400" : "border-input"}`}
+                placeholder="Ex: 4.562,98"
+                className={`w-full h-9 rounded-md border px-3 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring ${!orcValor || isNaN(parseBRL(orcValor)) ? "border-red-400" : "border-input"}`}
               />
             </div>
             <div className="space-y-1.5">
@@ -317,20 +327,21 @@ function PipelineTracker({
             <Button variant="outline" onClick={() => setOrcDialog(false)}>Voltar</Button>
             <Button
               className="bg-indigo-600 hover:bg-indigo-700"
-              disabled={!orcNumero || !orcValor || !orcData || mutation.isPending}
+              disabled={!orcNumero || !orcValor || isNaN(parseBRL(orcValor)) || !orcData || mutation.isPending}
               onClick={async () => {
+                const valor = parseBRL(orcValor);
                 if (orcTargetEstagio === "PROPOSTA_ENVIADA") {
                   // Orçamento Final → campos separados, não sobrescreve o Primeiro Orçamento
                   await axios.patch(`/api/clientes/${clienteId}`, {
                     orcamentoFinalNumero: orcNumero,
-                    orcamentoFinalValor: Number(orcValor),
+                    orcamentoFinalValor: valor,
                     orcamentoFinalEm: orcData,
                   });
                 } else {
                   // Primeiro Orçamento → campos originais
                   await axios.patch(`/api/clientes/${clienteId}`, {
                     numeroOrcamento: orcNumero,
-                    valorOrcamento: Number(orcValor),
+                    valorOrcamento: valor,
                     orcamentoEnviadoEm: orcData,
                   });
                 }
@@ -356,13 +367,12 @@ function PipelineTracker({
             <div className="space-y-1.5">
               <p className="text-sm font-medium">Valor (R$) <span className="text-red-500">*</span></p>
               <input
-                type="number"
-                step="0.01"
-                min="0"
+                type="text"
+                inputMode="decimal"
                 value={confValor}
                 onChange={(e) => setConfValor(e.target.value)}
-                placeholder="0,00"
-                className={`w-full h-9 rounded-md border px-3 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring ${!confValor ? "border-red-400" : "border-input"}`}
+                placeholder="Ex: 4.562,98"
+                className={`w-full h-9 rounded-md border px-3 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring ${!confValor || isNaN(parseBRL(confValor)) ? "border-red-400" : "border-input"}`}
               />
             </div>
             <div className="space-y-1.5">
@@ -380,12 +390,12 @@ function PipelineTracker({
             <Button variant="outline" onClick={() => setConfDialog(false)}>Voltar</Button>
             <Button
               className="bg-emerald-600 hover:bg-emerald-700"
-              disabled={!confValor || !confData || mutation.isPending}
+              disabled={!confValor || isNaN(parseBRL(confValor)) || !confData || mutation.isPending}
               onClick={() => {
                 mutation.mutate({
                   novoEstagio: "FECHADO_GANHO",
                   dataFechamento: confData,
-                  clientePatch: { valorOrcamento: Number(confValor), dataVenda: confData },
+                  clientePatch: { valorOrcamento: parseBRL(confValor), dataVenda: confData },
                 });
                 setConfDialog(false);
               }}

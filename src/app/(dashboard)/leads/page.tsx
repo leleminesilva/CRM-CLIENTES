@@ -1,6 +1,16 @@
 "use client";
 
 import { useState } from "react";
+
+function parseBRL(raw: string): number {
+  const s = raw.trim();
+  if (!s) return 0;
+  const hasDot   = s.includes(".");
+  const hasComma = s.includes(",");
+  if (hasDot && hasComma) return parseFloat(s.replace(/\./g, "").replace(",", "."));
+  if (hasComma)           return parseFloat(s.replace(",", "."));
+  return parseFloat(s);
+}
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
 import { toast } from "sonner";
@@ -146,7 +156,7 @@ function NovoLeadDialog({ estagio, onSuccess }: { estagio: EstagioLead; onSucces
         descricao,
         estagio,
         temperatura,
-        valorEstimado: valor ? parseFloat(valor) : undefined,
+        valorEstimado: valor ? parseBRL(valor) : undefined,
       }),
     onSuccess: () => {
       toast.success("Lead criado com sucesso!");
@@ -183,7 +193,7 @@ function NovoLeadDialog({ estagio, onSuccess }: { estagio: EstagioLead; onSucces
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label>Valor Estimado</Label>
-              <Input type="number" value={valor} onChange={(e) => setValor(e.target.value)} placeholder="0,00" />
+              <Input type="text" inputMode="decimal" value={valor} onChange={(e) => setValor(e.target.value)} placeholder="Ex: 4.562,98" />
             </div>
             <div className="space-y-1.5">
               <Label>Temperatura</Label>

@@ -373,7 +373,7 @@ export default function DashboardPage() {
                           className="h-full rounded-lg flex items-center pl-3 text-white text-xs font-semibold transition-all duration-500"
                           style={{ width: `${Math.max(pct, 3)}%`, backgroundColor: barColor, minWidth: "50px" }}
                         >
-                          {f.total > 0 && formatCurrency(f.valor)}
+                          {f.total > 0 && f.total}
                         </div>
                       </div>
                     </div>

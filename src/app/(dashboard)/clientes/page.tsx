@@ -93,16 +93,24 @@ export default function ClientesPage() {
   const [sortMode, setSortMode] = useState(0);
   // 0 = desativado, 1 = etapa asc (pipeline), 2 = etapa desc
   const [etapaSort, setEtapaSort] = useState(0);
+  // 0 = desativado, 1 = QUENTE→FRIO, 2 = FRIO→QUENTE
+  const [tempSort, setTempSort] = useState(0);
 
   function cycleSortMode() {
-    setEtapaSort(0);
+    setEtapaSort(0); setTempSort(0);
     setSortMode((prev) => (prev + 1) % 3);
     setPage(1);
   }
 
   function cycleSortEtapa() {
-    setSortMode(0);
+    setSortMode(0); setTempSort(0);
     setEtapaSort((prev) => (prev + 1) % 3);
+    setPage(1);
+  }
+
+  function cycleSortTemp() {
+    setSortMode(0); setEtapaSort(0);
+    setTempSort((prev) => (prev + 1) % 3);
     setPage(1);
   }
 
@@ -176,16 +184,26 @@ export default function ClientesPage() {
     PROPOSTA_ENVIADA: 4, NEGOCIACAO: 5, FECHADO_GANHO: 6, FECHADO_PERDIDO: 7,
   };
 
+  const TEMP_ORDER: Record<string, number> = { QUENTE: 0, MORNO: 1, FRIO: 2 };
+
   const clientesRaw: Cliente[] = data?.data || [];
-  const clientes = etapaSort === 0
-    ? clientesRaw
-    : [...clientesRaw].sort((a, b) => {
+  const clientes = (() => {
+    if (etapaSort > 0) {
+      return [...clientesRaw].sort((a, b) => {
         const ea = (a as unknown as { leads?: { estagio: string }[] }).leads?.[0]?.estagio ?? "";
         const eb = (b as unknown as { leads?: { estagio: string }[] }).leads?.[0]?.estagio ?? "";
-        const oa = ESTAGIO_ORDER[ea] ?? 99;
-        const ob = ESTAGIO_ORDER[eb] ?? 99;
-        return etapaSort === 1 ? oa - ob : ob - oa;
+        const d = (ESTAGIO_ORDER[ea] ?? 99) - (ESTAGIO_ORDER[eb] ?? 99);
+        return etapaSort === 1 ? d : -d;
       });
+    }
+    if (tempSort > 0) {
+      return [...clientesRaw].sort((a, b) => {
+        const d = (TEMP_ORDER[a.temperatura] ?? 99) - (TEMP_ORDER[b.temperatura] ?? 99);
+        return tempSort === 1 ? d : -d;
+      });
+    }
+    return clientesRaw;
+  })();
   const total = data?.total || 0;
   const totalPages = data?.totalPages || 1;
 
@@ -371,7 +389,18 @@ export default function ClientesPage() {
                 <th className="text-left p-4 font-medium text-muted-foreground">Cliente</th>
                 <th className="text-left p-4 font-medium text-muted-foreground">Contato</th>
                 <th className="text-left p-4 font-medium text-muted-foreground">Serviço Buscado</th>
-                <th className="text-left p-4 font-medium text-muted-foreground">Temperatura</th>
+                <th className="p-4">
+                  <button
+                    type="button"
+                    onClick={cycleSortTemp}
+                    className="flex items-center gap-1 text-muted-foreground hover:text-foreground font-medium transition-colors group"
+                  >
+                    Temperatura
+                    {tempSort === 0 && <ArrowUpDown className="w-3.5 h-3.5 opacity-40 group-hover:opacity-70" />}
+                    {tempSort === 1 && <ArrowUp className="w-3.5 h-3.5 text-indigo-400" />}
+                    {tempSort === 2 && <ArrowDown className="w-3.5 h-3.5 text-indigo-400" />}
+                  </button>
+                </th>
                 <th className="p-4">
                   <button
                     type="button"

@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
       prisma.lead.count({ where: { deletedAt: null, createdAt: { gte: de, lte: ate } } }),
       prisma.lead.count({ where: { deletedAt: null, estagio: "FECHADO_GANHO", dataFechamento: { gte: de, lte: ate } } }),
       prisma.lead.count({ where: { deletedAt: null, estagio: "FECHADO_PERDIDO", dataFechamento: { gte: de, lte: ate } } }),
-      prisma.lead.count({ where: { deletedAt: null, estagio: { notIn: ["FECHADO_GANHO", "FECHADO_PERDIDO"] } } }),
+      prisma.lead.count({ where: { deletedAt: null, estagio: { notIn: ["FECHADO_GANHO", "FECHADO_PERDIDO"] }, createdAt: { gte: de, lte: ate } } }),
       prisma.lead.groupBy({
         by: ["origem"],
         where: { deletedAt: null, createdAt: { gte: de, lte: ate } },

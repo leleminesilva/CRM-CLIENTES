@@ -95,22 +95,30 @@ export default function ClientesPage() {
   const [etapaSort, setEtapaSort] = useState(0);
   // 0 = desativado, 1 = QUENTE→FRIO, 2 = FRIO→QUENTE
   const [tempSort, setTempSort] = useState(0);
+  // 0 = desativado, 1 = A→Z, 2 = Z→A
+  const [respSort, setRespSort] = useState(0);
 
   function cycleSortMode() {
-    setEtapaSort(0); setTempSort(0);
+    setEtapaSort(0); setTempSort(0); setRespSort(0);
     setSortMode((prev) => (prev + 1) % 3);
     setPage(1);
   }
 
   function cycleSortEtapa() {
-    setSortMode(0); setTempSort(0);
+    setSortMode(0); setTempSort(0); setRespSort(0);
     setEtapaSort((prev) => (prev + 1) % 3);
     setPage(1);
   }
 
   function cycleSortTemp() {
-    setSortMode(0); setEtapaSort(0);
+    setSortMode(0); setEtapaSort(0); setRespSort(0);
     setTempSort((prev) => (prev + 1) % 3);
+    setPage(1);
+  }
+
+  function cycleSortResp() {
+    setSortMode(0); setEtapaSort(0); setTempSort(0);
+    setRespSort((prev) => (prev + 1) % 3);
     setPage(1);
   }
 
@@ -200,6 +208,13 @@ export default function ClientesPage() {
       return [...clientesRaw].sort((a, b) => {
         const d = (TEMP_ORDER[a.temperatura] ?? 99) - (TEMP_ORDER[b.temperatura] ?? 99);
         return tempSort === 1 ? d : -d;
+      });
+    }
+    if (respSort > 0) {
+      return [...clientesRaw].sort((a, b) => {
+        const na = a.responsavel?.nome ?? "";
+        const nb = b.responsavel?.nome ?? "";
+        return respSort === 1 ? na.localeCompare(nb, "pt") : nb.localeCompare(na, "pt");
       });
     }
     return clientesRaw;
@@ -425,7 +440,22 @@ export default function ClientesPage() {
                     {sortMode === 2 && <ArrowDown className="w-3.5 h-3.5 text-indigo-400" />}
                   </button>
                 </th>
-                <th className="text-left p-4 font-medium text-muted-foreground">Responsável</th>
+                <th className="p-4">
+                  {isAdmin ? (
+                    <button
+                      type="button"
+                      onClick={cycleSortResp}
+                      className="flex items-center gap-1 text-muted-foreground hover:text-foreground font-medium transition-colors group"
+                    >
+                      Responsável
+                      {respSort === 0 && <ArrowUpDown className="w-3.5 h-3.5 opacity-40 group-hover:opacity-70" />}
+                      {respSort === 1 && <ArrowUp className="w-3.5 h-3.5 text-indigo-400" />}
+                      {respSort === 2 && <ArrowDown className="w-3.5 h-3.5 text-indigo-400" />}
+                    </button>
+                  ) : (
+                    <span className="text-left font-medium text-muted-foreground">Responsável</span>
+                  )}
+                </th>
                 <th className="p-4" />
               </tr>
             </thead>

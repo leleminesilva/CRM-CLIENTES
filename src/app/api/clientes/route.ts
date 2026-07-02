@@ -57,8 +57,12 @@ export async function GET(request: NextRequest) {
           { telefone: { contains: search } },
           { whatsapp: { contains: search } },
           ...(searchDigits.length >= 4 ? [
+            // busca por dígitos em qualquer posição (ex: DDD + número parcial)
             { telefone: { contains: searchDigits } },
             { whatsapp: { contains: searchDigits } },
+            // busca pelos últimos N dígitos (ex: apenas "7808")
+            { telefone: { endsWith: searchDigits } },
+            { whatsapp: { endsWith: searchDigits } },
           ] : []),
         ],
       });

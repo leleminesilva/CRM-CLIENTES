@@ -11,7 +11,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
 
     const cliente = await prisma.cliente.update({
       where: { id: params.id, deletedAt: null },
-      data: { updatedAt: new Date() },
+      data: { revisadoEm: new Date() },
     });
 
     await prisma.atividade.create({

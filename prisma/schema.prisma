@@ -3,8 +3,9 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 // ==========================================
@@ -231,6 +232,7 @@ model Cliente {
   dataVenda           DateTime?
   statusOrcamento     StatusOrcamentoCliente @default(PENDENTE)
   orcamentoEnviadoEm  DateTime?
+  revisadoEm          DateTime?
   temperatura     Temperatura            @default(MORNO)
   deletedAt       DateTime?
   createdAt       DateTime               @default(now())

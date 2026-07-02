@@ -139,6 +139,7 @@ export interface Cliente {
   dataVenda?: string | null;
   statusOrcamento: StatusOrcamentoCliente;
   orcamentoEnviadoEm?: string | null;
+  revisadoEm?: string | null;
   temperatura: Temperatura;
   createdAt: string;
   updatedAt: string;

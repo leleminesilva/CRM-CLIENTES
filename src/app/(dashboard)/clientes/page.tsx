@@ -369,7 +369,7 @@ export default function ClientesPage() {
                 const fechado = estagio === "FECHADO_GANHO" || estagio === "FECHADO_PERDIDO"
                   || c.statusOrcamento === "APROVADO" || c.statusOrcamento === "NAO_APROVADO";
                 const limite2d = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000);
-                const parado = !fechado && new Date(c.updatedAt) < limite2d;
+                const parado = !fechado && new Date(c.updatedAt) < limite2d && (!c.revisadoEm || new Date(c.revisadoEm) < limite2d);
                 return (
                 <tr key={c.id} className={cn("border-b transition-colors", parado ? "bg-red-500/10 hover:bg-red-500/15" : "hover:bg-muted/30")}>
                   <td className="p-4">

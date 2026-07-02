@@ -72,6 +72,13 @@ export async function GET(request: NextRequest) {
           { createdAt: rangeFilter },
           {
             updatedAt: { lt: limite2d },
+            revisadoEm: null,
+            statusOrcamento: { notIn: ["APROVADO", "NAO_APROVADO"] },
+            leads: { none: { estagio: { in: ["FECHADO_GANHO", "FECHADO_PERDIDO"] }, deletedAt: null } },
+          },
+          {
+            updatedAt: { lt: limite2d },
+            revisadoEm: { lt: limite2d },
             statusOrcamento: { notIn: ["APROVADO", "NAO_APROVADO"] },
             leads: { none: { estagio: { in: ["FECHADO_GANHO", "FECHADO_PERDIDO"] }, deletedAt: null } },
           },

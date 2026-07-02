@@ -19,6 +19,9 @@ import {
   Trash2,
   MessageCircle,
   X,
+  ArrowUp,
+  ArrowDown,
+  ArrowUpDown,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -86,6 +89,13 @@ export default function ClientesPage() {
   const [estagio, setEstagio] = useState(() => ss?.getItem("cf_estagio") ?? "");
   const [dataInicio, setDataInicio] = useState(() => ss?.getItem("cf_dataInicio") ?? "");
   const [dataFim, setDataFim] = useState(() => ss?.getItem("cf_dataFim") ?? "");
+  // 0 = padrão (updatedAt desc), 1 = inclusão asc, 2 = inclusão desc
+  const [sortMode, setSortMode] = useState(0);
+
+  function cycleSortMode() {
+    setSortMode((prev) => (prev + 1) % 3);
+    setPage(1);
+  }
 
   // Persiste filtros no sessionStorage sempre que mudam
   useEffect(() => { sessionStorage.setItem("cf_search", search); }, [search]);
@@ -124,7 +134,7 @@ export default function ClientesPage() {
   });
 
   const { data, isLoading } = useQuery({
-    queryKey: ["clientes", page, search, responsavelId, temperatura, servico, estagio, dataInicio, dataFim],
+    queryKey: ["clientes", page, search, responsavelId, temperatura, servico, estagio, dataInicio, dataFim, sortMode],
     queryFn: async () => {
       const params = new URLSearchParams({ page: String(page), limit: "100" });
       if (search) params.set("search", search);
@@ -134,6 +144,8 @@ export default function ClientesPage() {
       if (estagio) params.set("estagio", estagio);
       if (dataInicio) params.set("dataInicio", dataInicio);
       if (dataFim) params.set("dataFim", dataFim);
+      if (sortMode === 1) params.set("sort", "createdAt_asc");
+      if (sortMode === 2) params.set("sort", "createdAt_desc");
       const { data } = await axios.get(`/api/clientes?${params}`);
       return data;
     },
@@ -338,7 +350,18 @@ export default function ClientesPage() {
                 <th className="text-left p-4 font-medium text-muted-foreground">Serviço Buscado</th>
                 <th className="text-left p-4 font-medium text-muted-foreground">Temperatura</th>
                 <th className="text-left p-4 font-medium text-muted-foreground">Etapa</th>
-                <th className="text-left p-4 font-medium text-muted-foreground">Inclusão</th>
+                <th className="p-4">
+                  <button
+                    type="button"
+                    onClick={cycleSortMode}
+                    className="flex items-center gap-1 text-muted-foreground hover:text-foreground font-medium transition-colors group"
+                  >
+                    Inclusão
+                    {sortMode === 0 && <ArrowUpDown className="w-3.5 h-3.5 opacity-40 group-hover:opacity-70" />}
+                    {sortMode === 1 && <ArrowUp className="w-3.5 h-3.5 text-indigo-400" />}
+                    {sortMode === 2 && <ArrowDown className="w-3.5 h-3.5 text-indigo-400" />}
+                  </button>
+                </th>
                 <th className="text-left p-4 font-medium text-muted-foreground">Responsável</th>
                 <th className="p-4" />
               </tr>

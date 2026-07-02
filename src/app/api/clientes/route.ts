@@ -38,6 +38,7 @@ export async function GET(request: NextRequest) {
     const estagio = searchParams.get("estagio") || undefined;
     const dataInicio = searchParams.get("dataInicio") || undefined;
     const dataFim = searchParams.get("dataFim") || undefined;
+    const sort = searchParams.get("sort") || undefined;
 
     const andConditions: Record<string, unknown>[] = [];
 
@@ -101,7 +102,11 @@ export async function GET(request: NextRequest) {
             select: { estagio: true },
           },
         },
-        orderBy: { updatedAt: "desc" },
+        orderBy: sort === "createdAt_asc"
+          ? { createdAt: "asc" as const }
+          : sort === "createdAt_desc"
+          ? { createdAt: "desc" as const }
+          : { updatedAt: "desc" as const },
         skip: (page - 1) * limit,
         take: limit,
       }),

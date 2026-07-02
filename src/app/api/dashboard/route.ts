@@ -126,12 +126,16 @@ export async function GET(request: NextRequest) {
         },
       }),
 
-      // Valor em negociação — todos os clientes pendentes com orçamento, sem filtro de período
+      // Valor em negociação no período — filtra por orcamentoEnviadoEm se disponível, senão por createdAt
       prisma.cliente.aggregate({
         where: {
           deletedAt: null,
           statusOrcamento: { notIn: ["APROVADO", "NAO_APROVADO"] },
           valorOrcamento: { not: null },
+          OR: [
+            { orcamentoEnviadoEm: { gte: de, lte: ate } },
+            { orcamentoEnviadoEm: null, createdAt: { gte: de, lte: ate } },
+          ],
           ...userFilter,
         },
         _sum: { valorOrcamento: true },

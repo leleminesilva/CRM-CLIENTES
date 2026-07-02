@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 
-const ALERTA_KEY = "crm_alerta_sistema_v1";
+const ALERTA_KEY = "crm_alerta_sistema_v2";
 
 export function AlertaSistema() {
   const [aberto, setAberto] = useState(false);

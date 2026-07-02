@@ -126,7 +126,7 @@ export default function ClientesPage() {
   const { data, isLoading } = useQuery({
     queryKey: ["clientes", page, search, responsavelId, temperatura, servico, estagio, dataInicio, dataFim],
     queryFn: async () => {
-      const params = new URLSearchParams({ page: String(page), limit: "15" });
+      const params = new URLSearchParams({ page: String(page), limit: "100" });
       if (search) params.set("search", search);
       if (responsavelId) params.set("responsavelId", responsavelId);
       if (temperatura) params.set("temperatura", temperatura);

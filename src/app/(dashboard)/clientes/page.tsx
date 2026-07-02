@@ -365,13 +365,13 @@ export default function ClientesPage() {
                   </td>
                 </tr>
               ) : clientes.map((c) => {
-                const orcamentoPendente2d =
-                  c.valorOrcamento &&
-                  c.statusOrcamento === "PENDENTE" &&
-                  c.orcamentoEnviadoEm &&
-                  new Date(c.orcamentoEnviadoEm) < new Date(Date.now() - 2 * 24 * 60 * 60 * 1000);
+                const estagio = (c as unknown as { leads?: { estagio: string }[] }).leads?.[0]?.estagio;
+                const fechado = estagio === "FECHADO_GANHO" || estagio === "FECHADO_PERDIDO"
+                  || c.statusOrcamento === "APROVADO" || c.statusOrcamento === "NAO_APROVADO";
+                const limite2d = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000);
+                const parado = !fechado && new Date(c.updatedAt) < limite2d;
                 return (
-                <tr key={c.id} className={cn("border-b transition-colors", orcamentoPendente2d ? "bg-red-500/10 hover:bg-red-500/15" : "hover:bg-muted/30")}>
+                <tr key={c.id} className={cn("border-b transition-colors", parado ? "bg-red-500/10 hover:bg-red-500/15" : "hover:bg-muted/30")}>
                   <td className="p-4">
                     <div className="flex items-center gap-3">
                       <Avatar className="w-8 h-8">
@@ -438,8 +438,8 @@ export default function ClientesPage() {
                   </td>
                   <td className="p-4">
                     <div className="flex items-center gap-2">
-                      {orcamentoPendente2d && (
-                        <span title="Orçamento pendente há mais de 2 dias" className="text-red-500 text-xs font-semibold">⚠</span>
+                      {parado && (
+                        <span title="Sem movimentação há mais de 2 dias" className="text-red-500 text-xs font-semibold">⚠</span>
                       )}
                       <ActionMenu c={c} />
                     </div>

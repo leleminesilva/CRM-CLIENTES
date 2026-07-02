@@ -1,6 +1,7 @@
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Topbar } from "@/components/layout/Topbar";
 import { SidebarProvider } from "@/contexts/SidebarContext";
+import { AlertaSistema } from "@/components/AlertaSistema";
 
 export default function DashboardLayout({
   children,
@@ -18,6 +19,7 @@ export default function DashboardLayout({
           </main>
         </div>
       </div>
+      <AlertaSistema />
     </SidebarProvider>
   );
 }

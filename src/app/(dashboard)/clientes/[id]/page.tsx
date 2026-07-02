@@ -561,6 +561,18 @@ export default function ClienteDetalhePage() {
     onError: () => toast.error("Erro ao remover"),
   });
 
+  const revisarMutation = useMutation({
+    mutationFn: () => axios.patch(`/api/clientes/${id}/revisar`),
+    onSuccess: () => { toast.success("Cliente marcado como Em Processo!"); qc.invalidateQueries({ queryKey: ["cliente", id] }); },
+    onError: () => toast.error("Erro ao marcar Em Processo"),
+  });
+
+  const limite2d = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000);
+  const leadEstagio = cliente?.leads?.[0]?.estagio as string | undefined;
+  const fechado = leadEstagio === "FECHADO_GANHO" || leadEstagio === "FECHADO_PERDIDO"
+    || cliente?.statusOrcamento === "APROVADO" || cliente?.statusOrcamento === "NAO_APROVADO";
+  const clienteParado = !fechado && cliente?.updatedAt && new Date(cliente.updatedAt) < limite2d;
+
   if (isLoading) {
     return (
       <div className="space-y-4 animate-pulse">
@@ -587,7 +599,17 @@ export default function ClienteDetalhePage() {
           </div>
           {cliente.nomeFantasia && <p className="text-muted-foreground">{cliente.nomeFantasia}</p>}
         </div>
-        <div className="flex gap-2 shrink-0">
+        <div className="flex gap-2 shrink-0 flex-wrap justify-end">
+          {clienteParado && (
+            <Button
+              size="sm"
+              className="bg-amber-500 hover:bg-amber-600 text-white"
+              onClick={() => revisarMutation.mutate()}
+              disabled={revisarMutation.isPending}
+            >
+              ✅ Em Processo
+            </Button>
+          )}
           <Link href={`/clientes/${id}/editar`}>
             <Button variant="outline" size="sm">
               <Edit className="w-4 h-4 mr-2" />

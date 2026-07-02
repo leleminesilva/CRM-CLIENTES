@@ -48,11 +48,18 @@ export async function GET(request: NextRequest) {
     };
 
     if (search) {
+      const searchDigits = search.replace(/\D/g, "");
       andConditions.push({
         OR: [
           { nome: { contains: search, mode: "insensitive" } },
           { email: { contains: search, mode: "insensitive" } },
           { cpfCnpj: { contains: search } },
+          { telefone: { contains: search } },
+          { whatsapp: { contains: search } },
+          ...(searchDigits.length >= 4 ? [
+            { telefone: { contains: searchDigits } },
+            { whatsapp: { contains: searchDigits } },
+          ] : []),
         ],
       });
     }

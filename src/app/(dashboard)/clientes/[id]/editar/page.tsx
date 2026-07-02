@@ -32,7 +32,8 @@ const ORIGENS = [
 
 const SERVICOS = [
   "Box de banheiro", "Espelho", "Janela de vidro", "Porta de vidro",
-  "Fachada", "Guarda-corpo", "Pergolado de vidro", "Vitrine", "Divisória", "Outros",
+  "Fachada", "Guarda-corpo", "Pergolado de vidro", "Vitrine", "Divisória",
+  "Portão", "Corrimão", "Tampo de mesa", "Linha suprema", "Linha gold", "Outros",
 ];
 
 // ─── Formulário ─────────────────────────────────────────────────────────────

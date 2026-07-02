@@ -1,7 +1,7 @@
 "use client";
 
 import { useParams, useRouter } from "next/navigation";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
@@ -572,6 +572,7 @@ export default function ClienteDetalhePage() {
 
   const [notifDialog, setNotifDialog] = useState(false);
   const [notifMensagem, setNotifMensagem] = useState("");
+  const [notifPopupAberto, setNotifPopupAberto] = useState(false);
 
   const notifMutation = useMutation({
     mutationFn: (mensagem: string) => axios.post(`/api/clientes/${id}/notificar`, { mensagem }),
@@ -583,6 +584,32 @@ export default function ClienteDetalhePage() {
     },
     onError: () => toast.error("Erro ao enviar notificação"),
   });
+
+  const marcarLidaMutation = useMutation({
+    mutationFn: () => axios.patch(`/api/clientes/${id}/notificar`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["cliente", id] }),
+  });
+
+  // Abre o popup assim que os dados carregam e há notificação não lida para o usuário atual
+  const jaAbriuPopup = useState(false);
+  useEffect(() => {
+    if (
+      cliente &&
+      cliente.notificacaoMensagem &&
+      !cliente.notificacaoLida &&
+      cliente.responsavelId === user?.id &&
+      !jaAbriuPopup[0]
+    ) {
+      jaAbriuPopup[1](true);
+      setNotifPopupAberto(true);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cliente]);
+
+  function fecharPopup() {
+    setNotifPopupAberto(false);
+    marcarLidaMutation.mutate();
+  }
 
   const limite2d = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000);
   const leadEstagio = cliente?.leads?.[0]?.estagio as string | undefined;
@@ -603,6 +630,34 @@ export default function ClienteDetalhePage() {
 
   return (
     <div className="space-y-6 animate-fade-in">
+      {/* Popup de notificação — abre quando o responsável entra na tela do cliente */}
+      {notifPopupAberto && cliente.notificacaoMensagem && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="bg-card border border-amber-500/50 rounded-xl shadow-2xl w-full max-w-lg mx-4 p-6 space-y-4 animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex items-start gap-3">
+              <span className="text-2xl leading-none mt-0.5">🔔</span>
+              <div>
+                <p className="text-xs text-amber-400 font-medium uppercase tracking-wide mb-0.5">Notificação do Sistema</p>
+                <h2 className="text-lg font-bold text-foreground leading-tight">
+                  {cliente.nome}
+                </h2>
+              </div>
+            </div>
+            <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-4">
+              <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap">
+                {cliente.notificacaoMensagem}
+              </p>
+            </div>
+            <button
+              onClick={fecharPopup}
+              className="w-full py-2.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-white text-sm font-semibold transition-colors"
+            >
+              Entendido
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex items-start gap-4">
         <Button variant="ghost" size="icon" onClick={() => router.back()}>

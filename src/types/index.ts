@@ -139,6 +139,9 @@ export interface Cliente {
   dataVenda?: string | null;
   statusOrcamento: StatusOrcamentoCliente;
   orcamentoEnviadoEm?: string | null;
+  orcamentoFinalNumero?: string | null;
+  orcamentoFinalValor?: number | null;
+  orcamentoFinalEm?: string | null;
   revisadoEm?: string | null;
   notificacaoMensagem?: string | null;
   notificacaoEm?: string | null;

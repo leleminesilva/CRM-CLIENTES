@@ -232,6 +232,9 @@ model Cliente {
   dataVenda           DateTime?
   statusOrcamento     StatusOrcamentoCliente @default(PENDENTE)
   orcamentoEnviadoEm      DateTime?
+  orcamentoFinalNumero    String?
+  orcamentoFinalValor     Decimal?  @db.Decimal(15, 2)
+  orcamentoFinalEm        DateTime?
   revisadoEm              DateTime?
   notificacaoMensagem     String?
   notificacaoEm           DateTime?

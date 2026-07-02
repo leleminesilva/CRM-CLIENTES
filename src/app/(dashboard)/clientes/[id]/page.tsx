@@ -319,11 +319,21 @@ function PipelineTracker({
               className="bg-indigo-600 hover:bg-indigo-700"
               disabled={!orcNumero || !orcValor || !orcData || mutation.isPending}
               onClick={async () => {
-                await axios.patch(`/api/clientes/${clienteId}`, {
-                  numeroOrcamento: orcNumero,
-                  valorOrcamento: Number(orcValor),
-                  orcamentoEnviadoEm: orcData,
-                });
+                if (orcTargetEstagio === "PROPOSTA_ENVIADA") {
+                  // Orçamento Final → campos separados, não sobrescreve o Primeiro Orçamento
+                  await axios.patch(`/api/clientes/${clienteId}`, {
+                    orcamentoFinalNumero: orcNumero,
+                    orcamentoFinalValor: Number(orcValor),
+                    orcamentoFinalEm: orcData,
+                  });
+                } else {
+                  // Primeiro Orçamento → campos originais
+                  await axios.patch(`/api/clientes/${clienteId}`, {
+                    numeroOrcamento: orcNumero,
+                    valorOrcamento: Number(orcValor),
+                    orcamentoEnviadoEm: orcData,
+                  });
+                }
                 mutation.mutate({ novoEstagio: orcTargetEstagio });
                 setOrcDialog(false);
               }}
@@ -413,12 +423,17 @@ function TemperaturaSelect({
 }
 
 function OrcamentoCard({
-  clienteId, numeroOrcamento, valorOrcamento, orcamentoEnviadoEm, dataVenda, statusOrcamento, temperatura, onSaved,
+  clienteId, numeroOrcamento, valorOrcamento, orcamentoEnviadoEm,
+  orcamentoFinalNumero, orcamentoFinalValor, orcamentoFinalEm,
+  dataVenda, statusOrcamento, temperatura, onSaved,
 }: {
   clienteId: string;
   numeroOrcamento?: string | null;
   valorOrcamento?: number | null;
   orcamentoEnviadoEm?: string | null;
+  orcamentoFinalNumero?: string | null;
+  orcamentoFinalValor?: number | null;
+  orcamentoFinalEm?: string | null;
   dataVenda?: string | null;
   statusOrcamento: string;
   temperatura: string;
@@ -432,6 +447,8 @@ function OrcamentoCard({
         </p>
       </div>
       <div className="space-y-2 text-sm">
+        {/* Primeiro Orçamento */}
+        <p className="text-xs font-semibold text-indigo-400 uppercase tracking-wide">Primeiro Orçamento</p>
         <div className="flex justify-between">
           <span className="text-muted-foreground">Número</span>
           <span className="font-medium font-mono">{numeroOrcamento || "—"}</span>
@@ -443,12 +460,36 @@ function OrcamentoCard({
           </span>
         </div>
         <div className="flex justify-between">
-          <span className="text-muted-foreground">Data do Orçamento</span>
+          <span className="text-muted-foreground">Data</span>
           <span className="font-medium">
             {orcamentoEnviadoEm ? new Date(orcamentoEnviadoEm).toLocaleDateString("pt-BR") : "—"}
           </span>
         </div>
-        <div className="flex justify-between">
+
+        {/* Orçamento Final — só aparece se preenchido */}
+        {orcamentoFinalEm && (
+          <>
+            <div className="border-t border-border pt-2">
+              <p className="text-xs font-semibold text-amber-400 uppercase tracking-wide mb-2">Orçamento Final</p>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Número</span>
+              <span className="font-medium font-mono">{orcamentoFinalNumero || "—"}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Valor</span>
+              <span className={orcamentoFinalValor ? "font-semibold text-emerald-600" : "text-muted-foreground"}>
+                {orcamentoFinalValor ? formatCurrency(Number(orcamentoFinalValor)) : "—"}
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Data</span>
+              <span className="font-medium">{new Date(orcamentoFinalEm).toLocaleDateString("pt-BR")}</span>
+            </div>
+          </>
+        )}
+
+        <div className="flex justify-between pt-1 border-t border-border">
           <span className="text-muted-foreground">Data da Venda</span>
           <span className="font-medium">
             {dataVenda ? new Date(dataVenda).toLocaleDateString("pt-BR") : "—"}
@@ -847,6 +888,9 @@ export default function ClienteDetalhePage() {
           numeroOrcamento={cliente.numeroOrcamento as string | null}
           valorOrcamento={cliente.valorOrcamento ? Number(cliente.valorOrcamento) : null}
           orcamentoEnviadoEm={cliente.orcamentoEnviadoEm as string | null}
+          orcamentoFinalNumero={cliente.orcamentoFinalNumero}
+          orcamentoFinalValor={cliente.orcamentoFinalValor ? Number(cliente.orcamentoFinalValor) : null}
+          orcamentoFinalEm={cliente.orcamentoFinalEm}
           dataVenda={cliente.dataVenda as string | null}
           statusOrcamento={cliente.statusOrcamento as string}
           temperatura={cliente.temperatura as string}

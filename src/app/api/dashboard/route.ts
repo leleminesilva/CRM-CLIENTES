@@ -70,6 +70,7 @@ export async function GET(request: NextRequest) {
       leadsConvertidos,
       canceladosPeriodo,
       canceladosAggregate,
+      valorNegociacaoFinal,
     ] = await Promise.all([
       // Total de clientes cadastrados no período
       prisma.cliente.count({ where: { deletedAt: null, createdAt: { gte: de, lte: ate }, ...userFilter } }),
@@ -126,7 +127,7 @@ export async function GET(request: NextRequest) {
         },
       }),
 
-      // Valor em negociação no período — filtra por orcamentoEnviadoEm se disponível, senão por createdAt
+      // Valor em negociação — Primeiro Orçamento no período
       prisma.cliente.aggregate({
         where: {
           deletedAt: null,
@@ -201,6 +202,18 @@ export async function GET(request: NextRequest) {
           AND (l."clienteId" IS NULL OR c.id IS NOT NULL)
           ${leadsUserFilterSql}
       `),
+
+      // Valor em negociação — Orçamento Final no período (campos separados)
+      prisma.cliente.aggregate({
+        where: {
+          deletedAt: null,
+          statusOrcamento: { notIn: ["APROVADO", "NAO_APROVADO"] },
+          orcamentoFinalEm: { gte: de, lte: ate },
+          orcamentoFinalValor: { not: null },
+          ...userFilter,
+        },
+        _sum: { orcamentoFinalValor: true },
+      }),
     ]);
 
     const receitaFechadaRow = (receitaFechadaPeriodo as Array<{ count: number; valor: number }>)[0];
@@ -299,7 +312,7 @@ export async function GET(request: NextRequest) {
           totalClientes,
           leadsAtivos,
           oportunidadesAbertas: leadsAtivos,
-          valorNegociacao: Number(valorNegociacaoAtual._sum?.valorOrcamento || 0),
+          valorNegociacao: Number(valorNegociacaoAtual._sum?.valorOrcamento || 0) + Number((valorNegociacaoFinal as { _sum: { orcamentoFinalValor?: unknown } })._sum?.orcamentoFinalValor || 0),
           vendasFechadas,
           taxaConversao:      Math.round(taxaConversao * 10) / 10,
           ticketMedio:        Math.round(ticketMedio),

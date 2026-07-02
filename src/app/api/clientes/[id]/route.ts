@@ -284,7 +284,11 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     if ("statusOrcamento"      in body) updateData.statusOrcamento = body.statusOrcamento;
     if ("temperatura"          in body) updateData.temperatura     = body.temperatura;
     // Quando enviado explicitamente (ex: dialog Primeiro Orçamento), usa a data do campo diretamente
-    if ("orcamentoEnviadoEm"   in body) updateData.orcamentoEnviadoEm = body.orcamentoEnviadoEm ? new Date(`${body.orcamentoEnviadoEm}T12:00:00`) : null;
+    if ("orcamentoEnviadoEm"    in body) updateData.orcamentoEnviadoEm    = body.orcamentoEnviadoEm    ? new Date(`${body.orcamentoEnviadoEm}T12:00:00`)    : null;
+    // Campos do Orçamento Final — salvos separadamente para não sobrescrever o Primeiro Orçamento
+    if ("orcamentoFinalNumero"  in body) updateData.orcamentoFinalNumero  = body.orcamentoFinalNumero  || null;
+    if ("orcamentoFinalValor"   in body) updateData.orcamentoFinalValor   = body.orcamentoFinalValor   ? Number(body.orcamentoFinalValor)                  : null;
+    if ("orcamentoFinalEm"      in body) updateData.orcamentoFinalEm      = body.orcamentoFinalEm      ? new Date(`${body.orcamentoFinalEm}T12:00:00`)      : null;
 
     // Auto-gestão de orcamentoEnviadoEm quando não é enviado explicitamente
     if (!("orcamentoEnviadoEm" in body) && ("valorOrcamento" in body || "statusOrcamento" in body)) {

@@ -49,7 +49,7 @@ const ETAPAS: { estagio: EstagioLead; label: string; icon: React.ElementType }[]
   { estagio: "CONTATO_INICIAL",     label: "Contato Feito",       icon: MessageCircle },
   { estagio: "PRIMEIRO_ORCAMENTO",  label: "Primeiro Orçamento",  icon: FileText },
   { estagio: "QUALIFICACAO",        label: "Visita / Medição",    icon: ClipboardList },
-  { estagio: "PROPOSTA_ENVIADA", label: "Orçamento Enviado",  icon: FileCheck },
+  { estagio: "PROPOSTA_ENVIADA", label: "Orçamento Final",    icon: FileCheck },
   { estagio: "NEGOCIACAO",       label: "Em Negociação",      icon: Handshake },
 ];
 
@@ -70,8 +70,9 @@ function PipelineTracker({
   const [motivoCancelamento, setMotivoCancelamento] = useState("");
   const [dataCancelamento, setDataCancelamento] = useState(hoje);
 
-  // Dialog Primeiro Orçamento
+  // Dialog Primeiro Orçamento / Orçamento Final
   const [orcDialog, setOrcDialog] = useState(false);
+  const [orcTargetEstagio, setOrcTargetEstagio] = useState<EstagioLead>("PRIMEIRO_ORCAMENTO");
   const [orcNumero, setOrcNumero] = useState("");
   const [orcValor, setOrcValor] = useState("");
   const [orcData, setOrcData] = useState(hoje);
@@ -147,7 +148,8 @@ function PipelineTracker({
                   type="button"
                   disabled={mutation.isPending}
                   onClick={() => {
-                    if (etapa.estagio === "PRIMEIRO_ORCAMENTO") {
+                    if (etapa.estagio === "PRIMEIRO_ORCAMENTO" || etapa.estagio === "PROPOSTA_ENVIADA") {
+                      setOrcTargetEstagio(etapa.estagio);
                       setOrcData(hoje);
                       setOrcNumero("");
                       setOrcValor("");
@@ -269,12 +271,13 @@ function PipelineTracker({
         </DialogContent>
       </Dialog>
 
-      {/* Dialog Primeiro Orçamento */}
+      {/* Dialog Primeiro Orçamento / Orçamento Final */}
       <Dialog open={orcDialog} onOpenChange={(o) => { if (!o) { setOrcDialog(false); } }}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-indigo-500">
-              <FileText className="w-4 h-4" /> Primeiro Orçamento
+              <FileText className="w-4 h-4" />
+              {orcTargetEstagio === "PROPOSTA_ENVIADA" ? "Orçamento Final" : "Primeiro Orçamento"}
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-2">
@@ -321,7 +324,7 @@ function PipelineTracker({
                   valorOrcamento: Number(orcValor),
                   orcamentoEnviadoEm: orcData,
                 });
-                mutation.mutate({ novoEstagio: "PRIMEIRO_ORCAMENTO" });
+                mutation.mutate({ novoEstagio: orcTargetEstagio });
                 setOrcDialog(false);
               }}
             >

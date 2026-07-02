@@ -86,7 +86,7 @@ export const ESTAGIO_LABELS: Record<string, string> = {
   CONTATO_INICIAL: "Contato Inicial",
   PRIMEIRO_ORCAMENTO: "Primeiro Orçamento",
   QUALIFICACAO: "Qualificação",
-  PROPOSTA_ENVIADA: "Proposta Enviada",
+  PROPOSTA_ENVIADA: "Orçamento Final",
   NEGOCIACAO: "Negociação",
   FECHADO_GANHO: "Fechado Ganho",
   FECHADO_PERDIDO: "Fechado Perdido",

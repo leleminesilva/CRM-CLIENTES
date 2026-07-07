@@ -78,9 +78,10 @@ function NavLink({
   );
 }
 
-function SidebarContent({ collapsed, onLinkClick }: { collapsed: boolean; onLinkClick?: () => void }) {
+// Tracks how many clients were added since the user last visited /clientes.
+function useNewClientesCount() {
   const pathname = usePathname();
-  const { user, loading } = useAuth();
+  const { user } = useAuth();
   const [hydrated, setHydrated] = useState(false);
 
   // Initialize localStorage key for this user (first visit = save now, no badge on old clients)
@@ -116,7 +117,38 @@ function SidebarContent({ collapsed, onLinkClick }: { collapsed: boolean; onLink
     staleTime: 0,
   });
 
-  const newClientesCount = isOnClientes ? 0 : (novosData?.count ?? 0);
+  return isOnClientes ? 0 : (novosData?.count ?? 0);
+}
+
+// Prefixes the browser tab title with "(N)" while there are unseen new clients,
+// the same pattern WhatsApp Web uses for unread messages.
+function useDocumentTitleBadge(count: number) {
+  useEffect(() => {
+    const titleEl = document.querySelector("title");
+    if (!titleEl) return;
+
+    const prefixPattern = /^\(\d+\)\s/;
+    const applyPrefix = () => {
+      const base = document.title.replace(prefixPattern, "");
+      const next = count > 0 ? `(${count}) ${base}` : base;
+      if (document.title !== next) document.title = next;
+    };
+
+    applyPrefix();
+    // Next.js sets document.title on every navigation; re-apply our prefix whenever it does.
+    const observer = new MutationObserver(applyPrefix);
+    observer.observe(titleEl, { childList: true });
+    return () => observer.disconnect();
+  }, [count]);
+}
+
+function SidebarContent({
+  collapsed, onLinkClick, newClientesCount,
+}: {
+  collapsed: boolean; onLinkClick?: () => void; newClientesCount: number;
+}) {
+  const pathname = usePathname();
+  const { user, loading } = useAuth();
 
   const visibleTop = navItems.filter(
     (item) => !item.roles || (!loading && item.roles.includes((user?.role ?? "") as Role))
@@ -165,6 +197,8 @@ function SidebarContent({ collapsed, onLinkClick }: { collapsed: boolean; onLink
 export function Sidebar() {
   const [collapsed, setCollapsed] = useState(false);
   const { mobileOpen, closeMobile } = useSidebar();
+  const newClientesCount = useNewClientesCount();
+  useDocumentTitleBadge(newClientesCount);
 
   const logo = (
     <div className={cn("flex items-center h-16 border-b border-sidebar-border shrink-0", collapsed ? "justify-center px-2" : "gap-3 px-4")}>
@@ -188,7 +222,7 @@ export function Sidebar() {
         )}
       >
         {logo}
-        <SidebarContent collapsed={collapsed} />
+        <SidebarContent collapsed={collapsed} newClientesCount={newClientesCount} />
 
         <button
           onClick={() => setCollapsed(!collapsed)}
@@ -225,7 +259,7 @@ export function Sidebar() {
             <X className="w-5 h-5" />
           </button>
         </div>
-        <SidebarContent collapsed={false} onLinkClick={closeMobile} />
+        <SidebarContent collapsed={false} onLinkClick={closeMobile} newClientesCount={newClientesCount} />
       </aside>
     </TooltipProvider>
   );

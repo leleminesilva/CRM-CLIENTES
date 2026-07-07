@@ -1,6 +1,6 @@
 import { cn } from "@/lib/utils/cn";
 
-const ASPECT_RATIO = 948 / 571;
+const ASPECT_RATIO = 1232 / 743;
 
 export function Logo({ height = 32, className }: { height?: number; className?: string }) {
   return (

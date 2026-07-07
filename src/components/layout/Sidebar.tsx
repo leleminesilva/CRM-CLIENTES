@@ -35,11 +35,14 @@ const bottomNavItems: { href: string; label: string; icon: React.ElementType; ro
 ];
 
 function NavLink({
-  href, label, icon: Icon, active, collapsed, onClick, badge,
+  href, label, icon: Icon, active, collapsed, onClick, badgeCount,
 }: {
   href: string; label: string; icon: React.ElementType;
-  active: boolean; collapsed: boolean; onClick?: () => void; badge?: boolean;
+  active: boolean; collapsed: boolean; onClick?: () => void; badgeCount?: number;
 }) {
+  const showBadge = !!badgeCount && badgeCount > 0;
+  const badgeText = badgeCount && badgeCount > 9 ? "9+" : String(badgeCount);
+
   return (
     <Tooltip>
       <TooltipTrigger asChild>
@@ -56,13 +59,17 @@ function NavLink({
         >
           <div className="relative">
             <Icon className="w-5 h-5 shrink-0" />
-            {badge && collapsed && (
-              <span className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full ring-1 ring-sidebar" />
+            {showBadge && collapsed && (
+              <span className="absolute -top-1.5 -right-1.5 min-w-[16px] h-4 px-1 flex items-center justify-center bg-red-500 text-white text-[10px] font-bold rounded-full ring-1 ring-sidebar">
+                {badgeText}
+              </span>
             )}
           </div>
           {!collapsed && <span>{label}</span>}
-          {!collapsed && badge && (
-            <span className="ml-auto w-2 h-2 bg-red-500 rounded-full" />
+          {!collapsed && showBadge && (
+            <span className="ml-auto min-w-[18px] h-[18px] px-1.5 flex items-center justify-center bg-red-500 text-white text-[11px] font-bold rounded-full">
+              {badgeText}
+            </span>
           )}
         </Link>
       </TooltipTrigger>
@@ -109,7 +116,7 @@ function SidebarContent({ collapsed, onLinkClick }: { collapsed: boolean; onLink
     staleTime: 0,
   });
 
-  const hasNewClientes = !isOnClientes && (novosData?.count ?? 0) > 0;
+  const newClientesCount = isOnClientes ? 0 : (novosData?.count ?? 0);
 
   const visibleTop = navItems.filter(
     (item) => !item.roles || (!loading && item.roles.includes((user?.role ?? "") as Role))
@@ -133,7 +140,7 @@ function SidebarContent({ collapsed, onLinkClick }: { collapsed: boolean; onLink
               active={active}
               collapsed={collapsed}
               onClick={onLinkClick}
-              badge={item.href === "/clientes" && hasNewClientes}
+              badgeCount={item.href === "/clientes" ? newClientesCount : undefined}
             />
           );
         })}

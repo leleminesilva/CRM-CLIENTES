@@ -192,6 +192,7 @@ export default function NovoClientePage() {
                 onChange={(e) => setValue("telefone", maskPhone(e.target.value))}
                 placeholder="(47) 3456-7890"
               />
+              {errors.telefone && <p className="text-destructive text-sm">{errors.telefone.message}</p>}
             </div>
 
             <div className="space-y-1.5">

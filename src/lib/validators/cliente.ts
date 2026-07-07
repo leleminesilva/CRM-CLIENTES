@@ -44,7 +44,18 @@ export const clienteSchema = z.object({
   prazoOrcamento: z.preprocess(nullToUndefined, z.string().optional()),
   statusOrcamento: z.enum(["PENDENTE", "APROVADO", "NAO_APROVADO"]).default("PENDENTE"),
   temperatura: z.enum(["QUENTE", "MORNO", "FRIO"]).default("MORNO"),
-});
+}).refine(
+  (data) => {
+    const temTelefone = !!(data.telefone && data.telefone.trim() !== "");
+    const temWhatsapp = !!(data.whatsapp && data.whatsapp.trim() !== "");
+    const temEmail = !!(data.email && data.email.trim() !== "");
+    return temTelefone || temWhatsapp || temEmail;
+  },
+  {
+    message: "Pelo menos um meio de contato deve ser fornecido (Telefone, WhatsApp ou E-mail)",
+    path: ["telefone"],
+  }
+);
 
 export type ClienteInput = z.infer<typeof clienteSchema>;
 

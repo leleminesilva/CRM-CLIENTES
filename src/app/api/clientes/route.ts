@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import { getCurrentUser } from "@/lib/auth";
 import { requirePermission } from "@/lib/rbac";
 import { createAuditLog } from "@/lib/audit";
@@ -175,6 +176,9 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ data: cliente }, { status: 201 });
   } catch (error) {
+    if (error instanceof z.ZodError) {
+      return NextResponse.json({ error: error.errors[0].message }, { status: 400 });
+    }
     console.error(error);
     return NextResponse.json({ error: "Erro ao criar cliente" }, { status: 500 });
   }

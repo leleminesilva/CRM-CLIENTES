@@ -9,6 +9,7 @@ import {
   Settings, ChevronLeft, ChevronRight, Shield, X, MessageCircle,
 } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
+import { Logo } from "@/components/Logo";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSidebar } from "@/contexts/SidebarContext";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -160,17 +161,7 @@ export function Sidebar() {
 
   const logo = (
     <div className={cn("flex items-center h-16 px-4 border-b border-sidebar-border shrink-0", collapsed ? "justify-center" : "gap-3")}>
-      <svg width="32" height="32" viewBox="0 0 100 100" fill="none" className="shrink-0">
-        <defs>
-          <linearGradient id="sg-inner" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor="#c8e8f8" />
-            <stop offset="100%" stopColor="#5aace0" />
-          </linearGradient>
-        </defs>
-        <rect x="19" y="19" width="62" height="62" rx="13" transform="rotate(45 50 50)" fill="rgba(42,68,105,0.60)" />
-        <rect x="27" y="27" width="46" height="46" rx="10" transform="rotate(45 50 50)" fill="rgba(72,108,155,0.72)" />
-        <rect x="36" y="36" width="28" height="28" rx="6" transform="rotate(45 50 50)" fill="url(#sg-inner)" />
-      </svg>
+      <Logo size={32} />
       {!collapsed && (
         <span className="font-black text-base truncate tracking-wide">
           <span className="text-sidebar-foreground">INFINITY</span>
@@ -217,17 +208,7 @@ export function Sidebar() {
       >
         <div className="flex items-center justify-between h-16 px-4 border-b border-sidebar-border shrink-0">
           <div className="flex items-center gap-3">
-            <svg width="32" height="32" viewBox="0 0 100 100" fill="none">
-              <defs>
-                <linearGradient id="mg-inner" x1="0%" y1="0%" x2="100%" y2="100%">
-                  <stop offset="0%" stopColor="#c8e8f8" />
-                  <stop offset="100%" stopColor="#5aace0" />
-                </linearGradient>
-              </defs>
-              <rect x="19" y="19" width="62" height="62" rx="13" transform="rotate(45 50 50)" fill="rgba(42,68,105,0.60)" />
-              <rect x="27" y="27" width="46" height="46" rx="10" transform="rotate(45 50 50)" fill="rgba(72,108,155,0.72)" />
-              <rect x="36" y="36" width="28" height="28" rx="6" transform="rotate(45 50 50)" fill="url(#mg-inner)" />
-            </svg>
+            <Logo size={32} />
             <span className="font-black text-base tracking-wide">
               <span>INFINITY</span>
               <span className="text-blue-400 ml-1">GLASS</span>

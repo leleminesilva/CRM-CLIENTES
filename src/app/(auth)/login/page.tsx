@@ -6,6 +6,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
 import { Eye, EyeOff } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { Logo } from "@/components/Logo";
 import { loginSchema, type LoginInput } from "@/lib/validators/usuario";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -92,42 +93,8 @@ export default function LoginPage() {
       >
         {/* Logo */}
         <div className="text-center mb-8">
-          {/* Diamond logo — 3 concentric layered diamonds */}
           <div className="flex items-center justify-center mb-5">
-            <svg width="96" height="96" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <defs>
-                <linearGradient id="innerGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                  <stop offset="0%" stopColor="#c8e8f8" />
-                  <stop offset="100%" stopColor="#5aace0" />
-                </linearGradient>
-                <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
-                  <feGaussianBlur in="SourceGraphic" stdDeviation="2.5" result="blur" />
-                  <feMerge>
-                    <feMergeNode in="blur" />
-                    <feMergeNode in="SourceGraphic" />
-                  </feMerge>
-                </filter>
-              </defs>
-              {/* Outer diamond — dark slate blue */}
-              <rect
-                x="19" y="19" width="62" height="62" rx="13"
-                transform="rotate(45 50 50)"
-                fill="rgba(42, 68, 105, 0.60)"
-              />
-              {/* Middle diamond — medium slate blue */}
-              <rect
-                x="27" y="27" width="46" height="46" rx="10"
-                transform="rotate(45 50 50)"
-                fill="rgba(72, 108, 155, 0.72)"
-              />
-              {/* Inner diamond — bright blue gradient */}
-              <rect
-                x="36" y="36" width="28" height="28" rx="6"
-                transform="rotate(45 50 50)"
-                fill="url(#innerGrad)"
-                filter="url(#glow)"
-              />
-            </svg>
+            <Logo size={96} />
           </div>
 
           {/* Brand name */}

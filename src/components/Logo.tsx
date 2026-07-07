@@ -4,7 +4,7 @@ export function Logo({ size = 32, className }: { size?: number; className?: stri
   return (
     // eslint-disable-next-line @next/next/no-img-element
     <img
-      src="/assets/logo-icon-blue.png"
+      src="/assets/logo-icon-white.png"
       alt="Infinity Glass"
       width={size}
       height={size}

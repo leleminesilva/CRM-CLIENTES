@@ -114,6 +114,7 @@ function useNewClientesCount() {
     },
     enabled: !!user?.id && hydrated && !isOnClientes,
     refetchInterval: 30000,
+    refetchIntervalInBackground: true,
     staleTime: 0,
   });
 

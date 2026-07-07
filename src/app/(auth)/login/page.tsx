@@ -94,7 +94,7 @@ export default function LoginPage() {
         {/* Logo */}
         <div className="text-center mb-8">
           <div className="flex items-center justify-center mb-5">
-            <Logo size={96} />
+            <Logo height={90} />
           </div>
 
           {/* Brand name */}

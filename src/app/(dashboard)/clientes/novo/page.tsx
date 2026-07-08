@@ -19,6 +19,7 @@ import { Badge } from "@/components/ui/badge";
 import { clienteSchema, type ClienteInput } from "@/lib/validators/cliente";
 import { maskCpfCnpj, maskPhone, maskCep } from "@/lib/utils/masks";
 import { useAuth } from "@/contexts/AuthContext";
+import { SERVICOS } from "@/lib/constants";
 import type { User } from "@/types";
 
 const ORIGENS = [
@@ -30,12 +31,6 @@ const ORIGENS = [
   { value: "LIGACAO_ATIVA", label: "Ligação Ativa" },
   { value: "PARCEIRO", label: "Parceiro" },
   { value: "OUTROS", label: "Outros" },
-];
-
-const SERVICOS = [
-  "Box de banheiro", "Espelho", "Janela de vidro", "Porta de vidro",
-  "Fachada", "Guarda-corpo", "Pergolado de vidro", "Vitrine", "Divisória",
-  "Portão", "Corrimão", "Tampo de mesa", "Linha suprema", "Linha gold", "Outros",
 ];
 
 export default function NovoClientePage() {

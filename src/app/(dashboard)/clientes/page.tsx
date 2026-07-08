@@ -54,6 +54,7 @@ import {
 } from "@/components/ui/select";
 import { ORIGEM_LABELS } from "@/lib/utils/formatters";
 import { cn } from "@/lib/utils/cn";
+import { SERVICOS } from "@/lib/constants";
 import type { Cliente } from "@/types";
 
 const TEMP_CONFIG: Record<string, { label: string; color: string; icon: string }> = {
@@ -61,11 +62,6 @@ const TEMP_CONFIG: Record<string, { label: string; color: string; icon: string }
   MORNO:  { label: "Morno",  color: "text-amber-400",  icon: "🌡️" },
   FRIO:   { label: "Frio",   color: "text-blue-400",   icon: "❄️" },
 };
-
-const SERVICOS = [
-  "Box de banheiro", "Espelho", "Janela de vidro", "Porta de vidro",
-  "Fachada", "Guarda-corpo", "Pergolado de vidro", "Vitrine", "Divisória", "Outros",
-];
 
 const ETAPA_CONFIG: Record<string, { label: string; color: string }> = {
   NOVO_LEAD:        { label: "Entrar em Contato",  color: "bg-red-500/15 text-red-400 border-red-500/30" },

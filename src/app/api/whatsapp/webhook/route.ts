@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { findClienteByPhone } from "@/lib/utils/phone";
+import { processarAgenteWhatsApp } from "@/lib/whatsapp/agent";
 
 export const dynamic = "force-dynamic";
 
@@ -40,6 +42,12 @@ export async function POST(request: NextRequest) {
           const fromPhone = msg.from as string;
           const waId = msg.id as string;
           const tipo = msg.type as string;
+
+          // A Meta pode reentregar o mesmo webhook — se já processamos essa
+          // mensagem, pula (evita o agente responder duas vezes).
+          const jaExiste = await prisma.whatsAppMensagem.findUnique({ where: { waId } });
+          if (jaExiste) continue;
+
           let conteudo = "";
 
           if (tipo === "text") {
@@ -92,6 +100,18 @@ export async function POST(request: NextRequest) {
             },
             update: {},
           });
+
+          if (!conversa.clienteId) {
+            const clienteExistente = await findClienteByPhone(fromPhone);
+            if (!clienteExistente) {
+              const agentEstado = await prisma.whatsAppAgentEstado.findUnique({
+                where: { conversaId: conversa.id },
+              });
+              if (agentEstado?.estado !== "HUMANO" && agentEstado?.estado !== "CONCLUIDO") {
+                await processarAgenteWhatsApp({ ...conversa, instancia });
+              }
+            }
+          }
         }
       }
     }

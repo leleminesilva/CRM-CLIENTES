@@ -51,7 +51,10 @@ interface Conversa {
   naoLidas: number;
   ultimaMsgEm?: string;
   mensagens?: Mensagem[];
+  agentEstado?: { estado: string } | null;
 }
+
+const BOT_ATIVO_ESTADOS = ["TRIAGEM", "COLETANDO", "AGUARDANDO_CONFIRMACAO"];
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -295,8 +298,11 @@ function ListaConversas({
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between gap-1">
-                      <span className={cn("text-sm truncate", c.naoLidas > 0 && "font-semibold")}>
+                      <span className={cn("text-sm truncate flex items-center gap-1", c.naoLidas > 0 && "font-semibold")}>
                         {c.contatoNome ?? formatPhone(c.contatoPhone)}
+                        {c.agentEstado && BOT_ATIVO_ESTADOS.includes(c.agentEstado.estado) && (
+                          <span title="Agente de IA está atendendo" className="shrink-0">🤖</span>
+                        )}
                       </span>
                       {c.ultimaMsgEm && (
                         <span className="text-xs text-muted-foreground shrink-0">

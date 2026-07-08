@@ -19,19 +19,8 @@ import { Badge } from "@/components/ui/badge";
 import { clienteSchema, type ClienteInput } from "@/lib/validators/cliente";
 import { maskCpfCnpj, maskPhone, maskCep } from "@/lib/utils/masks";
 import { useAuth } from "@/contexts/AuthContext";
-import { SERVICOS } from "@/lib/constants";
+import { SERVICOS, ORIGENS } from "@/lib/constants";
 import type { User } from "@/types";
-
-const ORIGENS = [
-  { value: "INDICACAO", label: "Indicação" },
-  { value: "SITE", label: "Site" },
-  { value: "REDES_SOCIAIS", label: "Redes Sociais" },
-  { value: "GOOGLE_ADS", label: "Google Ads" },
-  { value: "EVENTO", label: "Evento" },
-  { value: "LIGACAO_ATIVA", label: "Ligação Ativa" },
-  { value: "PARCEIRO", label: "Parceiro" },
-  { value: "OUTROS", label: "Outros" },
-];
 
 export default function NovoClientePage() {
   const router = useRouter();

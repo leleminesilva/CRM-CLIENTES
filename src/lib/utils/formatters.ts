@@ -122,6 +122,7 @@ export const ORIGEM_LABELS: Record<string, string> = {
   EVENTO: "Evento",
   LIGACAO_ATIVA: "Ligação Ativa",
   PARCEIRO: "Parceiro",
+  WHATSAPP: "WhatsApp",
   OUTROS: "Outros",
 };
 

@@ -27,7 +27,7 @@ export const clienteSchema = z.object({
     z.enum(["MICRO", "PEQUENO", "MEDIO", "GRANDE", "ENTERPRISE"]).optional()
   ),
   origem: z
-    .enum(["INDICACAO", "SITE", "REDES_SOCIAIS", "GOOGLE_ADS", "EVENTO", "LIGACAO_ATIVA", "PARCEIRO", "OUTROS"])
+    .enum(["INDICACAO", "SITE", "REDES_SOCIAIS", "GOOGLE_ADS", "EVENTO", "LIGACAO_ATIVA", "PARCEIRO", "WHATSAPP", "OUTROS"])
     .default("OUTROS"),
   responsavelId: z.preprocess(nullToUndefined, z.string().optional()),
   empresaId: z.preprocess(nullToUndefined, z.string().optional()),

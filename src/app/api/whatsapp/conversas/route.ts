@@ -19,6 +19,7 @@ export async function GET(request: NextRequest) {
         orderBy: { enviadaEm: "desc" },
         take: 1,
       },
+      agentEstado: { select: { estado: true } },
     },
   });
 

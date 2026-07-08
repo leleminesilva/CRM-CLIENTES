@@ -4,3 +4,15 @@ export const SERVICOS = [
   "Portão", "Corrimão", "Tampo de mesa", "Linha suprema", "Linha gold",
   "Vidro comum", "Linha 25", "Cobertura", "Sacada", "Basculante", "Outros",
 ];
+
+export const ORIGENS = [
+  { value: "INDICACAO", label: "Indicação" },
+  { value: "SITE", label: "Site" },
+  { value: "REDES_SOCIAIS", label: "Redes Sociais" },
+  { value: "GOOGLE_ADS", label: "Google Ads" },
+  { value: "EVENTO", label: "Evento" },
+  { value: "LIGACAO_ATIVA", label: "Ligação Ativa" },
+  { value: "PARCEIRO", label: "Parceiro" },
+  { value: "WHATSAPP", label: "WhatsApp" },
+  { value: "OUTROS", label: "Outros" },
+];

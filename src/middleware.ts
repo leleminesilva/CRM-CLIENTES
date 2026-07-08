@@ -7,6 +7,10 @@ const PUBLIC_PATHS = [
   "/forgot-password",
   "/api/auth/login",
   "/api/auth/register",
+  // A Meta chama isso diretamente (verificação + entrega de mensagens); não
+  // tem como enviar o cookie de sessão do app. Autenticado pelo próprio
+  // hub.verify_token no handler, não pelo login de usuário.
+  "/api/whatsapp/webhook",
 ];
 
 export async function middleware(request: NextRequest) {

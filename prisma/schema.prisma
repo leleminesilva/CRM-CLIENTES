@@ -451,15 +451,26 @@ model AuditLog {
 // WHATSAPP BUSINESS API
 // ==========================================
 
+enum WhatsAppTipoConexao {
+  OFICIAL
+  QRCODE
+}
+
 model WhatsAppInstancia {
-  id            String   @id @default(cuid())
+  id            String              @id @default(cuid())
   nome          String
-  phoneNumberId String   @unique
-  accessToken   String
+  tipo          WhatsAppTipoConexao @default(OFICIAL)
+  phoneNumberId String?             @unique
+  accessToken   String?
   phoneNumber   String?
-  ativo         Boolean  @default(true)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  ativo         Boolean             @default(true)
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+
+  // Usados apenas por instâncias tipo QRCODE (conexão temporária via bridge local/Baileys)
+  sessaoId      String?   @unique
+  statusConexao String    @default("desconectado") // desconectado | aguardando_qr | conectado
+  qrCode        String?   @db.Text
 
   conversas WhatsAppConversa[]
 

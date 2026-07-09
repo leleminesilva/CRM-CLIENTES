@@ -13,6 +13,27 @@ export async function sendWhatsAppMessage(
   conversa: ConversaComInstancia,
   mensagem: string
 ) {
+  // Instância QRCODE (bridge local via Baileys, não tem Meta credentials): grava a mensagem
+  // como "pendente" e deixa o bridge entregá-la de fato na próxima vez que fizer polling.
+  if (conversa.instancia.tipo === "QRCODE") {
+    const novaMensagem = await prisma.whatsAppMensagem.create({
+      data: {
+        conversaId: conversa.id,
+        direcao: "saida",
+        tipo: "texto",
+        conteudo: mensagem,
+        status: "pendente",
+      },
+    });
+
+    await prisma.whatsAppConversa.update({
+      where: { id: conversa.id },
+      data: { ultimaMsgEm: new Date() },
+    });
+
+    return novaMensagem;
+  }
+
   const { phoneNumberId, accessToken } = conversa.instancia;
 
   const metaRes = await fetch(

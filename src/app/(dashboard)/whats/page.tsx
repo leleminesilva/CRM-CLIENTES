@@ -61,11 +61,18 @@ function formatPhone(phone: string) {
   return phone;
 }
 
+// Usado na lista de conversas (rótulo relativo do dia da última mensagem)
 function formatTime(date: string) {
   const d = new Date(date);
   if (isToday(d)) return format(d, "HH:mm");
   if (isYesterday(d)) return "Ontem";
   return format(d, "dd/MM/yy", { locale: ptBR });
+}
+
+// Usado dentro do balão da mensagem — sempre hora, nunca "Ontem" (o separador de data já
+// agrupa por dia; o horário de cada mensagem precisa ser sempre a hora mesmo).
+function formatMsgTime(date: string) {
+  return format(new Date(date), "HH:mm");
 }
 
 function getInitials(name?: string, phone?: string) {
@@ -86,6 +93,15 @@ function previewConteudo(msg?: Mensagem): string {
     return rotulos[msg.tipo] || "📎 Anexo";
   }
   return msg.conteudo;
+}
+
+// Legenda embaixo da mídia no balão do chat: nunca pra áudio (WhatsApp não tem legenda de
+// áudio) nem pro nome do arquivo em documento (isso já aparece dentro do card do anexo), e
+// nunca quando é só um texto de preenchimento tipo "[imagem]"/"[audio]" sem legenda real.
+function legendaVisivel(msg: Mensagem): boolean {
+  if (!msg.conteudo) return false;
+  if (msg.tipo === "audio" || msg.tipo === "documento") return false;
+  return !/^\[.+\]$/.test(msg.conteudo);
 }
 
 function tocarBeep() {
@@ -460,13 +476,13 @@ function AreaChat({ conversa, onBack }: { conversa: Conversa | null; onBack: () 
                         {msg.mediaUrl ? (
                           <div className="space-y-1.5">
                             <BolhaMidia msg={msg} />
-                            {msg.conteudo && msg.tipo !== "documento" && <p className="whitespace-pre-wrap break-words">{msg.conteudo}</p>}
+                            {legendaVisivel(msg) && <p className="whitespace-pre-wrap break-words">{msg.conteudo}</p>}
                           </div>
                         ) : (
                           <p className="whitespace-pre-wrap break-words">{msg.conteudo}</p>
                         )}
                         <div className={cn("flex items-center gap-1 mt-1", msg.direcao === "saida" ? "justify-end" : "justify-start")}>
-                          <span className={cn("text-[10px]", msg.direcao === "saida" ? "text-red-200" : "text-muted-foreground")}>{formatTime(msg.enviadaEm)}</span>
+                          <span className={cn("text-[10px]", msg.direcao === "saida" ? "text-red-200" : "text-muted-foreground")}>{formatMsgTime(msg.enviadaEm)}</span>
                           {msg.direcao === "saida" && <StatusIcon status={msg.status} />}
                         </div>
                       </div>

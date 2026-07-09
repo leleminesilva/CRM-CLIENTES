@@ -10,14 +10,16 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
   }
 
-  const { mensagemId, sucesso } = await request.json();
+  const { mensagemId, sucesso, waId } = await request.json();
   if (!mensagemId) {
     return NextResponse.json({ error: "mensagemId obrigatório" }, { status: 400 });
   }
 
+  // Guarda o waId retornado pelo Baileys: quando esse mesmo envio ecoar de volta pelo
+  // evento messages.upsert (fromMe), o /bridge/receber reconhece pelo waId e não duplica.
   const mensagem = await prisma.whatsAppMensagem.update({
     where: { id: mensagemId },
-    data: { status: sucesso ? "enviada" : "erro" },
+    data: { status: sucesso ? "enviada" : "erro", waId: waId || undefined },
   });
 
   return NextResponse.json({ ok: true, mensagem });

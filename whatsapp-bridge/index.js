@@ -2,7 +2,7 @@
 // da Meta não fica pronta. Roda local, nesta máquina, enquanto você quiser manter
 // o número conectado (ex: das 7:30 às 18h). Ao fechar este processo, o WhatsApp
 // desconecta — basta rodar `npm start` de novo pra reconectar (sem precisar
-// escanear o QR de novo, a sessão fica salva em ./sessao).
+// escanear o QR de novo, a sessão fica salva em ./sessao-<instancia>).
 //
 // AVISO: isso usa uma biblioteca não-oficial que simula o WhatsApp Web. Viola os
 // Termos de Uso do WhatsApp e traz risco real de suspensão do número. Use só
@@ -31,6 +31,9 @@ const NOME_INSTANCIA = process.env.NOME_INSTANCIA || `WhatsApp (QR temporário${
 const CONFIG_PATH = path.join(__dirname, `bridge-config.${INSTANCIA_KEY}.json`);
 const SESSAO_DIR = path.join(__dirname, `sessao-${INSTANCIA_KEY}`);
 const POLL_INTERVAL_MS = 2000;
+// Histórico sincronizado ao conectar pela 1ª vez: só traz mensagens de até N dias atrás,
+// pra não tentar importar o histórico inteiro de anos de conversa de uma vez.
+const HISTORICO_MAX_DIAS = Number(process.env.HISTORICO_MAX_DIAS || 30);
 
 if (!CRM_BASE_URL || !BRIDGE_SECRET) {
   console.error("Faltando CRM_BASE_URL ou WHATSAPP_BRIDGE_SECRET no .env — veja .env.example");
@@ -81,6 +84,36 @@ function extrairTexto(msg) {
   );
 }
 
+// Repassa uma mensagem (ao vivo ou do histórico) pro CRM. waId é usado pelo endpoint pra
+// não duplicar: tanto em re-sincronizações de histórico quanto quando uma mensagem que o
+// próprio bridge enviou (via /enviar) ecoa de volta pelo evento messages.upsert.
+async function repassarMensagem(instanciaId, msg) {
+  if (msg.key.remoteJid?.endsWith("@g.us")) return; // ignora grupos por enquanto
+  if (msg.key.remoteJid === "status@broadcast") return;
+  const conteudo = extrairTexto(msg);
+  if (!conteudo) return;
+
+  const telefone = telefoneDoJid(msg.key.remoteJid);
+  const direcao = msg.key.fromMe ? "saida" : "entrada";
+  const nome = !msg.key.fromMe ? msg.pushName || undefined : undefined;
+  const timestamp = Number(msg.messageTimestamp || 0);
+  const enviadaEm = timestamp ? new Date(timestamp * 1000).toISOString() : new Date().toISOString();
+
+  try {
+    await api.post("/api/whatsapp/bridge/receber", {
+      instanciaId,
+      telefone,
+      nome,
+      conteudo,
+      direcao,
+      waId: msg.key.id || undefined,
+      enviadaEm,
+    });
+  } catch (e) {
+    console.error("Erro ao repassar mensagem:", e.message);
+  }
+}
+
 let pollHandle = null;
 
 async function main() {
@@ -100,9 +133,13 @@ async function main() {
 
   const { state, saveCreds } = await useMultiFileAuthState(SESSAO_DIR);
 
+  let conectado = false; // marcador confiável de "socket pronto pra enviar" — não depender de sock.ws interno
+
   const sock = makeWASocket({
     auth: state,
     logger: P({ level: "silent" }),
+    syncFullHistory: true,
+    shouldSyncHistoryMessage: () => true,
   });
 
   sock.ev.on("creds.update", saveCreds);
@@ -125,6 +162,7 @@ async function main() {
     }
 
     if (connection === "open") {
+      conectado = true;
       const phoneNumber = telefoneDoJid(sock.user?.id);
       console.log("✅ Conectado ao WhatsApp:", phoneNumber);
       await api.post("/api/whatsapp/bridge/status", {
@@ -135,6 +173,7 @@ async function main() {
     }
 
     if (connection === "close") {
+      conectado = false;
       const statusCode = lastDisconnect?.error?.output?.statusCode;
       const deveReconectar = statusCode !== DisconnectReason.loggedOut;
       console.log("Conexão fechada. Reconectar?", deveReconectar);
@@ -149,27 +188,26 @@ async function main() {
     }
   });
 
+  // Disparado (normalmente uma vez, logo após conectar pela 1ª vez) com o histórico de
+  // conversas do celular. Importa só o que estiver dentro da janela HISTORICO_MAX_DIAS.
+  sock.ev.on("messaging-history.set", async ({ messages, isLatest }) => {
+    if (!messages?.length) return;
+    const corte = Date.now() / 1000 - HISTORICO_MAX_DIAS * 24 * 60 * 60;
+    const relevantes = messages.filter((m) => Number(m.messageTimestamp || 0) >= corte);
+    console.log(`Sincronizando histórico: ${relevantes.length} mensagem(ns) dos últimos ${HISTORICO_MAX_DIAS} dias...`);
+    for (const msg of relevantes) {
+      await repassarMensagem(instanciaId, msg);
+    }
+    if (isLatest) console.log("Histórico sincronizado.");
+  });
+
   sock.ev.on("messages.upsert", async ({ messages, type }) => {
     if (type !== "notify") return;
     for (const msg of messages) {
-      if (msg.key.fromMe) continue;
-      if (msg.key.remoteJid?.endsWith("@g.us")) continue; // ignora grupos por enquanto
-      const conteudo = extrairTexto(msg);
-      if (!conteudo) continue;
-
-      const telefone = telefoneDoJid(msg.key.remoteJid);
-      const nome = msg.pushName || undefined;
-
-      try {
-        await api.post("/api/whatsapp/bridge/receber", {
-          instanciaId,
-          telefone,
-          nome,
-          conteudo,
-        });
-        console.log(`Mensagem recebida de ${nome || telefone}: ${conteudo.slice(0, 60)}`);
-      } catch (e) {
-        console.error("Erro ao repassar mensagem recebida:", e.message);
+      await repassarMensagem(instanciaId, msg);
+      if (!msg.key.fromMe) {
+        const conteudo = extrairTexto(msg);
+        if (conteudo) console.log(`Mensagem recebida de ${msg.pushName || telefoneDoJid(msg.key.remoteJid)}: ${conteudo.slice(0, 60)}`);
       }
     }
   });
@@ -179,15 +217,19 @@ async function main() {
   // reconexão) pra não acumular pollers duplicados enviando a mesma mensagem 2x.
   if (pollHandle) clearInterval(pollHandle);
   pollHandle = setInterval(async () => {
-    if (sock.ws?.readyState !== 1) return; // só envia se realmente conectado
+    if (!conectado) return;
     try {
       const { data: pendentes } = await api.get("/api/whatsapp/bridge/pendentes", {
         params: { instanciaId },
       });
       for (const p of pendentes) {
         try {
-          await sock.sendMessage(jidDoTelefone(p.telefone), { text: p.conteudo });
-          await api.post("/api/whatsapp/bridge/confirmar-envio", { mensagemId: p.mensagemId, sucesso: true });
+          const enviada = await sock.sendMessage(jidDoTelefone(p.telefone), { text: p.conteudo });
+          await api.post("/api/whatsapp/bridge/confirmar-envio", {
+            mensagemId: p.mensagemId,
+            sucesso: true,
+            waId: enviada?.key?.id,
+          });
           console.log(`Mensagem enviada para ${p.telefone}: ${p.conteudo.slice(0, 60)}`);
         } catch (e) {
           console.error("Erro ao enviar mensagem pendente:", e.message);

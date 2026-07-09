@@ -13,11 +13,13 @@ const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
 const axios = require("axios");
+const FormData = require("form-data");
 const QRCode = require("qrcode");
 const P = require("pino");
 const {
   default: makeWASocket,
   useMultiFileAuthState,
+  downloadMediaMessage,
   DisconnectReason,
 } = require("@whiskeysockets/baileys");
 
@@ -31,6 +33,7 @@ const NOME_INSTANCIA = process.env.NOME_INSTANCIA || `WhatsApp (QR temporário${
 const CONFIG_PATH = path.join(__dirname, `bridge-config.${INSTANCIA_KEY}.json`);
 const SESSAO_DIR = path.join(__dirname, `sessao-${INSTANCIA_KEY}`);
 const POLL_INTERVAL_MS = 2000;
+const HEARTBEAT_INTERVAL_MS = 20000;
 // Histórico sincronizado ao conectar pela 1ª vez: só traz mensagens de até N dias atrás,
 // pra não tentar importar o histórico inteiro de anos de conversa de uma vez.
 const HISTORICO_MAX_DIAS = Number(process.env.HISTORICO_MAX_DIAS || 30);
@@ -43,7 +46,7 @@ if (!CRM_BASE_URL || !BRIDGE_SECRET) {
 const api = axios.create({
   baseURL: CRM_BASE_URL,
   headers: { "x-bridge-secret": BRIDGE_SECRET },
-  timeout: 15000,
+  timeout: 20000,
 });
 
 function carregarConfig() {
@@ -70,34 +73,72 @@ function jidDoTelefone(telefone) {
 function extrairTexto(msg) {
   const m = msg.message;
   if (!m) return null;
-  return (
-    m.conversation ||
-    m.extendedTextMessage?.text ||
-    m.imageMessage?.caption ||
-    m.videoMessage?.caption ||
-    (m.imageMessage ? "[Imagem]" : null) ||
-    (m.videoMessage ? "[Vídeo]" : null) ||
-    (m.audioMessage ? "[Áudio]" : null) ||
-    (m.documentMessage ? `[Documento] ${m.documentMessage.fileName || ""}`.trim() : null) ||
-    (m.stickerMessage ? "[Figurinha]" : null) ||
-    null
-  );
+  return m.conversation || m.extendedTextMessage?.text || null;
 }
 
-// Repassa uma mensagem (ao vivo ou do histórico) pro CRM. waId é usado pelo endpoint pra
-// não duplicar: tanto em re-sincronizações de histórico quanto quando uma mensagem que o
-// próprio bridge enviou (via /enviar) ecoa de volta pelo evento messages.upsert.
+const MIME_POR_EXTENSAO = {
+  jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", webp: "image/webp", gif: "image/gif",
+  mp4: "video/mp4", mp3: "audio/mpeg", ogg: "audio/ogg", oga: "audio/ogg", m4a: "audio/mp4", wav: "audio/wav",
+  pdf: "application/pdf",
+};
+
+function extensaoDeMime(mime) {
+  if (!mime) return "bin";
+  return (mime.split("/")[1] || "bin").split(";")[0];
+}
+
+function tipoDeMidia(m) {
+  if (!m) return null;
+  if (m.imageMessage) return { tipo: "imagem", chave: "imageMessage" };
+  if (m.videoMessage) return { tipo: "video", chave: "videoMessage" };
+  if (m.audioMessage) return { tipo: "audio", chave: "audioMessage" };
+  if (m.documentMessage) return { tipo: "documento", chave: "documentMessage" };
+  if (m.stickerMessage) return { tipo: "figurinha", chave: "stickerMessage" };
+  return null;
+}
+
+// Repassa uma mensagem (ao vivo ou do histórico) pro CRM — texto ou mídia. waId é usado
+// pelo endpoint pra não duplicar: tanto em re-sincronizações de histórico quanto quando
+// uma mensagem que o próprio bridge enviou (via /enviar) ecoa de volta.
 async function repassarMensagem(instanciaId, msg) {
   if (msg.key.remoteJid?.endsWith("@g.us")) return; // ignora grupos por enquanto
   if (msg.key.remoteJid === "status@broadcast") return;
-  const conteudo = extrairTexto(msg);
-  if (!conteudo) return;
 
   const telefone = telefoneDoJid(msg.key.remoteJid);
   const direcao = msg.key.fromMe ? "saida" : "entrada";
   const nome = !msg.key.fromMe ? msg.pushName || undefined : undefined;
   const timestamp = Number(msg.messageTimestamp || 0);
   const enviadaEm = timestamp ? new Date(timestamp * 1000).toISOString() : new Date().toISOString();
+
+  const media = tipoDeMidia(msg.message);
+  if (media) {
+    try {
+      const buffer = await downloadMediaMessage(msg, "buffer", {});
+      const detalhes = msg.message[media.chave] || {};
+      const mimetype = detalhes.mimetype || "application/octet-stream";
+      const fileName = detalhes.fileName || `${media.tipo}.${extensaoDeMime(mimetype)}`;
+
+      const form = new FormData();
+      form.append("instanciaId", instanciaId);
+      form.append("telefone", telefone);
+      if (nome) form.append("nome", nome);
+      form.append("conteudo", detalhes.caption || "");
+      form.append("tipo", media.tipo);
+      form.append("direcao", direcao);
+      if (msg.key.id) form.append("waId", msg.key.id);
+      form.append("enviadaEm", enviadaEm);
+      form.append("file", buffer, { filename: fileName, contentType: mimetype });
+
+      await api.post("/api/whatsapp/bridge/receber-midia", form, { headers: form.getHeaders() });
+      console.log(`Mídia (${media.tipo}) repassada — ${direcao === "entrada" ? "de" : "para"} ${nome || telefone}`);
+    } catch (e) {
+      console.error("Erro ao repassar mídia:", e.message);
+    }
+    return;
+  }
+
+  const conteudo = extrairTexto(msg);
+  if (!conteudo) return;
 
   try {
     await api.post("/api/whatsapp/bridge/receber", {
@@ -109,12 +150,24 @@ async function repassarMensagem(instanciaId, msg) {
       waId: msg.key.id || undefined,
       enviadaEm,
     });
+    if (direcao === "entrada") console.log(`Mensagem recebida de ${nome || telefone}: ${conteudo.slice(0, 60)}`);
   } catch (e) {
     console.error("Erro ao repassar mensagem:", e.message);
   }
 }
 
+function payloadDeEnvio(pendente) {
+  if (!pendente.mediaUrl) return { text: pendente.conteudo };
+  const ext = (pendente.mediaUrl.split(".").pop() || "").toLowerCase().split("?")[0];
+  const mimetype = MIME_POR_EXTENSAO[ext] || "application/octet-stream";
+  if (pendente.tipo === "imagem") return { image: { url: pendente.mediaUrl }, caption: pendente.conteudo || undefined };
+  if (pendente.tipo === "video") return { video: { url: pendente.mediaUrl }, caption: pendente.conteudo || undefined };
+  if (pendente.tipo === "audio") return { audio: { url: pendente.mediaUrl }, mimetype };
+  return { document: { url: pendente.mediaUrl }, mimetype, fileName: pendente.conteudo || `arquivo.${ext}` };
+}
+
 let pollHandle = null;
+let heartbeatHandle = null;
 
 async function main() {
   let config = carregarConfig();
@@ -205,16 +258,40 @@ async function main() {
     if (type !== "notify") return;
     for (const msg of messages) {
       await repassarMensagem(instanciaId, msg);
-      if (!msg.key.fromMe) {
-        const conteudo = extrairTexto(msg);
-        if (conteudo) console.log(`Mensagem recebida de ${msg.pushName || telefoneDoJid(msg.key.remoteJid)}: ${conteudo.slice(0, 60)}`);
+    }
+  });
+
+  // Recibos de entrega ("✓✓" cinza) e leitura ("✓✓" azul) — casados pelo waId com a
+  // mensagem já registrada no CRM.
+  sock.ev.on("messages.update", async (updates) => {
+    for (const u of updates) {
+      const waId = u.key?.id;
+      const statusNum = u.update?.status;
+      if (!waId || statusNum === undefined || statusNum === null) continue;
+      const status = statusNum >= 4 ? "lida" : statusNum === 3 ? "entregue" : null;
+      if (!status) continue;
+      try {
+        await api.post("/api/whatsapp/bridge/status-mensagem", { waId, status });
+      } catch (e) {
+        console.error("Erro ao repassar recibo:", e.message);
       }
     }
   });
 
-  // Poll: mensagens digitadas no CRM aguardando entrega de fato via WhatsApp.
-  // Limpa o intervalo anterior antes de criar um novo (main() roda de novo a cada
-  // reconexão) pra não acumular pollers duplicados enviando a mesma mensagem 2x.
+  // Heartbeat: reafirma "conectado" periodicamente pro CRM detectar bridge morto sem
+  // aviso (terminal fechado à força, notebook dormiu) e não deixar a tela travada
+  // achando que ainda está tudo certo.
+  if (heartbeatHandle) clearInterval(heartbeatHandle);
+  heartbeatHandle = setInterval(() => {
+    if (!conectado) return;
+    api.post("/api/whatsapp/bridge/status", { instanciaId, status: "conectado" }).catch((e) => {
+      console.error("Erro no heartbeat:", e.message);
+    });
+  }, HEARTBEAT_INTERVAL_MS);
+
+  // Poll: mensagens (texto ou mídia) digitadas no CRM aguardando entrega de fato via
+  // WhatsApp. Limpa o intervalo anterior antes de criar um novo (main() roda de novo a
+  // cada reconexão) pra não acumular pollers duplicados enviando a mesma mensagem 2x.
   if (pollHandle) clearInterval(pollHandle);
   pollHandle = setInterval(async () => {
     if (!conectado) return;
@@ -224,13 +301,13 @@ async function main() {
       });
       for (const p of pendentes) {
         try {
-          const enviada = await sock.sendMessage(jidDoTelefone(p.telefone), { text: p.conteudo });
+          const enviada = await sock.sendMessage(jidDoTelefone(p.telefone), payloadDeEnvio(p));
           await api.post("/api/whatsapp/bridge/confirmar-envio", {
             mensagemId: p.mensagemId,
             sucesso: true,
             waId: enviada?.key?.id,
           });
-          console.log(`Mensagem enviada para ${p.telefone}: ${p.conteudo.slice(0, 60)}`);
+          console.log(`${p.mediaUrl ? "Mídia" : "Mensagem"} enviada para ${p.telefone}${p.mediaUrl ? "" : `: ${p.conteudo.slice(0, 60)}`}`);
         } catch (e) {
           console.error("Erro ao enviar mensagem pendente:", e.message);
           await api.post("/api/whatsapp/bridge/confirmar-envio", { mensagemId: p.mensagemId, sucesso: false }).catch(() => {});

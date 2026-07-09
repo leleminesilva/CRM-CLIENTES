@@ -1,13 +1,14 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
 import { format, isToday, isYesterday } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import {
   MessageCircle, Phone, Send, Loader2, ChevronLeft, Check, CheckCheck,
-  Search, QrCode, AlertTriangle,
+  Search, QrCode, AlertTriangle, Paperclip, FileText, Download, ExternalLink, WifiOff,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -19,6 +20,9 @@ import { useAuth } from "@/contexts/AuthContext";
 const POLL_INSTANCIAS_MS = 2500;
 const POLL_CONVERSAS_MS = 3000;
 const POLL_MENSAGENS_MS = 2500;
+// Heartbeat do bridge é a cada 20s — 2 batidas perdidas (45s) já indicam processo morto,
+// não só uma falha isolada de rede.
+const HEARTBEAT_STALE_MS = 45000;
 
 interface Instancia {
   id: string;
@@ -26,6 +30,7 @@ interface Instancia {
   statusConexao: string;
   qrCode?: string | null;
   phoneNumber?: string | null;
+  ultimoPing?: string | null;
 }
 
 interface Mensagem {
@@ -34,6 +39,7 @@ interface Mensagem {
   tipo: string;
   conteudo: string;
   status: string;
+  mediaUrl?: string | null;
   enviadaEm: string;
 }
 
@@ -42,6 +48,7 @@ interface Conversa {
   instanciaId: string;
   contatoPhone: string;
   contatoNome?: string;
+  clienteId?: string | null;
   naoLidas: number;
   ultimaMsgEm?: string;
   mensagens?: Mensagem[];
@@ -66,11 +73,77 @@ function getInitials(name?: string, phone?: string) {
   return (phone ?? "?").slice(-2);
 }
 
+function instanciaConectadaEViva(inst?: Instancia): boolean {
+  if (!inst || inst.statusConexao !== "conectado") return false;
+  if (!inst.ultimoPing) return true; // versão antiga do bridge sem heartbeat ainda — não bloqueia
+  return Date.now() - new Date(inst.ultimoPing).getTime() < HEARTBEAT_STALE_MS;
+}
+
+function previewConteudo(msg?: Mensagem): string {
+  if (!msg) return "";
+  if (msg.mediaUrl) {
+    const rotulos: Record<string, string> = { imagem: "📷 Foto", video: "🎬 Vídeo", audio: "🎤 Áudio", documento: "📄 Documento", figurinha: "😀 Figurinha" };
+    return rotulos[msg.tipo] || "📎 Anexo";
+  }
+  return msg.conteudo;
+}
+
+function tocarBeep() {
+  try {
+    const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+    const ctx = new AudioCtx();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.frequency.value = 880;
+    gain.gain.setValueAtTime(0.15, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.3);
+  } catch {
+    // navegador pode bloquear áudio sem interação prévia — sem problema, é só um extra
+  }
+}
+
 function StatusIcon({ status }: { status: string }) {
   if (status === "erro") return <AlertTriangle className="w-3.5 h-3.5 text-red-400" />;
   if (status === "lida") return <CheckCheck className="w-3.5 h-3.5 text-blue-400" />;
+  if (status === "entregue") return <CheckCheck className="w-3.5 h-3.5 text-muted-foreground" />;
   if (status === "enviada") return <Check className="w-3.5 h-3.5 text-muted-foreground" />;
   return <Loader2 className="w-3 h-3 text-muted-foreground animate-spin" />;
+}
+
+// ── Bolha de mídia dentro do chat ───────────────────────────────────────────
+
+function BolhaMidia({ msg }: { msg: Mensagem }) {
+  if (!msg.mediaUrl) return null;
+  if (msg.tipo === "imagem" || msg.tipo === "figurinha") {
+    return (
+      <a href={msg.mediaUrl} target="_blank" rel="noreferrer">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={msg.mediaUrl} alt={msg.conteudo || "Imagem"} className="rounded-lg max-w-[240px] max-h-64 object-cover" />
+      </a>
+    );
+  }
+  if (msg.tipo === "video") {
+    return <video controls src={msg.mediaUrl} className="rounded-lg max-w-[240px] max-h-64" />;
+  }
+  if (msg.tipo === "audio") {
+    return <audio controls src={msg.mediaUrl} className="max-w-[240px] h-10" />;
+  }
+  return (
+    <a
+      href={msg.mediaUrl}
+      target="_blank"
+      rel="noreferrer"
+      className="flex items-center gap-2 rounded-lg border border-current/20 px-3 py-2 hover:bg-black/5 transition-colors"
+    >
+      <FileText className="w-5 h-5 shrink-0" />
+      <span className="text-sm truncate max-w-[160px]">{msg.conteudo || "Documento"}</span>
+      <Download className="w-4 h-4 shrink-0 opacity-70" />
+    </a>
+  );
 }
 
 // ── Painel de instâncias (vários números conectados) ────────────────────────
@@ -89,32 +162,35 @@ function PainelInstancias({
       </div>
       <ScrollArea className="flex-1">
         <div className="py-2 flex flex-col items-center gap-2 px-2">
-          {instancias.map((inst) => (
-            <button
-              key={inst.id}
-              onClick={() => onSelect(inst.id)}
-              title={inst.nome}
-              className={cn(
-                "relative w-10 h-10 rounded-xl flex items-center justify-center text-xs font-bold transition-all",
-                selected === inst.id ? "bg-red-600 text-white shadow-lg scale-105" : "bg-muted text-muted-foreground hover:bg-accent"
-              )}
-            >
-              {getInitials(inst.nome)}
-              <span
+          {instancias.map((inst) => {
+            const viva = instanciaConectadaEViva(inst);
+            return (
+              <button
+                key={inst.id}
+                onClick={() => onSelect(inst.id)}
+                title={inst.nome}
                 className={cn(
-                  "absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-background",
-                  inst.statusConexao === "conectado" ? "bg-green-500" : "bg-amber-500"
+                  "relative w-10 h-10 rounded-xl flex items-center justify-center text-xs font-bold transition-all",
+                  selected === inst.id ? "bg-red-600 text-white shadow-lg scale-105" : "bg-muted text-muted-foreground hover:bg-accent"
                 )}
-              />
-            </button>
-          ))}
+              >
+                {getInitials(inst.nome)}
+                <span
+                  className={cn(
+                    "absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-background",
+                    viva ? "bg-green-500" : "bg-amber-500"
+                  )}
+                />
+              </button>
+            );
+          })}
         </div>
       </ScrollArea>
     </div>
   );
 }
 
-// ── Tela de conexão (aguardando bridge / QR code) ──────────────────────────
+// ── Tela de conexão (aguardando bridge / QR code / bridge parado) ──────────
 
 function TelaConexao({ instancia }: { instancia: Instancia | undefined }) {
   if (!instancia) {
@@ -128,6 +204,24 @@ function TelaConexao({ instancia }: { instancia: Instancia | undefined }) {
           <p className="text-muted-foreground mt-2 max-w-sm">
             Inicie o script <code className="px-1 py-0.5 rounded bg-muted text-xs">whatsapp-bridge</code> no
             computador que vai ficar com o WhatsApp conectado. O QR Code aparece aqui assim que ele iniciar.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (instancia.statusConexao === "conectado" && !instanciaConectadaEViva(instancia)) {
+    return (
+      <div className="flex-1 flex flex-col items-center justify-center gap-4 p-8 text-center">
+        <div className="w-20 h-20 rounded-2xl bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center">
+          <WifiOff className="w-10 h-10 text-amber-600" />
+        </div>
+        <div>
+          <h2 className="text-xl font-semibold">Conector sem resposta</h2>
+          <p className="text-muted-foreground mt-2 max-w-sm">
+            O terminal do <code className="px-1 py-0.5 rounded bg-muted text-xs">whatsapp-bridge</code> parece ter
+            fechado ou o computador dormiu. Abra o terminal de novo e rode <code className="px-1 py-0.5 rounded bg-muted text-xs">npm start</code> pra
+            reconectar (não precisa escanear o QR de novo).
           </p>
         </div>
       </div>
@@ -204,14 +298,15 @@ function ListaConversas({
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between gap-1">
-                      <span className={cn("text-sm truncate", c.naoLidas > 0 && "font-semibold")}>
+                      <span className={cn("text-sm truncate flex items-center gap-1", c.naoLidas > 0 && "font-semibold")}>
                         {c.contatoNome ?? formatPhone(c.contatoPhone)}
+                        {c.clienteId && <span title="Cliente cadastrado" className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />}
                       </span>
                       {c.ultimaMsgEm && <span className="text-xs text-muted-foreground shrink-0">{formatTime(c.ultimaMsgEm)}</span>}
                     </div>
                     <div className="flex items-center justify-between gap-1 mt-0.5">
                       <span className="text-xs text-muted-foreground truncate">
-                        {lastMsg ? (lastMsg.direcao === "saida" ? `Você: ${lastMsg.conteudo}` : lastMsg.conteudo) : formatPhone(c.contatoPhone)}
+                        {lastMsg ? (lastMsg.direcao === "saida" ? `Você: ${previewConteudo(lastMsg)}` : previewConteudo(lastMsg)) : formatPhone(c.contatoPhone)}
                       </span>
                       {c.naoLidas > 0 && <Badge className="bg-red-600 text-white h-5 min-w-[20px] shrink-0 text-xs px-1.5">{c.naoLidas}</Badge>}
                     </div>
@@ -231,6 +326,7 @@ function ListaConversas({
 function AreaChat({ conversa, onBack }: { conversa: Conversa | null; onBack: () => void }) {
   const [texto, setTexto] = useState("");
   const bottomRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const queryClient = useQueryClient();
 
   const { data, isLoading } = useQuery({
@@ -259,6 +355,24 @@ function AreaChat({ conversa, onBack }: { conversa: Conversa | null; onBack: () 
     },
   });
 
+  const enviarArquivo = useMutation({
+    mutationFn: async (file: File) => {
+      const form = new FormData();
+      form.append("conversaId", conversa!.id);
+      form.append("file", file);
+      const { data } = await axios.post("/api/whatsapp/enviar-midia", form);
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["whats-mensagens", conversa?.id] });
+      queryClient.invalidateQueries({ queryKey: ["whats-conversas"] });
+    },
+    onError: (e: unknown) => {
+      const msg = (e as { response?: { data?: { error?: string } } })?.response?.data?.error;
+      toast.error(msg ?? "Erro ao enviar arquivo");
+    },
+  });
+
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [data?.mensagens]);
 
   function handleKeyDown(e: React.KeyboardEvent) {
@@ -266,6 +380,12 @@ function AreaChat({ conversa, onBack }: { conversa: Conversa | null; onBack: () 
       e.preventDefault();
       if (texto.trim()) enviar.mutate(texto.trim());
     }
+  }
+
+  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (file) enviarArquivo.mutate(file);
+    e.target.value = "";
   }
 
   if (!conversa) {
@@ -311,6 +431,14 @@ function AreaChat({ conversa, onBack }: { conversa: Conversa | null; onBack: () 
             <Phone className="w-3 h-3" /> {formatPhone(conversa.contatoPhone)}
           </p>
         </div>
+        {conversa.clienteId && (
+          <Link
+            href={`/clientes/${conversa.clienteId}`}
+            className="flex items-center gap-1 text-xs font-medium text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 shrink-0 px-2 py-1 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-950/30 transition-colors"
+          >
+            Ver cliente <ExternalLink className="w-3 h-3" />
+          </Link>
+        )}
       </div>
 
       <ScrollArea className="flex-1 px-4 py-4" style={{ backgroundImage: "radial-gradient(circle, hsl(var(--muted)/0.3) 1px, transparent 1px)", backgroundSize: "20px 20px" }}>
@@ -329,7 +457,14 @@ function AreaChat({ conversa, onBack }: { conversa: Conversa | null; onBack: () 
                   {g.msgs.map((msg) => (
                     <div key={msg.id} className={cn("flex", msg.direcao === "saida" ? "justify-end" : "justify-start")}>
                       <div className={cn("max-w-[75%] rounded-2xl px-3.5 py-2 text-sm shadow-sm", msg.direcao === "saida" ? "bg-red-600 text-white rounded-tr-sm" : "bg-card text-foreground rounded-tl-sm border border-border")}>
-                        <p className="whitespace-pre-wrap break-words">{msg.conteudo}</p>
+                        {msg.mediaUrl ? (
+                          <div className="space-y-1.5">
+                            <BolhaMidia msg={msg} />
+                            {msg.conteudo && msg.tipo !== "documento" && <p className="whitespace-pre-wrap break-words">{msg.conteudo}</p>}
+                          </div>
+                        ) : (
+                          <p className="whitespace-pre-wrap break-words">{msg.conteudo}</p>
+                        )}
                         <div className={cn("flex items-center gap-1 mt-1", msg.direcao === "saida" ? "justify-end" : "justify-start")}>
                           <span className={cn("text-[10px]", msg.direcao === "saida" ? "text-red-200" : "text-muted-foreground")}>{formatTime(msg.enviadaEm)}</span>
                           {msg.direcao === "saida" && <StatusIcon status={msg.status} />}
@@ -347,6 +482,16 @@ function AreaChat({ conversa, onBack }: { conversa: Conversa | null; onBack: () 
 
       <div className="p-3 border-t border-border bg-card shrink-0">
         <div className="flex items-end gap-2">
+          <input ref={fileInputRef} type="file" className="hidden" onChange={handleFileChange} />
+          <button
+            type="button"
+            disabled={enviarArquivo.isPending}
+            onClick={() => fileInputRef.current?.click()}
+            className="w-10 h-10 rounded-xl border border-input hover:bg-accent disabled:opacity-50 text-muted-foreground shrink-0 flex items-center justify-center"
+            title="Anexar arquivo"
+          >
+            {enviarArquivo.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Paperclip className="w-4 h-4" />}
+          </button>
           <textarea
             value={texto}
             onChange={(e) => setTexto(e.target.value)}
@@ -377,6 +522,7 @@ export default function WhatsPage() {
   const [instanciaId, setInstanciaId] = useState<string | null>(null);
   const [conversa, setConversa] = useState<Conversa | null>(null);
   const [search, setSearch] = useState("");
+  const naoLidasAnterior = useRef<number | null>(null);
 
   const { data: instancias = [] } = useQuery({
     queryKey: ["whats-instancias"],
@@ -394,7 +540,7 @@ export default function WhatsPage() {
   }, [instancias, instanciaId]);
 
   const instanciaAtual = instancias.find((i) => i.id === instanciaId);
-  const conectado = instanciaAtual?.statusConexao === "conectado";
+  const conectado = instanciaConectadaEViva(instanciaAtual);
 
   const { data: conversas = [] } = useQuery({
     queryKey: ["whats-conversas", instanciaAtual?.id],
@@ -405,6 +551,21 @@ export default function WhatsPage() {
     enabled: !!instanciaAtual?.id && conectado,
     refetchInterval: POLL_CONVERSAS_MS,
   });
+
+  // Toast + beep quando chega mensagem nova de alguém que não é a conversa aberta no momento
+  useEffect(() => {
+    const total = conversas.reduce((soma, c) => soma + c.naoLidas, 0);
+    if (naoLidasAnterior.current !== null && total > naoLidasAnterior.current) {
+      const comMaisRecente = [...conversas].filter((c) => c.naoLidas > 0 && c.id !== conversa?.id).sort((a, b) => (b.ultimaMsgEm ?? "").localeCompare(a.ultimaMsgEm ?? ""))[0];
+      if (comMaisRecente) {
+        toast.message(`Nova mensagem — ${comMaisRecente.contatoNome ?? formatPhone(comMaisRecente.contatoPhone)}`, {
+          description: previewConteudo(comMaisRecente.mensagens?.[0]),
+        });
+        tocarBeep();
+      }
+    }
+    naoLidasAnterior.current = total;
+  }, [conversas, conversa?.id]);
 
   const painelChat = conversa !== null;
 

@@ -32,6 +32,8 @@ export async function GET(request: NextRequest) {
       mensagemId: m.id,
       telefone: m.conversa.contatoPhone,
       conteudo: m.conteudo,
+      tipo: m.tipo,
+      mediaUrl: m.mediaUrl,
     }))
   );
 }

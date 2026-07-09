@@ -471,6 +471,10 @@ model WhatsAppInstancia {
   sessaoId      String?   @unique
   statusConexao String    @default("desconectado") // desconectado | aguardando_qr | conectado
   qrCode        String?   @db.Text
+  // Heartbeat: o bridge reporta esse timestamp periodicamente enquanto conectado. Se ficar
+  // velho demais mesmo com statusConexao="conectado", o processo local morreu sem avisar
+  // (terminal fechado à força, notebook dormiu) — a UI trata como desconectado.
+  ultimoPing    DateTime?
 
   conversas WhatsAppConversa[]
 

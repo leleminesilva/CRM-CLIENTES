@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 import {
   LayoutDashboard, Users,
   CheckSquare, Calendar, BarChart3, UserCog,
-  Settings, ChevronLeft, ChevronRight, Shield, X, MessageCircle,
+  Settings, ChevronLeft, ChevronRight, Shield, X, MessageCircle, MessageSquare,
 } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { Logo } from "@/components/Logo";
@@ -24,6 +24,7 @@ const navItems: { href: string; label: string; icon: React.ElementType; roles?: 
   { href: "/clientes",   label: "Clientes",   icon: Users },
   { href: "/tarefas",    label: "Tarefas",    icon: CheckSquare },
   { href: "/agenda",     label: "Agenda",     icon: Calendar },
+  { href: "/chat",       label: "Chat",       icon: MessageSquare },
   { href: "/whatsapp",   label: "WhatsApp",   icon: MessageCircle, roles: ["ADMINISTRADOR"] },
 ];
 
@@ -121,6 +122,28 @@ function useNewClientesCount() {
   return isOnClientes ? 0 : (novosData?.count ?? 0);
 }
 
+// Não lidas do chat interno (canal geral + DMs) — mesmo endpoint que a própria página
+// /chat usa (["chat-resumo"]), então os dois compartilham o cache do React Query.
+function useChatNaoLidas() {
+  const pathname = usePathname();
+  const { user } = useAuth();
+  const isOnChat = pathname.startsWith("/chat");
+
+  const { data } = useQuery({
+    queryKey: ["chat-resumo"],
+    queryFn: async () => {
+      const { data } = await axios.get("/api/chat/conversas");
+      return data as { totalNaoLidas: number };
+    },
+    enabled: !!user?.id,
+    refetchInterval: 15000,
+    refetchIntervalInBackground: true,
+    staleTime: 0,
+  });
+
+  return isOnChat ? 0 : (data?.totalNaoLidas ?? 0);
+}
+
 // Prefixes the browser tab title with "(N)" while there are unseen new clients,
 // the same pattern WhatsApp Web uses for unread messages.
 function useDocumentTitleBadge(count: number) {
@@ -144,9 +167,9 @@ function useDocumentTitleBadge(count: number) {
 }
 
 function SidebarContent({
-  collapsed, onLinkClick, newClientesCount,
+  collapsed, onLinkClick, newClientesCount, chatNaoLidas,
 }: {
-  collapsed: boolean; onLinkClick?: () => void; newClientesCount: number;
+  collapsed: boolean; onLinkClick?: () => void; newClientesCount: number; chatNaoLidas: number;
 }) {
   const pathname = usePathname();
   const { user, loading } = useAuth();
@@ -173,7 +196,7 @@ function SidebarContent({
               active={active}
               collapsed={collapsed}
               onClick={onLinkClick}
-              badgeCount={item.href === "/clientes" ? newClientesCount : undefined}
+              badgeCount={item.href === "/clientes" ? newClientesCount : item.href === "/chat" ? chatNaoLidas : undefined}
             />
           );
         })}
@@ -199,6 +222,7 @@ export function Sidebar() {
   const [collapsed, setCollapsed] = useState(false);
   const { mobileOpen, closeMobile } = useSidebar();
   const newClientesCount = useNewClientesCount();
+  const chatNaoLidas = useChatNaoLidas();
   useDocumentTitleBadge(newClientesCount);
 
   const logo = (
@@ -223,7 +247,7 @@ export function Sidebar() {
         )}
       >
         {logo}
-        <SidebarContent collapsed={collapsed} newClientesCount={newClientesCount} />
+        <SidebarContent collapsed={collapsed} newClientesCount={newClientesCount} chatNaoLidas={chatNaoLidas} />
 
         <button
           onClick={() => setCollapsed(!collapsed)}
@@ -260,7 +284,7 @@ export function Sidebar() {
             <X className="w-5 h-5" />
           </button>
         </div>
-        <SidebarContent collapsed={false} onLinkClick={closeMobile} newClientesCount={newClientesCount} />
+        <SidebarContent collapsed={false} onLinkClick={closeMobile} newClientesCount={newClientesCount} chatNaoLidas={chatNaoLidas} />
       </aside>
     </TooltipProvider>
   );

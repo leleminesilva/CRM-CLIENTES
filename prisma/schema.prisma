@@ -141,6 +141,10 @@ model User {
   notificacoes  Notificacao[]
   auditLogs     AuditLog[]
 
+  chatMensagensEnviadas  ChatMensagem[] @relation("ChatMensagensEnviadas")
+  chatMensagensRecebidas ChatMensagem[] @relation("ChatMensagensRecebidas")
+  chatLeitura            ChatLeitura?
+
   @@map("users")
 }
 
@@ -429,6 +433,42 @@ model Notificacao {
   user User @relation(fields: [userId], references: [id])
 
   @@map("notificacoes")
+}
+
+// ==========================================
+// CHAT INTERNO (comunicação entre a equipe)
+// ==========================================
+
+model ChatMensagem {
+  id             String    @id @default(cuid())
+  conteudo       String
+  autorId        String
+  // null = mensagem do canal geral (visível a todos); preenchido = DM pro usuário
+  destinatarioId String?
+  lida           Boolean   @default(false)
+  deletedAt      DateTime?
+  createdAt      DateTime  @default(now())
+
+  autor        User  @relation("ChatMensagensEnviadas", fields: [autorId], references: [id])
+  destinatario User? @relation("ChatMensagensRecebidas", fields: [destinatarioId], references: [id])
+
+  @@index([destinatarioId])
+  @@index([autorId])
+  @@index([createdAt])
+  @@map("chat_mensagens")
+}
+
+// Marca até quando cada usuário já leu o canal geral — usado só pra contar não lidas
+// (mensagens diretas já têm o campo "lida" por mensagem, isso aqui é só pro canal geral).
+model ChatLeitura {
+  id          String   @id @default(cuid())
+  userId      String   @unique
+  ultimaGeral DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@map("chat_leituras")
 }
 
 model AuditLog {

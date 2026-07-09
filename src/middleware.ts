@@ -11,9 +11,6 @@ const PUBLIC_PATHS = [
   // tem como enviar o cookie de sessão do app. Autenticado pelo próprio
   // hub.verify_token no handler, não pelo login de usuário.
   "/api/whatsapp/webhook",
-  // O bridge local (script fora do navegador) não tem cookie de sessão —
-  // autenticado por segredo compartilhado (x-bridge-secret) em cada handler.
-  "/api/whatsapp/bridge",
 ];
 
 export async function middleware(request: NextRequest) {

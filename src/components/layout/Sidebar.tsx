@@ -19,13 +19,12 @@ import axios from "axios";
 
 type Role = "ADMINISTRADOR" | "GESTOR" | "COMERCIAL" | "OPERACIONAL";
 
-const navItems: { href: string; label: string; icon: React.ElementType; roles?: Role[]; iconClassName?: string }[] = [
+const navItems: { href: string; label: string; icon: React.ElementType; roles?: Role[] }[] = [
   { href: "/",           label: "Dashboard",  icon: LayoutDashboard },
   { href: "/clientes",   label: "Clientes",   icon: Users },
   { href: "/tarefas",    label: "Tarefas",    icon: CheckSquare },
   { href: "/agenda",     label: "Agenda",     icon: Calendar },
   { href: "/whatsapp",   label: "WhatsApp",   icon: MessageCircle, roles: ["ADMINISTRADOR"] },
-  { href: "/whats",      label: "Whats",      icon: MessageCircle, roles: ["ADMINISTRADOR"], iconClassName: "text-red-500" },
 ];
 
 const bottomNavItems: { href: string; label: string; icon: React.ElementType; roles?: Role[] }[] = [
@@ -36,10 +35,10 @@ const bottomNavItems: { href: string; label: string; icon: React.ElementType; ro
 ];
 
 function NavLink({
-  href, label, icon: Icon, active, collapsed, onClick, badgeCount, iconClassName,
+  href, label, icon: Icon, active, collapsed, onClick, badgeCount,
 }: {
   href: string; label: string; icon: React.ElementType;
-  active: boolean; collapsed: boolean; onClick?: () => void; badgeCount?: number; iconClassName?: string;
+  active: boolean; collapsed: boolean; onClick?: () => void; badgeCount?: number;
 }) {
   const showBadge = !!badgeCount && badgeCount > 0;
   const badgeText = badgeCount && badgeCount > 9 ? "9+" : String(badgeCount);
@@ -59,7 +58,7 @@ function NavLink({
           )}
         >
           <div className="relative">
-            <Icon className={cn("w-5 h-5 shrink-0", iconClassName)} />
+            <Icon className="w-5 h-5 shrink-0" />
             {showBadge && collapsed && (
               <span className="absolute -top-1.5 -right-1.5 min-w-[16px] h-4 px-1 flex items-center justify-center bg-red-500 text-white text-[10px] font-bold rounded-full ring-1 ring-sidebar">
                 {badgeText}

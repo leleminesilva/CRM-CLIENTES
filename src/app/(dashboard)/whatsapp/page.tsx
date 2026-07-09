@@ -631,7 +631,7 @@ function WhatsAppContent() {
   const { data: instancias = [] } = useQuery({
     queryKey: ["wa-instancias"],
     queryFn: async () => {
-      const { data } = await axios.get("/api/whatsapp/instancias?tipo=OFICIAL");
+      const { data } = await axios.get("/api/whatsapp/instancias");
       return data as Instancia[];
     },
   });

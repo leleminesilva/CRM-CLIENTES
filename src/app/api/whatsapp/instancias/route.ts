@@ -8,10 +8,7 @@ export async function GET(request: NextRequest) {
   const payload = await getCurrentUser(request);
   if (!payload) return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
 
-  const tipo = request.nextUrl.searchParams.get("tipo");
-
   const instancias = await prisma.whatsAppInstancia.findMany({
-    where: tipo === "OFICIAL" || tipo === "QRCODE" ? { tipo } : undefined,
     orderBy: { createdAt: "asc" },
     include: {
       _count: { select: { conversas: true } },

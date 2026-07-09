@@ -23,6 +23,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { cn } from "@/lib/utils/cn";
 import type { Tarefa } from "@/types";
 import { TIPO_TAREFA_LABELS, dataCalendario, dataHoraVencimento } from "@/lib/utils/formatters";
+import { SeletorAtribuicao, ATRIBUICAO_INICIAL, payloadAtribuicao, atribuicaoValida, type AtribuicaoState } from "@/components/SeletorAtribuicao";
 
 const localizer = dateFnsLocalizer({
   format,
@@ -139,6 +140,7 @@ export default function AgendaPage() {
     horario: "",
     descricao: "",
   });
+  const [atribuicao, setAtribuicao] = useState<AtribuicaoState>(ATRIBUICAO_INICIAL);
 
   const { data } = useQuery({
     queryKey: ["tarefas-agenda"],
@@ -149,12 +151,14 @@ export default function AgendaPage() {
   });
 
   const mutation = useMutation({
-    mutationFn: (payload: typeof form) => axios.post("/api/tarefas", payload),
-    onSuccess: () => {
-      toast.success("Evento adicionado à agenda!");
+    mutationFn: (payload: typeof form & ReturnType<typeof payloadAtribuicao>) => axios.post("/api/tarefas", payload),
+    onSuccess: (res) => {
+      const qtd = Array.isArray(res.data?.data) ? res.data.data.length : 1;
+      toast.success(qtd > 1 ? `Evento adicionado para ${qtd} pessoas!` : "Evento adicionado à agenda!");
       queryClient.invalidateQueries({ queryKey: ["tarefas-agenda"] });
       setOpen(false);
       setForm({ titulo: "", tipo: "TAREFA", prioridade: "MEDIA", dataVencimento: "", horario: "", descricao: "" });
+      setAtribuicao(ATRIBUICAO_INICIAL);
     },
     onError: () => toast.error("Erro ao criar evento"),
   });
@@ -365,7 +369,8 @@ export default function AgendaPage() {
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!form.titulo || !form.dataVencimento) return toast.error("Preencha título e data");
-    mutation.mutate(form);
+    if (!atribuicaoValida(atribuicao)) return toast.error("Selecione ao menos uma pessoa");
+    mutation.mutate({ ...form, ...payloadAtribuicao(atribuicao) });
   }
 
   return (
@@ -526,8 +531,10 @@ export default function AgendaPage() {
               />
             </div>
 
+            <SeletorAtribuicao value={atribuicao} onChange={setAtribuicao} />
+
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
+              <Button type="button" variant="outline" onClick={() => { setOpen(false); setAtribuicao(ATRIBUICAO_INICIAL); }}>Cancelar</Button>
               <Button type="submit" className="bg-indigo-600 hover:bg-indigo-700" disabled={mutation.isPending}>
                 {mutation.isPending ? "Salvando..." : "Salvar Evento"}
               </Button>

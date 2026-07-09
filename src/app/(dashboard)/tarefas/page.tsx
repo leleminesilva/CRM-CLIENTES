@@ -21,6 +21,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { formatDataVencimento, dataHoraVencimento, TIPO_TAREFA_LABELS, PRIORIDADE_LABELS } from "@/lib/utils/formatters";
+import { SeletorAtribuicao, ATRIBUICAO_INICIAL, payloadAtribuicao, atribuicaoValida, type AtribuicaoState } from "@/components/SeletorAtribuicao";
 import type { Tarefa } from "@/types";
 
 const PRIORIDADE_COLORS: Record<string, string> = {
@@ -40,12 +41,24 @@ function NovaTarefaDialog({ onSuccess }: { onSuccess: () => void }) {
   const [form, setForm] = useState({
     titulo: "", descricao: "", tipo: "TAREFA", prioridade: "MEDIA", dataVencimento: "", horario: "",
   });
+  const [atribuicao, setAtribuicao] = useState<AtribuicaoState>(ATRIBUICAO_INICIAL);
 
   const mutation = useMutation({
-    mutationFn: () => axios.post("/api/tarefas", form),
-    onSuccess: () => { toast.success("Tarefa criada!"); setOpen(false); onSuccess(); },
+    mutationFn: () => axios.post("/api/tarefas", { ...form, ...payloadAtribuicao(atribuicao) }),
+    onSuccess: (res) => {
+      const qtd = Array.isArray(res.data?.data) ? res.data.data.length : 1;
+      toast.success(qtd > 1 ? `Tarefa criada para ${qtd} pessoas!` : "Tarefa criada!");
+      setOpen(false);
+      setAtribuicao(ATRIBUICAO_INICIAL);
+      onSuccess();
+    },
     onError: () => toast.error("Erro ao criar tarefa"),
   });
+
+  function criar() {
+    if (!atribuicaoValida(atribuicao)) return toast.error("Selecione ao menos uma pessoa");
+    mutation.mutate();
+  }
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -102,11 +115,13 @@ function NovaTarefaDialog({ onSuccess }: { onSuccess: () => void }) {
               <Input type="time" value={form.horario} onChange={e => setForm(f => ({ ...f, horario: e.target.value }))} />
             </div>
           </div>
+          <SeletorAtribuicao value={atribuicao} onChange={setAtribuicao} />
+
           <div className="flex justify-end gap-2">
-            <Button variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
+            <Button variant="outline" onClick={() => { setOpen(false); setAtribuicao(ATRIBUICAO_INICIAL); }}>Cancelar</Button>
             <Button
               className="bg-indigo-600 hover:bg-indigo-700"
-              onClick={() => mutation.mutate()}
+              onClick={criar}
               disabled={!form.titulo || !form.dataVencimento || mutation.isPending}
             >
               {mutation.isPending ? "Criando..." : "Criar"}

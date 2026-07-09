@@ -56,33 +56,58 @@ export async function POST(request: NextRequest) {
     requirePermission(payload.role, "tarefas:create");
 
     const body = await request.json();
-    const data = tarefaSchema.parse(body);
+    const { responsavelIds, paraTodos, ...resto } = body as {
+      responsavelIds?: string[];
+      paraTodos?: boolean;
+      [key: string]: unknown;
+    };
+    const data = tarefaSchema.parse(resto);
 
-    const tarefa = await prisma.tarefa.create({
-      data: {
-        ...data,
-        horario: data.horario || null,
-        dataVencimento: new Date(data.dataVencimento),
-        dataInicio: data.dataInicio ? new Date(data.dataInicio) : null,
-        responsavelId: data.responsavelId || payload.userId,
-      },
-    });
+    // Atribuição compartilhada: cria uma cópia independente da tarefa por pessoa selecionada
+    // (ou por todos os usuários ativos), cada uma concluível separadamente.
+    let idsAlvo: string[];
+    if (paraTodos) {
+      const todos = await prisma.user.findMany({
+        where: { ativo: true, deletedAt: null },
+        select: { id: true },
+      });
+      idsAlvo = todos.map((u) => u.id);
+    } else if (Array.isArray(responsavelIds) && responsavelIds.length > 0) {
+      idsAlvo = responsavelIds;
+    } else {
+      idsAlvo = [data.responsavelId || payload.userId];
+    }
 
-    await createAuditLog({ userId: payload.userId, entidade: "Tarefa", entidadeId: tarefa.id, acao: "CREATE", dadosNovos: data });
+    const tarefas = await prisma.$transaction(
+      idsAlvo.map((responsavelId) =>
+        prisma.tarefa.create({
+          data: {
+            ...data,
+            horario: data.horario || null,
+            dataVencimento: new Date(data.dataVencimento),
+            dataInicio: data.dataInicio ? new Date(data.dataInicio) : null,
+            responsavelId,
+          },
+        })
+      )
+    );
 
-    await prisma.atividade.create({
-      data: {
-        tipo: "TAREFA_CRIADA",
-        descricao: `Tarefa "${tarefa.titulo}" criada`,
-        userId: payload.userId,
-        clienteId: tarefa.clienteId,
-        leadId: tarefa.leadId,
-        oportunidadeId: tarefa.oportunidadeId,
-        tarefaId: tarefa.id,
-      },
-    });
+    for (const tarefa of tarefas) {
+      await createAuditLog({ userId: payload.userId, entidade: "Tarefa", entidadeId: tarefa.id, acao: "CREATE", dadosNovos: data });
+      await prisma.atividade.create({
+        data: {
+          tipo: "TAREFA_CRIADA",
+          descricao: `Tarefa "${tarefa.titulo}" criada`,
+          userId: payload.userId,
+          clienteId: tarefa.clienteId,
+          leadId: tarefa.leadId,
+          oportunidadeId: tarefa.oportunidadeId,
+          tarefaId: tarefa.id,
+        },
+      });
+    }
 
-    return NextResponse.json({ data: tarefa }, { status: 201 });
+    return NextResponse.json({ data: tarefas }, { status: 201 });
   } catch (error) {
     console.error(error);
     return NextResponse.json({ error: "Erro ao criar tarefa" }, { status: 500 });

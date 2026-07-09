@@ -552,12 +552,19 @@ export default function WhatsPage() {
     refetchInterval: POLL_CONVERSAS_MS,
   });
 
-  // Toast + beep quando chega mensagem nova de alguém que não é a conversa aberta no momento
+  // Toast + beep quando chega mensagem nova de alguém que não é a conversa aberta no momento.
+  // Só considera "nova" se a mensagem em si for recente — sem isso, a sincronização de
+  // histórico (que pode marcar dezenas de conversas antigas como não lidas de uma vez ao
+  // conectar) disparava um toast atrás do outro.
   useEffect(() => {
     const total = conversas.reduce((soma, c) => soma + c.naoLidas, 0);
     if (naoLidasAnterior.current !== null && total > naoLidasAnterior.current) {
-      const comMaisRecente = [...conversas].filter((c) => c.naoLidas > 0 && c.id !== conversa?.id).sort((a, b) => (b.ultimaMsgEm ?? "").localeCompare(a.ultimaMsgEm ?? ""))[0];
-      if (comMaisRecente) {
+      const candidatas = [...conversas]
+        .filter((c) => c.naoLidas > 0 && c.id !== conversa?.id)
+        .sort((a, b) => (b.ultimaMsgEm ?? "").localeCompare(a.ultimaMsgEm ?? ""));
+      const comMaisRecente = candidatas[0];
+      const recente = comMaisRecente?.ultimaMsgEm && Date.now() - new Date(comMaisRecente.ultimaMsgEm).getTime() < 2 * 60 * 1000;
+      if (comMaisRecente && recente) {
         toast.message(`Nova mensagem — ${comMaisRecente.contatoNome ?? formatPhone(comMaisRecente.contatoPhone)}`, {
           description: previewConteudo(comMaisRecente.mensagens?.[0]),
         });

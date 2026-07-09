@@ -34,9 +34,18 @@ const CONFIG_PATH = path.join(__dirname, `bridge-config.${INSTANCIA_KEY}.json`);
 const SESSAO_DIR = path.join(__dirname, `sessao-${INSTANCIA_KEY}`);
 const POLL_INTERVAL_MS = 2000;
 const HEARTBEAT_INTERVAL_MS = 20000;
-// Histórico sincronizado ao conectar pela 1ª vez: só traz mensagens de até N dias atrás,
-// pra não tentar importar o histórico inteiro de anos de conversa de uma vez.
-const HISTORICO_MAX_DIAS = Number(process.env.HISTORICO_MAX_DIAS || 30);
+
+// Histórico sincronizado ao conectar pela 1ª vez: só traz mensagens deste mês e do mês
+// passado — não o histórico inteiro de anos de conversa. Dá pra sobrescrever com uma data
+// fixa via HISTORICO_DESDE=2026-06-01 no .env, se precisar de uma janela diferente.
+function inicioDaJanelaDeHistorico() {
+  if (process.env.HISTORICO_DESDE) {
+    const d = new Date(process.env.HISTORICO_DESDE);
+    if (!isNaN(d.getTime())) return d.getTime() / 1000;
+  }
+  const agora = new Date();
+  return new Date(agora.getFullYear(), agora.getMonth() - 1, 1, 0, 0, 0, 0).getTime() / 1000;
+}
 
 if (!CRM_BASE_URL || !BRIDGE_SECRET) {
   console.error("Faltando CRM_BASE_URL ou WHATSAPP_BRIDGE_SECRET no .env — veja .env.example");
@@ -59,6 +68,18 @@ function carregarConfig() {
 
 function salvarConfig(config) {
   fs.writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2));
+}
+
+// messageTimestamp vem ora como number, ora como Long (protobuf), ora como objeto
+// {low, high, unsigned} sem os métodos do Long de verdade — Number() direto falha
+// silenciosamente pra NaN nesse último caso, então trata cada formato à mão.
+function timestampSegundos(ts) {
+  if (ts == null) return 0;
+  if (typeof ts === "number") return ts;
+  if (typeof ts === "string") return Number(ts) || 0;
+  if (typeof ts.toNumber === "function") return ts.toNumber();
+  if (typeof ts.low === "number") return ts.low >>> 0;
+  return Number(ts) || 0;
 }
 
 function telefoneDoJid(jid) {
@@ -107,7 +128,7 @@ async function repassarMensagem(instanciaId, msg) {
   const telefone = telefoneDoJid(msg.key.remoteJid);
   const direcao = msg.key.fromMe ? "saida" : "entrada";
   const nome = !msg.key.fromMe ? msg.pushName || undefined : undefined;
-  const timestamp = Number(msg.messageTimestamp || 0);
+  const timestamp = timestampSegundos(msg.messageTimestamp);
   const enviadaEm = timestamp ? new Date(timestamp * 1000).toISOString() : new Date().toISOString();
 
   const media = tipoDeMidia(msg.message);
@@ -192,7 +213,11 @@ async function main() {
     auth: state,
     logger: P({ level: "silent" }),
     syncFullHistory: true,
-    shouldSyncHistoryMessage: () => true,
+    // Limita a sincronização de histórico na origem: sem isso, retornar sempre "true" faz o
+    // Baileys pedir cada vez mais páginas de histórico antigo pro WhatsApp (potencialmente
+    // meses/anos de conversa) — aqui só continua pedindo mais enquanto ainda houver mensagem
+    // dentro da janela desejada (este mês + mês passado).
+    shouldSyncHistoryMessage: (msg) => timestampSegundos(msg.messageTimestamp) >= inicioDaJanelaDeHistorico(),
   });
 
   sock.ev.on("creds.update", saveCreds);
@@ -241,13 +266,18 @@ async function main() {
     }
   });
 
-  // Disparado (normalmente uma vez, logo após conectar pela 1ª vez) com o histórico de
-  // conversas do celular. Importa só o que estiver dentro da janela HISTORICO_MAX_DIAS.
+  // Disparado (possivelmente várias vezes, em lotes) com o histórico de conversas do
+  // celular. Importa só o que estiver dentro da janela deste mês + mês passado — o resto
+  // já nem chega a ser pedido ao WhatsApp por causa do shouldSyncHistoryMessage acima, isso
+  // aqui é um filtro extra de segurança.
   sock.ev.on("messaging-history.set", async ({ messages, isLatest }) => {
     if (!messages?.length) return;
-    const corte = Date.now() / 1000 - HISTORICO_MAX_DIAS * 24 * 60 * 60;
-    const relevantes = messages.filter((m) => Number(m.messageTimestamp || 0) >= corte);
-    console.log(`Sincronizando histórico: ${relevantes.length} mensagem(ns) dos últimos ${HISTORICO_MAX_DIAS} dias...`);
+    const corte = inicioDaJanelaDeHistorico();
+    const relevantes = messages.filter((m) => timestampSegundos(m.messageTimestamp) >= corte);
+    console.log(
+      `Sincronizando histórico: ${relevantes.length} de ${messages.length} mensagem(ns) recebidas estão dentro da janela ` +
+      `(desde ${new Date(corte * 1000).toLocaleDateString("pt-BR")}) — as demais foram ignoradas.`
+    );
     for (const msg of relevantes) {
       await repassarMensagem(instanciaId, msg);
     }

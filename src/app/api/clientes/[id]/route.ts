@@ -394,11 +394,17 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
     if (!payload) return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
     requirePermission(payload.role, "clientes:delete");
 
+    const body = await request.json().catch(() => ({}));
+    const motivo = typeof body.motivo === "string" ? body.motivo.trim() : "";
+    if (!motivo) {
+      return NextResponse.json({ error: "Informe o motivo da exclusão" }, { status: 400 });
+    }
+
     const agora = new Date();
 
     await prisma.cliente.update({
       where: { id: params.id },
-      data: { deletedAt: agora },
+      data: { deletedAt: agora, motivoExclusao: motivo },
     });
 
     // Remove todos os leads e oportunidades vinculados para não distorcer o dashboard
@@ -417,6 +423,7 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
       entidade: "Cliente",
       entidadeId: params.id,
       acao: "DELETE",
+      dadosNovos: { motivo },
     });
 
     return NextResponse.json({ message: "Cliente removido com sucesso" });

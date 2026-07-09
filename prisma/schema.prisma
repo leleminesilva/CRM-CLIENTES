@@ -241,6 +241,7 @@ model Cliente {
   notificacaoEm           DateTime?
   notificacaoLida         Boolean   @default(false)
   temperatura     Temperatura            @default(MORNO)
+  motivoExclusao  String?
   deletedAt       DateTime?
   createdAt       DateTime               @default(now())
   updatedAt       DateTime               @updatedAt

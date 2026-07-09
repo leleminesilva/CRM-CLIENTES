@@ -595,6 +595,10 @@ export default function ClienteDetalhePage() {
   const { user } = useAuth();
   const isAdmin = user?.role === "ADMINISTRADOR";
 
+  // Dialog de exclusão do cliente
+  const [deleteDialog, setDeleteDialog] = useState(false);
+  const [motivoExclusao, setMotivoExclusao] = useState("");
+
   const { data: cliente, isLoading } = useQuery({
     queryKey: ["cliente", id],
     queryFn: async () => {
@@ -610,7 +614,7 @@ export default function ClienteDetalhePage() {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: () => axios.delete(`/api/clientes/${id}`),
+    mutationFn: (motivo: string) => axios.delete(`/api/clientes/${id}`, { data: { motivo } }),
     onSuccess: () => { toast.success("Cliente removido"); router.push("/clientes"); },
     onError: () => toast.error("Erro ao remover"),
   });
@@ -749,7 +753,7 @@ export default function ClienteDetalhePage() {
               Editar
             </Button>
           </Link>
-          <AlertDialog>
+          <AlertDialog open={deleteDialog} onOpenChange={(open) => { setDeleteDialog(open); if (!open) setMotivoExclusao(""); }}>
             <AlertDialogTrigger asChild>
               <Button variant="destructive" size="sm">
                 <Trash2 className="w-4 h-4 mr-2" />
@@ -761,11 +765,24 @@ export default function ClienteDetalhePage() {
                 <AlertDialogTitle>Remover cliente?</AlertDialogTitle>
                 <AlertDialogDescription>Esta ação não pode ser desfeita.</AlertDialogDescription>
               </AlertDialogHeader>
+              <div className="space-y-2">
+                <p className="text-sm font-medium">Motivo da exclusão <span className="text-red-500">*</span></p>
+                <Textarea
+                  placeholder="Explique por que este cliente está sendo removido..."
+                  value={motivoExclusao}
+                  onChange={(e) => setMotivoExclusao(e.target.value)}
+                  rows={3}
+                />
+              </div>
               <AlertDialogFooter>
                 <AlertDialogCancel>Cancelar</AlertDialogCancel>
                 <AlertDialogAction
                   className="bg-destructive hover:bg-destructive/90"
-                  onClick={() => deleteMutation.mutate()}
+                  disabled={!motivoExclusao.trim() || deleteMutation.isPending}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    if (motivoExclusao.trim()) deleteMutation.mutate(motivoExclusao.trim());
+                  }}
                 >
                   Remover
                 </AlertDialogAction>

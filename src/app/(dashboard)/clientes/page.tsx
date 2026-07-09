@@ -44,6 +44,8 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Card } from "@/components/ui/card";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   Select,
@@ -79,6 +81,7 @@ export default function ClientesPage() {
   const [search, setSearch] = useState(() => ss?.getItem("cf_search") ?? "");
   const [page, setPage] = useState(1);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [motivoExclusao, setMotivoExclusao] = useState("");
   const [responsavelId, setResponsavelId] = useState(() => ss?.getItem("cf_responsavelId") ?? "");
   const [temperatura, setTemperatura] = useState(() => ss?.getItem("cf_temperatura") ?? "");
   const [servico, setServico] = useState(() => ss?.getItem("cf_servico") ?? "");
@@ -173,12 +176,14 @@ export default function ClientesPage() {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id: string) => axios.delete(`/api/clientes/${id}`),
+    mutationFn: ({ id, motivo }: { id: string; motivo: string }) =>
+      axios.delete(`/api/clientes/${id}`, { data: { motivo } }),
     onSuccess: () => {
       toast.success("Cliente removido com sucesso");
       qc.invalidateQueries({ queryKey: ["clientes"] });
       qc.invalidateQueries({ queryKey: ["dashboard"] });
       setDeleteId(null);
+      setMotivoExclusao("");
     },
     onError: () => toast.error("Erro ao remover cliente"),
   });
@@ -595,7 +600,7 @@ export default function ClientesPage() {
       )}
 
       {/* Delete Dialog */}
-      <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
+      <AlertDialog open={!!deleteId} onOpenChange={(open) => { if (!open) { setDeleteId(null); setMotivoExclusao(""); } }}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Remover cliente</AlertDialogTitle>
@@ -603,11 +608,25 @@ export default function ClientesPage() {
               Tem certeza que deseja remover este cliente? Esta ação não poderá ser desfeita.
             </AlertDialogDescription>
           </AlertDialogHeader>
+          <div className="space-y-1.5">
+            <Label htmlFor="motivo-exclusao-cliente">Motivo da exclusão *</Label>
+            <Textarea
+              id="motivo-exclusao-cliente"
+              placeholder="Explique por que este cliente está sendo removido..."
+              value={motivoExclusao}
+              onChange={(e) => setMotivoExclusao(e.target.value)}
+              rows={3}
+            />
+          </div>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction
               className="bg-destructive hover:bg-destructive/90"
-              onClick={() => deleteId && deleteMutation.mutate(deleteId)}
+              disabled={!motivoExclusao.trim() || deleteMutation.isPending}
+              onClick={(e) => {
+                e.preventDefault();
+                if (deleteId && motivoExclusao.trim()) deleteMutation.mutate({ id: deleteId, motivo: motivoExclusao.trim() });
+              }}
             >
               Remover
             </AlertDialogAction>

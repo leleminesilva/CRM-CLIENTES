@@ -38,7 +38,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { formatCurrency, formatCPFCNPJ, formatPhone, ORIGEM_LABELS, PORTE_LABELS, formatDateTime } from "@/lib/utils/formatters";
+import { formatCurrency, formatCPFCNPJ, formatPhone, ORIGEM_LABELS, PORTE_LABELS, formatDateTime, formatDataVencimento } from "@/lib/utils/formatters";
 import { cn } from "@/lib/utils/cn";
 import type { Cliente } from "@/types";
 
@@ -1054,7 +1054,7 @@ export default function ClienteDetalhePage() {
                     <Badge variant={t.status === "CONCLUIDA" ? "success" : t.status === "ATRASADA" ? "destructive" : "secondary"}>
                       {t.status}
                     </Badge>
-                    <p className="text-xs text-muted-foreground">{formatDateTime(t.dataVencimento)}</p>
+                    <p className="text-xs text-muted-foreground">{formatDataVencimento(t.dataVencimento)}</p>
                   </div>
                 </Card>
               ))

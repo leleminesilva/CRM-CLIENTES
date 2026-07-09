@@ -20,7 +20,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { formatDate, TIPO_TAREFA_LABELS, PRIORIDADE_LABELS } from "@/lib/utils/formatters";
+import { formatDataVencimento, dataHoraVencimento, TIPO_TAREFA_LABELS, PRIORIDADE_LABELS } from "@/lib/utils/formatters";
 import type { Tarefa } from "@/types";
 
 const PRIORIDADE_COLORS: Record<string, string> = {
@@ -142,7 +142,7 @@ export default function TarefasPage() {
   const hoje = new Date();
 
   const atrasadas = tarefas.filter(t =>
-    t.status !== "CONCLUIDA" && new Date(t.dataVencimento) < hoje
+    t.status !== "CONCLUIDA" && dataHoraVencimento(t) < hoje
   );
 
   return (
@@ -187,7 +187,7 @@ export default function TarefasPage() {
 
                 <div className="space-y-2">
                   {grupo.map(t => {
-                    const vencida = t.status !== "CONCLUIDA" && new Date(t.dataVencimento) < hoje;
+                    const vencida = t.status !== "CONCLUIDA" && dataHoraVencimento(t) < hoje;
 
                     return (
                       <Card key={t.id} className={`hover:shadow-sm transition-shadow ${vencida ? "border-red-200 dark:border-red-800" : ""}`}>
@@ -214,7 +214,7 @@ export default function TarefasPage() {
                               <span className="text-xs text-muted-foreground">·</span>
                               <span className={`text-xs ${vencida ? "text-red-500 font-medium" : "text-muted-foreground"}`}>
                                 {vencida ? "Atrasada — " : ""}
-                                {formatDate(t.dataVencimento)}
+                                {formatDataVencimento(t.dataVencimento)}
                                 {t.horario ? ` às ${t.horario}` : ""}
                               </span>
                             </div>

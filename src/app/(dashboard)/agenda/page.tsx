@@ -22,7 +22,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils/cn";
 import type { Tarefa } from "@/types";
-import { TIPO_TAREFA_LABELS } from "@/lib/utils/formatters";
+import { TIPO_TAREFA_LABELS, dataCalendario, dataHoraVencimento } from "@/lib/utils/formatters";
 
 const localizer = dateFnsLocalizer({
   format,
@@ -112,7 +112,7 @@ function EventCard({ event, compact = false }: { event: AgendaEvent; compact?: b
               <Clock className="w-3 h-3" /> {t.horario}
             </span>
           )}
-          {t.status === "PENDENTE" && isPast(new Date(t.dataVencimento)) && (
+          {t.status === "PENDENTE" && isPast(dataHoraVencimento(t)) && (
             <span className="text-xs text-red-500 font-medium flex items-center gap-0.5">
               <Clock className="w-3 h-3" /> Atrasada
             </span>
@@ -162,8 +162,8 @@ export default function AgendaPage() {
   const events: AgendaEvent[] = (data || []).map((t) => ({
     id: t.id,
     title: `${TIPO_TAREFA_LABELS[t.tipo] || t.tipo}: ${t.titulo}`,
-    start: new Date(t.dataVencimento),
-    end: new Date(t.dataVencimento),
+    start: dataCalendario(t.dataVencimento),
+    end: dataCalendario(t.dataVencimento),
     resource: t,
     allDay: true,
   }));

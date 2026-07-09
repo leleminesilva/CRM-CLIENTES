@@ -18,7 +18,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { ROLE_LABELS } from "@/lib/utils/formatters";
+import { ROLE_LABELS, hojeISO } from "@/lib/utils/formatters";
 import { useSidebar } from "@/contexts/SidebarContext";
 
 const TIPO_TASK_COLORS: Record<string, string> = {
@@ -133,7 +133,7 @@ export function Topbar() {
   const notifNaoLidas = notificacoes.filter(n => !n.lida).slice(0, 15);
 
   // Today's tasks
-  const today = new Date().toISOString().split("T")[0];
+  const today = hojeISO();
   const { data: tarefasHoje } = useQuery<Tarefa[]>({
     queryKey: ["tarefas-hoje", today],
     queryFn: async () => {

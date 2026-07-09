@@ -16,6 +16,34 @@ export function formatDateTime(date: string | Date): string {
   return format(new Date(date), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR });
 }
 
+// dataVencimento (Tarefa) é uma data "pura" — o horário fica em campo separado — salva no banco
+// como meia-noite UTC. Lida com new Date()/format() comuns (fuso local), em fusos negativos como
+// o do Brasil (UTC-3) ela vira "ontem às 21h", fazendo a tarefa aparecer um dia antes do marcado.
+// Estas funções leem os componentes em UTC e remontam em horário local para evitar o desvio.
+export function dataCalendario(valor: string | Date): Date {
+  const d = new Date(valor);
+  return new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
+}
+
+export function formatDataVencimento(valor: string | Date): string {
+  return format(dataCalendario(valor), "dd/MM/yyyy", { locale: ptBR });
+}
+
+// Combina a data-calendário com o horário (quando marcado) para comparações de "atrasada"/lembrete.
+// Sem horário, considera o início do dia — condizente com o comportamento anterior, sem o desvio de fuso.
+export function dataHoraVencimento(tarefa: { dataVencimento: string | Date; horario?: string | null }): Date {
+  const alvo = dataCalendario(tarefa.dataVencimento);
+  if (tarefa.horario) {
+    const [h, m] = tarefa.horario.split(":").map(Number);
+    alvo.setHours(h, m, 0, 0);
+  }
+  return alvo;
+}
+
+export function hojeISO(): string {
+  return format(new Date(), "yyyy-MM-dd");
+}
+
 export function formatRelativeTime(date: string | Date): string {
   return formatDistanceToNow(new Date(date), {
     addSuffix: true,

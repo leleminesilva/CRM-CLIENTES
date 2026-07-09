@@ -2,6 +2,7 @@ import { Sidebar } from "@/components/layout/Sidebar";
 import { Topbar } from "@/components/layout/Topbar";
 import { SidebarProvider } from "@/contexts/SidebarContext";
 import { AlertaSistema } from "@/components/AlertaSistema";
+import { LembreteAgenda } from "@/components/LembreteAgenda";
 
 export default function DashboardLayout({
   children,
@@ -20,6 +21,7 @@ export default function DashboardLayout({
         </div>
       </div>
       <AlertaSistema />
+      <LembreteAgenda />
     </SidebarProvider>
   );
 }

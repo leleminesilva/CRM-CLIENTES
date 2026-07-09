@@ -16,7 +16,21 @@ número ser suspenso.
    7:30 às 18h). Fechar o terminal desconecta o número — não desliga o CRM nem
    afeta a aba WhatsApp oficial.
 6. Pra reconectar depois de fechar, só rode `npm start` de novo — não precisa
-   escanear o QR outra vez (a sessão fica salva em `./sessao`).
+   escanear o QR outra vez (a sessão fica salva em `./sessao-padrao`).
+
+## Conectar mais de um número ao mesmo tempo
+
+Abra um terminal por número, cada um com um valor diferente de `INSTANCIA`:
+
+```
+INSTANCIA=comercial npm start
+```
+```
+INSTANCIA=suporte npm start
+```
+
+Cada um vira um número separado na aba **Whats** do CRM, com sua própria sessão
+(`sessao-comercial/`, `sessao-suporte/`) e conversas independentes.
 
 ## Encerrar de vez
 

@@ -35,8 +35,8 @@ prisma/.env
 
 # WhatsApp bridge (conector local temporário — sessão/credenciais nunca vão pro git)
 whatsapp-bridge/node_modules
-whatsapp-bridge/sessao
-whatsapp-bridge/bridge-config.json
+whatsapp-bridge/sessao*
+whatsapp-bridge/bridge-config*.json
 
 # TypeScript
 *.tsbuildinfo

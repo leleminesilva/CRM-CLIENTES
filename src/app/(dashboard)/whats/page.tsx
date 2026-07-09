@@ -16,6 +16,10 @@ import { cn } from "@/lib/utils/cn";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 
+const POLL_INSTANCIAS_MS = 2500;
+const POLL_CONVERSAS_MS = 3000;
+const POLL_MENSAGENS_MS = 2500;
+
 interface Instancia {
   id: string;
   nome: string;
@@ -67,6 +71,47 @@ function StatusIcon({ status }: { status: string }) {
   if (status === "lida") return <CheckCheck className="w-3.5 h-3.5 text-blue-400" />;
   if (status === "enviada") return <Check className="w-3.5 h-3.5 text-muted-foreground" />;
   return <Loader2 className="w-3 h-3 text-muted-foreground animate-spin" />;
+}
+
+// ── Painel de instâncias (vários números conectados) ────────────────────────
+
+function PainelInstancias({
+  instancias, selected, onSelect,
+}: {
+  instancias: Instancia[]; selected: string | null; onSelect: (id: string) => void;
+}) {
+  if (instancias.length === 0) return null;
+
+  return (
+    <div className="w-16 md:w-20 flex flex-col bg-sidebar border-r border-border shrink-0">
+      <div className="h-14 flex items-center justify-center border-b border-border">
+        <QrCode className="w-6 h-6 text-red-500" />
+      </div>
+      <ScrollArea className="flex-1">
+        <div className="py-2 flex flex-col items-center gap-2 px-2">
+          {instancias.map((inst) => (
+            <button
+              key={inst.id}
+              onClick={() => onSelect(inst.id)}
+              title={inst.nome}
+              className={cn(
+                "relative w-10 h-10 rounded-xl flex items-center justify-center text-xs font-bold transition-all",
+                selected === inst.id ? "bg-red-600 text-white shadow-lg scale-105" : "bg-muted text-muted-foreground hover:bg-accent"
+              )}
+            >
+              {getInitials(inst.nome)}
+              <span
+                className={cn(
+                  "absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-background",
+                  inst.statusConexao === "conectado" ? "bg-green-500" : "bg-amber-500"
+                )}
+              />
+            </button>
+          ))}
+        </div>
+      </ScrollArea>
+    </div>
+  );
 }
 
 // ── Tela de conexão (aguardando bridge / QR code) ──────────────────────────
@@ -195,7 +240,7 @@ function AreaChat({ conversa, onBack }: { conversa: Conversa | null; onBack: () 
       return data as { mensagens: Mensagem[] };
     },
     enabled: !!conversa?.id,
-    refetchInterval: 4000,
+    refetchInterval: POLL_MENSAGENS_MS,
   });
 
   const enviar = useMutation({
@@ -329,6 +374,7 @@ function AreaChat({ conversa, onBack }: { conversa: Conversa | null; onBack: () 
 export default function WhatsPage() {
   const { user } = useAuth();
   const isAdmin = user?.role === "ADMINISTRADOR";
+  const [instanciaId, setInstanciaId] = useState<string | null>(null);
   const [conversa, setConversa] = useState<Conversa | null>(null);
   const [search, setSearch] = useState("");
 
@@ -338,20 +384,26 @@ export default function WhatsPage() {
       const { data } = await axios.get("/api/whatsapp/instancias?tipo=QRCODE");
       return data as Instancia[];
     },
-    refetchInterval: 3000,
+    refetchInterval: POLL_INSTANCIAS_MS,
   });
 
-  const instancia = instancias[0];
-  const conectado = instancia?.statusConexao === "conectado";
+  useEffect(() => {
+    if (instancias.length > 0 && !instancias.some((i) => i.id === instanciaId)) {
+      setInstanciaId(instancias[0].id);
+    }
+  }, [instancias, instanciaId]);
+
+  const instanciaAtual = instancias.find((i) => i.id === instanciaId);
+  const conectado = instanciaAtual?.statusConexao === "conectado";
 
   const { data: conversas = [] } = useQuery({
-    queryKey: ["whats-conversas", instancia?.id],
+    queryKey: ["whats-conversas", instanciaAtual?.id],
     queryFn: async () => {
-      const { data } = await axios.get(`/api/whatsapp/conversas?instanciaId=${instancia!.id}`);
+      const { data } = await axios.get(`/api/whatsapp/conversas?instanciaId=${instanciaAtual!.id}`);
       return data as Conversa[];
     },
-    enabled: !!instancia?.id && conectado,
-    refetchInterval: 5000,
+    enabled: !!instanciaAtual?.id && conectado,
+    refetchInterval: POLL_CONVERSAS_MS,
   });
 
   const painelChat = conversa !== null;
@@ -370,8 +422,14 @@ export default function WhatsPage() {
 
   return (
     <div className="h-full flex overflow-hidden rounded-xl border border-border bg-background shadow-sm -m-4 md:-m-6">
+      <PainelInstancias
+        instancias={instancias}
+        selected={instanciaId}
+        onSelect={(id) => { setInstanciaId(id); setConversa(null); }}
+      />
+
       {!conectado ? (
-        <TelaConexao instancia={instancia} />
+        <TelaConexao instancia={instanciaAtual} />
       ) : (
         <>
           <div className={cn("flex flex-col border-r border-border", painelChat ? "hidden md:flex md:w-80" : "flex flex-1 md:flex-none md:w-80")}>

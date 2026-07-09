@@ -23,10 +23,14 @@ const {
 
 const CRM_BASE_URL = (process.env.CRM_BASE_URL || "").replace(/\/$/, "");
 const BRIDGE_SECRET = process.env.WHATSAPP_BRIDGE_SECRET;
-const NOME_INSTANCIA = process.env.NOME_INSTANCIA || "WhatsApp (QR temporário)";
-const CONFIG_PATH = path.join(__dirname, "bridge-config.json");
-const SESSAO_DIR = path.join(__dirname, "sessao");
-const POLL_INTERVAL_MS = 4000;
+// Nome usado pra rodar vários números ao mesmo tempo: cada valor de INSTANCIA usa sua
+// própria pasta de sessão e arquivo de config, então dá pra abrir um terminal por número
+// (ex: `INSTANCIA=comercial npm start` num, `INSTANCIA=suporte npm start` noutro).
+const INSTANCIA_KEY = (process.env.INSTANCIA || "padrao").replace(/[^a-z0-9_-]/gi, "_");
+const NOME_INSTANCIA = process.env.NOME_INSTANCIA || `WhatsApp (QR temporário${INSTANCIA_KEY !== "padrao" ? ` - ${INSTANCIA_KEY}` : ""})`;
+const CONFIG_PATH = path.join(__dirname, `bridge-config.${INSTANCIA_KEY}.json`);
+const SESSAO_DIR = path.join(__dirname, `sessao-${INSTANCIA_KEY}`);
+const POLL_INTERVAL_MS = 2000;
 
 if (!CRM_BASE_URL || !BRIDGE_SECRET) {
   console.error("Faltando CRM_BASE_URL ou WHATSAPP_BRIDGE_SECRET no .env — veja .env.example");
@@ -76,6 +80,8 @@ function extrairTexto(msg) {
     null
   );
 }
+
+let pollHandle = null;
 
 async function main() {
   let config = carregarConfig();
@@ -138,7 +144,7 @@ async function main() {
       if (deveReconectar) {
         setTimeout(main, 3000);
       } else {
-        console.log("Sessão deslogada no celular. Apague a pasta ./sessao e rode de novo pra reconectar.");
+        console.log(`Sessão deslogada no celular. Apague a pasta ${SESSAO_DIR} e rode de novo pra reconectar.`);
       }
     }
   });
@@ -168,8 +174,11 @@ async function main() {
     }
   });
 
-  // Poll: mensagens digitadas no CRM aguardando entrega de fato via WhatsApp
-  setInterval(async () => {
+  // Poll: mensagens digitadas no CRM aguardando entrega de fato via WhatsApp.
+  // Limpa o intervalo anterior antes de criar um novo (main() roda de novo a cada
+  // reconexão) pra não acumular pollers duplicados enviando a mesma mensagem 2x.
+  if (pollHandle) clearInterval(pollHandle);
+  pollHandle = setInterval(async () => {
     if (sock.ws?.readyState !== 1) return; // só envia se realmente conectado
     try {
       const { data: pendentes } = await api.get("/api/whatsapp/bridge/pendentes", {

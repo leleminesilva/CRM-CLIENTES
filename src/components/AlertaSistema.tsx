@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 
-const ALERTA_KEY = "crm_alerta_sistema_v2";
+const ALERTA_KEY = "crm_alerta_sistema_v3";
 
 export function AlertaSistema() {
   const [aberto, setAberto] = useState(false);
@@ -29,35 +29,35 @@ export function AlertaSistema() {
       className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm"
       onClick={(e) => { if (e.target === e.currentTarget) fechar(); }}
     >
-      <div className="bg-card border border-border rounded-xl shadow-2xl w-full max-w-lg mx-4 p-6 space-y-4 animate-in fade-in zoom-in-95 duration-200">
+      <div className="bg-card border border-amber-500/50 rounded-xl shadow-2xl w-full max-w-lg mx-4 p-6 space-y-4 animate-in fade-in zoom-in-95 duration-200">
         <div className="flex items-start gap-3">
-          <span className="text-2xl leading-none mt-0.5">🚨</span>
+          <span className="text-2xl leading-none mt-0.5">⚠️</span>
           <h2 className="text-lg font-bold text-foreground leading-tight">
-            Atualização Importante do Sistema
+            Aviso Importante
           </h2>
         </div>
 
-        <div className="space-y-3 text-sm text-muted-foreground leading-relaxed">
+        <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-4 space-y-3 text-sm text-foreground leading-relaxed">
           <p>
-            A partir de hoje, todos os clientes que permanecerem sem atualizações dentro de dois dias
-            deverão ser revisados e ter seu andamento atualizado no sistema.
+            Todos os valores referentes a vendas, compras, despesas e demais movimentações devem ser
+            lançados no CRM em até <strong>24 horas</strong> após sua ocorrência.
           </p>
           <p>
-            Essa medida foi implementada para garantir um melhor controle de qualidade, organização
-            e acompanhamento dos atendimentos, evitando que qualquer cliente fique sem o devido
-            acompanhamento.
+            A atualização dentro desse prazo é obrigatória para garantir a confiabilidade das
+            informações, o controle financeiro e o bom funcionamento dos processos da empresa.
+          </p>
+          <p className="font-semibold text-amber-500">
+            Não será permitido atraso superior a 24 horas no lançamento dos valores.
           </p>
           <p>
-            Contamos com a colaboração de toda a equipe para manter as informações sempre atualizadas.
-          </p>
-          <p className="font-medium text-foreground">
-            Em caso de dúvidas sobre o procedimento, procure a administração.
+            Em caso de dúvidas ou qualquer impedimento para realizar o lançamento, comunique
+            imediatamente o responsável.
           </p>
         </div>
 
         <button
           onClick={fechar}
-          className="w-full py-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold transition-colors"
+          className="w-full py-2.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-white text-sm font-semibold transition-colors"
         >
           Entendido
         </button>

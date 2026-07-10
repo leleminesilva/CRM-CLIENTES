@@ -13,7 +13,7 @@ import {
 import { ptBR } from "date-fns/locale";
 import "react-big-calendar/lib/css/react-big-calendar.css";
 import { toast } from "sonner";
-import { Plus, ChevronLeft, ChevronRight, CheckCircle2, Clock, Bell } from "lucide-react";
+import { Plus, ChevronLeft, ChevronRight, CheckCircle2, Clock } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";

@@ -70,6 +70,7 @@ enum TipoTarefa {
   FOLLOW_UP
   EMAIL
   TAREFA
+  NOTIFICACAO
 }
 
 enum StatusTarefa {

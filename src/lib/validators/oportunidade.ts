@@ -22,7 +22,7 @@ export const tarefaSchema = z.object({
   titulo: z.string().min(2, "Título deve ter no mínimo 2 caracteres"),
   descricao: z.string().optional(),
   tipo: z
-    .enum(["REUNIAO", "LIGACAO", "VISITA", "FOLLOW_UP", "EMAIL", "TAREFA"])
+    .enum(["REUNIAO", "LIGACAO", "VISITA", "FOLLOW_UP", "EMAIL", "TAREFA", "NOTIFICACAO"])
     .default("TAREFA"),
   prioridade: z.enum(["ALTA", "MEDIA", "BAIXA"]).default("MEDIA"),
   dataVencimento: z.string(),

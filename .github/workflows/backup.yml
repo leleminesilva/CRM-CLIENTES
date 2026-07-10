@@ -1,0 +1,31 @@
+name: Backup semanal do banco de dados
+
+on:
+  schedule:
+    # Todo domingo às 03:00 UTC (00:00 no horário de Brasília)
+    - cron: "0 3 * * 0"
+  workflow_dispatch: {}
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Instalar cliente do Postgres
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+
+      - name: Gerar dump do banco
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          if [ -z "$DATABASE_URL" ]; then
+            echo "DATABASE_URL não configurada nos secrets do repositório." >&2
+            exit 1
+          fi
+          pg_dump "$DATABASE_URL" --no-owner --no-privileges -f "backup-$(date +%Y-%m-%d).sql"
+
+      - name: Enviar como artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: db-backup-${{ github.run_id }}
+          path: backup-*.sql
+          retention-days: 90

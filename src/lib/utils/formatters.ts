@@ -161,6 +161,7 @@ export const TIPO_TAREFA_LABELS: Record<string, string> = {
   FOLLOW_UP: "Follow-up",
   EMAIL: "E-mail",
   TAREFA: "Tarefa",
+  NOTIFICACAO: "Notificação",
 };
 
 export const TEMPERATURA_LABELS: Record<string, string> = {

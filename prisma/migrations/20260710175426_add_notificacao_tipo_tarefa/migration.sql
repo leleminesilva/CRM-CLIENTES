@@ -1,0 +1,2 @@
+-- AlterEnum
+ALTER TYPE "TipoTarefa" ADD VALUE 'NOTIFICACAO';

@@ -27,7 +27,8 @@ export type TipoTarefa =
   | "VISITA"
   | "FOLLOW_UP"
   | "EMAIL"
-  | "TAREFA";
+  | "TAREFA"
+  | "NOTIFICACAO";
 export type StatusTarefa =
   | "PENDENTE"
   | "EM_ANDAMENTO"

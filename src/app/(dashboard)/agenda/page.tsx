@@ -13,7 +13,8 @@ import {
 import { ptBR } from "date-fns/locale";
 import "react-big-calendar/lib/css/react-big-calendar.css";
 import { toast } from "sonner";
-import { Plus, ChevronLeft, ChevronRight, CheckCircle2, Clock } from "lucide-react";
+import { Plus, ChevronLeft, ChevronRight, CheckCircle2, Clock, Bell } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -34,18 +35,19 @@ const localizer = dateFnsLocalizer({
 });
 
 const TIPO_COLORS: Record<string, string> = {
-  REUNIAO:   "#6366f1",
-  LIGACAO:   "#8b5cf6",
-  VISITA:    "#ec4899",
-  FOLLOW_UP: "#f59e0b",
-  EMAIL:     "#3b82f6",
-  TAREFA:    "#64748b",
+  REUNIAO:     "#6366f1",
+  LIGACAO:     "#8b5cf6",
+  VISITA:      "#ec4899",
+  FOLLOW_UP:   "#f59e0b",
+  EMAIL:       "#3b82f6",
+  TAREFA:      "#64748b",
+  NOTIFICACAO: "#ef4444",
 };
 
 const PRIORIDADE_LABEL: Record<string, string> = { ALTA: "Alta", MEDIA: "Média", BAIXA: "Baixa" };
 const PRIORIDADE_COLOR: Record<string, string> = { ALTA: "text-red-500", MEDIA: "text-amber-500", BAIXA: "text-emerald-500" };
 
-const TIPOS = [
+const TIPOS_BASE = [
   { value: "REUNIAO",   label: "Reunião" },
   { value: "LIGACAO",   label: "Ligação" },
   { value: "VISITA",    label: "Visita" },
@@ -53,6 +55,8 @@ const TIPOS = [
   { value: "EMAIL",     label: "E-mail" },
   { value: "TAREFA",    label: "Tarefa" },
 ];
+
+const TIPO_NOTIFICACAO = { value: "NOTIFICACAO", label: "🔔 Notificação" };
 
 const PRIORIDADES = [
   { value: "ALTA",  label: "🔴 Alta" },
@@ -129,6 +133,9 @@ function EventCard({ event, compact = false }: { event: AgendaEvent; compact?: b
 
 export default function AgendaPage() {
   const queryClient = useQueryClient();
+  const { user } = useAuth();
+  const isAdmin = user?.role === "ADMINISTRADOR";
+  const TIPOS = isAdmin ? [...TIPOS_BASE, TIPO_NOTIFICACAO] : TIPOS_BASE;
   const [view, setView] = useState<ViewType>("mes");
   const [currentDate, setCurrentDate] = useState(new Date());
   const [open, setOpen] = useState(false);

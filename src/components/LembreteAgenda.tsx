@@ -19,6 +19,7 @@ const TIPO_COLORS: Record<string, string> = {
   FOLLOW_UP: "#f59e0b",
   EMAIL: "#3b82f6",
   TAREFA: "#64748b",
+  NOTIFICACAO: "#ef4444",
 };
 
 function carregarDisparados(): Record<string, number> {

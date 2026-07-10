@@ -20,6 +20,7 @@ import { clienteSchema, type ClienteInput } from "@/lib/validators/cliente";
 import { maskCpfCnpj, maskPhone, maskCep } from "@/lib/utils/masks";
 import { useAuth } from "@/contexts/AuthContext";
 import { SERVICOS, ORIGENS } from "@/lib/constants";
+import { tocarNotificacaoNovoCliente } from "@/lib/utils/sound";
 import type { User } from "@/types";
 
 export default function NovoClientePage() {
@@ -60,6 +61,7 @@ export default function NovoClientePage() {
     mutationFn: (data: ClienteInput) => axios.post("/api/clientes", data),
     onSuccess: (res) => {
       toast.success("Cliente cadastrado com sucesso!");
+      tocarNotificacaoNovoCliente();
       qc.invalidateQueries({ queryKey: ["clientes"] });
       qc.invalidateQueries({ queryKey: ["dashboard"] });
       qc.invalidateQueries({ queryKey: ["clientes-novos"] });

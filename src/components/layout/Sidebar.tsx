@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -16,6 +16,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useQuery } from "@tanstack/react-query";
 import axios from "axios";
+import { tocarNotificacaoNovoCliente } from "@/lib/utils/sound";
 
 type Role = "ADMINISTRADOR" | "GESTOR" | "COMERCIAL" | "OPERACIONAL";
 
@@ -118,6 +119,18 @@ function useNewClientesCount() {
     refetchIntervalInBackground: true,
     staleTime: 0,
   });
+
+  // Toca um som quando a contagem sobe durante a sessão (cliente novo chegou agora) — não na
+  // primeira leitura, pra não apitar por clientes que já estavam sem ver desde antes.
+  const contagemAnterior = useRef<number | null>(null);
+  useEffect(() => {
+    const atual = novosData?.count;
+    if (atual === undefined) return;
+    if (contagemAnterior.current !== null && atual > contagemAnterior.current) {
+      tocarNotificacaoNovoCliente();
+    }
+    contagemAnterior.current = atual;
+  }, [novosData?.count]);
 
   return isOnClientes ? 0 : (novosData?.count ?? 0);
 }

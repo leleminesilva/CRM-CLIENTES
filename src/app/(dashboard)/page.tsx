@@ -167,11 +167,12 @@ export default function DashboardPage() {
   const vendasPorVendedor = data?.vendasPorVendedor || [];
   const servicosMaisSolicitados: Array<{ servico: string; total: number }> = data?.servicosMaisSolicitados || [];
 
-  // Meta é R$100k/mês por vendedor. Olhando "Todos os vendedores", soma a meta de cada
-  // vendedor ativo; filtrando por 1 pessoa específica (ou pra quem não é gestor, que só
-  // enxerga a própria meta) volta a ser individual.
-  const totalVendedoresAtivos = Math.max(vendedoresData?.length || 0, 1);
-  const metaMes = isGestor && !vendedorId ? 100000 * totalVendedoresAtivos : 100000;
+  // Meta é R$100k/mês por vendedor — soma só quem tem venda no período (aparece em
+  // "Performance por Vendedor"), não o total de usuários cadastrados no sistema. Filtrando
+  // por 1 pessoa específica (ou pra quem não é gestor, que só enxerga a própria meta) volta
+  // a ser individual.
+  const totalVendedoresVendendo = Math.max(vendasPorVendedor.length, 1);
+  const metaMes = isGestor && !vendedorId ? 100000 * totalVendedoresVendendo : 100000;
 
   return (
     <div className="space-y-6 animate-fade-in">

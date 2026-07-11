@@ -34,20 +34,8 @@ import {
 } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { formatCurrency, ORIGEM_LABELS, ESTAGIO_LABELS } from "@/lib/utils/formatters";
+import { formatCurrency, ORIGEM_LABELS } from "@/lib/utils/formatters";
 import { useAuth } from "@/contexts/AuthContext";
-
-
-// Cores distintas por estágio do funil (alta legibilidade em light e dark)
-const FUNIL_COLORS: Record<string, string> = {
-  NOVO_LEAD:           "#3b82f6", // blue
-  CONTATO_INICIAL:     "#8b5cf6", // violet
-  PRIMEIRO_ORCAMENTO:  "#6366f1", // indigo
-  QUALIFICACAO:        "#a855f7", // purple
-  PROPOSTA_ENVIADA: "#f59e0b", // amber
-  NEGOCIACAO:       "#f97316", // orange
-  FECHADO_GANHO:    "#10b981", // emerald
-};
 
 const SERVICE_COLORS = ["#6366f1","#3b82f6","#10b981","#f59e0b","#f97316","#ec4899","#8b5cf6","#14b8a6"];
 const VENDOR_COLORS  = ["#6366f1","#10b981","#f59e0b","#3b82f6","#f97316","#ec4899"];
@@ -173,14 +161,11 @@ export default function DashboardPage() {
   }
 
   const kpis = data?.kpis || {};
-  const funil = data?.funil || [];
   const vendasMes = Array.isArray(data?.vendasMes) ? data.vendasMes : [];
+  const leadsPorOrigem = data?.leadsPorOrigem || [];
   const vendasPorOrigem = data?.vendasPorOrigem || [];
   const vendasPorVendedor = data?.vendasPorVendedor || [];
   const servicosMaisSolicitados: Array<{ servico: string; total: number }> = data?.servicosMaisSolicitados || [];
-
-  const funnelOrdem = ["NOVO_LEAD", "CONTATO_INICIAL", "PRIMEIRO_ORCAMENTO", "QUALIFICACAO", "PROPOSTA_ENVIADA", "NEGOCIACAO", "FECHADO_GANHO"];
-  const funnelOrdenado = funnelOrdem.map((e) => funil.find((f: { estagio: string; total: number; valor: number }) => f.estagio === e)).filter(Boolean);
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -324,43 +309,41 @@ export default function DashboardPage() {
 
       {/* Charts Row 1 */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Funil de Vendas */}
+        {/* Origem das Vendas — só leads fechados ganhos, não todos os leads */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Funil de Vendas</CardTitle>
+            <CardTitle className="text-base">Origem das Vendas</CardTitle>
           </CardHeader>
           <CardContent>
-            {funnelOrdenado.length > 0 ? (
-              <div className="space-y-2">
-                {funnelOrdenado.map((f: { estagio: string; total: number; valor: number } | undefined) => {
-                  if (!f) return null;
-                  const max = Math.max(...funnelOrdenado.map((x: { total: number } | undefined) => x?.total || 0));
-                  const pct = max > 0 ? (f.total / max) * 100 : 0;
-                  const barColor = FUNIL_COLORS[f.estagio] ?? "#6366f1";
-                  return (
-                    <div key={f.estagio} className="space-y-1">
-                      <div className="flex justify-between text-sm">
-                        <div className="flex items-center gap-2">
-                          <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: barColor }} />
-                          <span className="font-medium">{ESTAGIO_LABELS[f.estagio] || f.estagio}</span>
-                        </div>
-                        <span className="text-muted-foreground text-xs">{f.total} leads</span>
+            {vendasPorOrigem.length > 0 ? (
+              <div className="flex flex-col sm:flex-row items-center gap-4">
+                <ResponsiveContainer width="100%" height={160} className="max-w-[180px] shrink-0">
+                  <PieChart>
+                    <Pie data={vendasPorOrigem} cx="50%" cy="50%" innerRadius={45} outerRadius={70} dataKey="total" nameKey="origem" paddingAngle={3}>
+                      {vendasPorOrigem.map((_: unknown, index: number) => (
+                        <Cell key={index} fill={PIE_COLORS[index % PIE_COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <RechartTooltip
+                      formatter={(v: number, n: string) => [v, ORIGEM_LABELS[n] || n]}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+                <div className="flex-1 w-full space-y-2">
+                  {vendasPorOrigem.map((l: { origem: string; total: number }, i: number) => (
+                    <div key={l.origem} className="flex items-center justify-between text-sm">
+                      <div className="flex items-center gap-2">
+                        <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: PIE_COLORS[i % PIE_COLORS.length] }} />
+                        <span className="truncate">{ORIGEM_LABELS[l.origem] || l.origem}</span>
                       </div>
-                      <div className="h-9 bg-muted/60 rounded-lg overflow-hidden">
-                        <div
-                          className="h-full rounded-lg flex items-center pl-3 text-white text-xs font-semibold transition-all duration-500"
-                          style={{ width: `${Math.max(pct, 3)}%`, backgroundColor: barColor, minWidth: "50px" }}
-                        >
-                          {f.total > 0 && f.total}
-                        </div>
-                      </div>
+                      <span className="font-medium ml-2">{l.total}</span>
                     </div>
-                  );
-                })}
+                  ))}
+                </div>
               </div>
             ) : (
               <div className="flex items-center justify-center h-40 text-muted-foreground">
-                Sem dados para exibir
+                Sem vendas fechadas no período
               </div>
             )}
           </CardContent>
@@ -451,18 +434,18 @@ export default function DashboardPage() {
 
       {/* Charts Row 2 */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Origem das Vendas — só leads fechados ganhos, não todos os leads */}
+        {/* Origem dos Leads */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Origem das Vendas</CardTitle>
+            <CardTitle className="text-base">Origem dos Leads</CardTitle>
           </CardHeader>
           <CardContent>
-            {vendasPorOrigem.length > 0 ? (
+            {leadsPorOrigem.length > 0 ? (
               <div className="flex flex-col sm:flex-row items-center gap-4">
                 <ResponsiveContainer width="100%" height={160} className="max-w-[180px] shrink-0">
                   <PieChart>
-                    <Pie data={vendasPorOrigem} cx="50%" cy="50%" innerRadius={45} outerRadius={70} dataKey="total" nameKey="origem" paddingAngle={3}>
-                      {vendasPorOrigem.map((_: unknown, index: number) => (
+                    <Pie data={leadsPorOrigem} cx="50%" cy="50%" innerRadius={45} outerRadius={70} dataKey="total" nameKey="origem" paddingAngle={3}>
+                      {leadsPorOrigem.map((_: unknown, index: number) => (
                         <Cell key={index} fill={PIE_COLORS[index % PIE_COLORS.length]} />
                       ))}
                     </Pie>
@@ -472,7 +455,7 @@ export default function DashboardPage() {
                   </PieChart>
                 </ResponsiveContainer>
                 <div className="flex-1 w-full space-y-2">
-                  {vendasPorOrigem.map((l: { origem: string; total: number }, i: number) => (
+                  {leadsPorOrigem.map((l: { origem: string; total: number }, i: number) => (
                     <div key={l.origem} className="flex items-center justify-between text-sm">
                       <div className="flex items-center gap-2">
                         <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: PIE_COLORS[i % PIE_COLORS.length] }} />
@@ -485,7 +468,7 @@ export default function DashboardPage() {
               </div>
             ) : (
               <div className="flex items-center justify-center h-40 text-muted-foreground">
-                Sem vendas fechadas no período
+                Sem dados para exibir
               </div>
             )}
           </CardContent>

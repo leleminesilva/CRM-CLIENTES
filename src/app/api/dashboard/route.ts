@@ -61,7 +61,7 @@ export async function GET(request: NextRequest) {
     const [
       totalClientes,
       leadsAtivos,
-      funnelData,
+      leadsPorOrigem,
       vendasPorOrigem,
       leadsGanhosPeriodo,
       valorNegociacaoAtual,
@@ -86,23 +86,17 @@ export async function GET(request: NextRequest) {
         },
       }),
 
-      // Funil de vendas no período — valor usa COALESCE(c.valorOrcamento, l.valorEstimado)
-      prisma.$queryRaw<Array<{ estagio: string; total: number; valor: number }>>(
-        Prisma.sql`
-          SELECT
-            l.estagio::text AS estagio,
-            COUNT(*)::int AS total,
-            COALESCE(SUM(COALESCE(c."valorOrcamento", l."valorEstimado")), 0)::float AS valor
-          FROM leads l
-          LEFT JOIN clientes c ON l."clienteId" = c.id AND c."deletedAt" IS NULL
-          WHERE l."deletedAt" IS NULL
-            AND l."createdAt" >= ${de}
-            AND l."createdAt" <= ${ate}
-            AND (l."clienteId" IS NULL OR c.id IS NOT NULL)
-            ${leadsUserFilterSql}
-          GROUP BY l.estagio
-        `
-      ),
+      // Leads por origem no período (todos, independente do estágio)
+      prisma.lead.groupBy({
+        by: ["origem"],
+        where: {
+          deletedAt: null,
+          createdAt: { gte: de, lte: ate },
+          OR: [{ clienteId: null }, { cliente: { deletedAt: null } }],
+          ...userFilter,
+        },
+        _count: { _all: true },
+      }),
 
       // Origem das vendas fechadas no período (só leads FECHADO_GANHO, pelo dataFechamento —
       // mesmo critério usado em "Vendas Fechadas"/"Receita Fechada" nesse dashboard)
@@ -226,12 +220,6 @@ export async function GET(request: NextRequest) {
     const canceladosValor = canceladosValorRow?.valor ?? 0;
     const taxaConversao   = leadsTotal > 0 ? (leadsConvertidos / leadsTotal) * 100 : 0;
 
-    const funnelFormatted = funnelData.map((f) => ({
-      estagio: f.estagio,
-      total:   Number(f.total),
-      valor:   Number(f.valor),
-    }));
-
     // Performance por vendedor — usa COALESCE(c.valorOrcamento, l.valorEstimado)
     const vendasPorVendedorRaw = await prisma.$queryRaw<Array<{ responsavelId: string; total: number; valor: number }>>(
       Prisma.sql`
@@ -323,8 +311,8 @@ export async function GET(request: NextRequest) {
           canceladosPeriodo,
           canceladosValor,
         },
-        funil:             funnelFormatted,
         vendasMes:         vendasMesRaw,
+        leadsPorOrigem:    leadsPorOrigem.map((l) => ({ origem: l.origem, total: l._count._all })),
         vendasPorOrigem:   vendasPorOrigem.map((l) => ({ origem: l.origem, total: l._count._all })),
         vendasPorVendedor,
         servicosMaisSolicitados,

@@ -17,7 +17,8 @@ export type EstagioLead =
   | "PROPOSTA_ENVIADA"
   | "NEGOCIACAO"
   | "FECHADO_GANHO"
-  | "FECHADO_PERDIDO";
+  | "FECHADO_PERDIDO"
+  | "REENGAJAR";
 export type Temperatura = "QUENTE" | "MORNO" | "FRIO";
 export type StatusOrcamentoCliente = "PENDENTE" | "APROVADO" | "NAO_APROVADO";
 export type StatusOportunidade = "ABERTA" | "GANHA" | "PERDIDA" | "SUSPENSA";
@@ -171,6 +172,7 @@ export interface Lead {
   contato?: Contato | null;
   dataFechamento?: string | null;
   motivoPerda?: string | null;
+  proximoContato?: string | null;
   createdAt: string;
   updatedAt: string;
 }

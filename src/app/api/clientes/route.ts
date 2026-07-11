@@ -5,6 +5,7 @@ import { requirePermission } from "@/lib/rbac";
 import { createAuditLog } from "@/lib/audit";
 import prisma from "@/lib/prisma";
 import { clienteSchema } from "@/lib/validators/cliente";
+import { promoverLeadsParaReengajar } from "@/lib/leads";
 import type { EstagioLead, OrigemCliente, Temperatura } from "@prisma/client";
 
 export const dynamic = "force-dynamic";
@@ -25,6 +26,8 @@ export async function GET(request: NextRequest) {
     const payload = await getCurrentUser(request);
     if (!payload) return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
     requirePermission(payload.role, "clientes:read");
+
+    await promoverLeadsParaReengajar();
 
     const canViewAll = payload.role === "ADMINISTRADOR" || payload.role === "GESTOR";
 

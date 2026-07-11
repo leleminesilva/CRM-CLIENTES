@@ -49,6 +49,7 @@ import { formatCurrency, ESTAGIO_LABELS } from "@/lib/utils/formatters";
 import type { EstagioLead, Lead } from "@/types";
 
 const ESTAGIOS: EstagioLead[] = [
+  "REENGAJAR",
   "NOVO_LEAD",
   "CONTATO_INICIAL",
   "PRIMEIRO_ORCAMENTO",
@@ -60,6 +61,7 @@ const ESTAGIOS: EstagioLead[] = [
 ];
 
 const ESTAGIO_COLORS: Record<EstagioLead, string> = {
+  REENGAJAR:           "bg-purple-50 border-purple-300 dark:bg-purple-950 dark:border-purple-700",
   NOVO_LEAD:           "bg-slate-100 border-slate-300 dark:bg-slate-800 dark:border-slate-600",
   CONTATO_INICIAL:     "bg-blue-50 border-blue-200 dark:bg-blue-950 dark:border-blue-800",
   PRIMEIRO_ORCAMENTO:  "bg-indigo-50 border-indigo-200 dark:bg-indigo-950 dark:border-indigo-800",
@@ -71,6 +73,7 @@ const ESTAGIO_COLORS: Record<EstagioLead, string> = {
 };
 
 const ESTAGIO_HEADER_COLORS: Record<EstagioLead, string> = {
+  REENGAJAR:           "bg-purple-500",
   NOVO_LEAD:           "bg-slate-500",
   CONTATO_INICIAL:     "bg-blue-500",
   PRIMEIRO_ORCAMENTO:  "bg-indigo-500",
@@ -232,6 +235,8 @@ export default function LeadsKanbanPage() {
   const [dataCancelamento, setDataCancelamento] = useState(() => new Date().toISOString().slice(0, 10));
   const [motivoCategoria, setMotivoCategoria] = useState("");
   const [motivoCancelamento, setMotivoCancelamento] = useState("");
+  const [reengajar, setReengajar] = useState(false);
+  const [proximoContato, setProximoContato] = useState("");
 
   const MOTIVOS = ["Prazo", "Preço", "Distância", "Não Realizamos", "Outros"];
 
@@ -248,8 +253,8 @@ export default function LeadsKanbanPage() {
   });
 
   const moveMutation = useMutation({
-    mutationFn: ({ id, estagio, dataFechamento, motivoPerda }: { id: string; estagio: EstagioLead; dataFechamento?: string; motivoPerda?: string }) =>
-      axios.patch(`/api/leads/${id}/mover`, { estagio, dataFechamento, motivoPerda }),
+    mutationFn: ({ id, estagio, dataFechamento, motivoPerda, proximoContato }: { id: string; estagio: EstagioLead; dataFechamento?: string; motivoPerda?: string; proximoContato?: string }) =>
+      axios.patch(`/api/leads/${id}/mover`, { estagio, dataFechamento, motivoPerda, proximoContato }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["leads-kanban"] }),
     onError: () => toast.error("Erro ao mover lead"),
   });
@@ -290,14 +295,23 @@ export default function LeadsKanbanPage() {
 
   function confirmarCancelamentoKanban() {
     if (!dataCancelamento || !motivoCategoria || !motivoCancelamento.trim()) return;
+    if (reengajar && !proximoContato) return;
     const motivoPerda = motivoCancelamento.trim()
       ? `${motivoCategoria} — ${motivoCancelamento.trim()}`
       : motivoCategoria;
-    moveMutation.mutate({ id: cancelPendente!.id, estagio: "FECHADO_PERDIDO", dataFechamento: dataCancelamento, motivoPerda });
+    moveMutation.mutate({
+      id: cancelPendente!.id,
+      estagio: "FECHADO_PERDIDO",
+      dataFechamento: dataCancelamento,
+      motivoPerda,
+      proximoContato: reengajar ? proximoContato : undefined,
+    });
     setCancelPendente(null);
     setMotivoCategoria("");
     setMotivoCancelamento("");
     setDataCancelamento(new Date().toISOString().slice(0, 10));
+    setReengajar(false);
+    setProximoContato("");
   }
 
   const totalLeads = leads.length;
@@ -320,7 +334,7 @@ export default function LeadsKanbanPage() {
       </div>
 
       {/* Dialog de cancelamento via drag */}
-      <Dialog open={!!cancelPendente} onOpenChange={(o) => { if (!o) { setCancelPendente(null); setMotivoCategoria(""); setMotivoCancelamento(""); } }}>
+      <Dialog open={!!cancelPendente} onOpenChange={(o) => { if (!o) { setCancelPendente(null); setMotivoCategoria(""); setMotivoCancelamento(""); setReengajar(false); setProximoContato(""); } }}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-red-500">
@@ -365,14 +379,40 @@ export default function LeadsKanbanPage() {
                 />
               </div>
             )}
+            <div className="space-y-2 border-t pt-3">
+              <label className="flex items-center gap-2 text-sm font-medium cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={reengajar}
+                  onChange={(e) => setReengajar(e.target.checked)}
+                  className="w-4 h-4 accent-purple-600"
+                />
+                Entrar em contato novamente
+              </label>
+              {reengajar && (
+                <div className="space-y-1.5 pl-6">
+                  <p className="text-xs text-muted-foreground">Data do próximo contato <span className="text-red-500">*</span></p>
+                  <input
+                    type="date"
+                    value={proximoContato}
+                    min={new Date().toISOString().slice(0, 10)}
+                    onChange={(e) => setProximoContato(e.target.value)}
+                    className={`w-full h-9 rounded-md border px-3 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring ${!proximoContato ? "border-red-400" : "border-input"}`}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Ao chegar essa data, o lead volta ao topo do Kanban em roxo, na etapa &quot;Entrar em Contato Novamente&quot;.
+                  </p>
+                </div>
+              )}
+            </div>
           </div>
           <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => { setCancelPendente(null); setMotivoCategoria(""); setMotivoCancelamento(""); }}>
+            <Button variant="outline" onClick={() => { setCancelPendente(null); setMotivoCategoria(""); setMotivoCancelamento(""); setReengajar(false); setProximoContato(""); }}>
               Voltar
             </Button>
             <Button
               variant="destructive"
-              disabled={!dataCancelamento || !motivoCategoria || !motivoCancelamento.trim() || moveMutation.isPending}
+              disabled={!dataCancelamento || !motivoCategoria || !motivoCancelamento.trim() || (reengajar && !proximoContato) || moveMutation.isPending}
               onClick={confirmarCancelamentoKanban}
             >
               Confirmar cancelamento

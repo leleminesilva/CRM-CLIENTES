@@ -16,10 +16,12 @@ const moverSchema = z.object({
     "NEGOCIACAO",
     "FECHADO_GANHO",
     "FECHADO_PERDIDO",
+    "REENGAJAR",
   ]),
   ordemKanban: z.number().optional(),
   motivoPerda: z.string().optional(),
   dataFechamento: z.string().optional(), // YYYY-MM-DD, obrigatório no front para fechamentos
+  proximoContato: z.string().optional(), // YYYY-MM-DD, só relevante quando estagio = FECHADO_PERDIDO
 });
 
 export async function PATCH(request: NextRequest, { params }: { params: { id: string } }) {
@@ -29,7 +31,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     requirePermission(payload.role, "leads:update");
 
     const body = await request.json();
-    const { estagio, ordemKanban, motivoPerda, dataFechamento } = moverSchema.parse(body);
+    const { estagio, ordemKanban, motivoPerda, dataFechamento, proximoContato } = moverSchema.parse(body);
 
     if ((estagio === "FECHADO_PERDIDO" || estagio === "FECHADO_GANHO") && !dataFechamento) {
       return NextResponse.json({ error: "Data de fechamento é obrigatória" }, { status: 400 });
@@ -45,6 +47,11 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
         estagio,
         ordemKanban: ordemKanban ?? old.ordemKanban,
         motivoPerda: motivoPerda ?? old.motivoPerda,
+        // proximoContato só faz sentido enquanto o lead está cancelado; qualquer
+        // outra transição de estágio limpa o agendamento de reengajamento.
+        proximoContato: estagio === "FECHADO_PERDIDO"
+          ? (proximoContato ? new Date(`${proximoContato}T12:00:00`) : null)
+          : null,
         dataFechamento: isFechamento
           ? dataFechamento
             ? new Date(`${dataFechamento}T12:00:00`)

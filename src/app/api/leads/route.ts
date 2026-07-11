@@ -4,6 +4,7 @@ import { requirePermission, buildWhereClause } from "@/lib/rbac";
 import { createAuditLog } from "@/lib/audit";
 import prisma from "@/lib/prisma";
 import { leadSchema } from "@/lib/validators/lead";
+import { promoverLeadsParaReengajar } from "@/lib/leads";
 
 export const dynamic = "force-dynamic";
 
@@ -12,6 +13,8 @@ export async function GET(request: NextRequest) {
     const payload = await getCurrentUser(request);
     if (!payload) return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
     requirePermission(payload.role, "leads:read");
+
+    await promoverLeadsParaReengajar();
 
     const { searchParams } = new URL(request.url);
     const estagio = searchParams.get("estagio") || undefined;

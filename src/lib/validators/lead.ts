@@ -13,6 +13,7 @@ export const leadSchema = z.object({
       "NEGOCIACAO",
       "FECHADO_GANHO",
       "FECHADO_PERDIDO",
+      "REENGAJAR",
     ])
     .default("NOVO_LEAD"),
   valorEstimado: z.number().min(0).optional(),

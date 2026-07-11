@@ -118,6 +118,7 @@ export const ESTAGIO_LABELS: Record<string, string> = {
   NEGOCIACAO: "Negociação",
   FECHADO_GANHO: "Fechado Ganho",
   FECHADO_PERDIDO: "Fechado Perdido",
+  REENGAJAR: "Entrar em Contato Novamente",
 };
 
 export const STATUS_OPO_LABELS: Record<string, string> = {

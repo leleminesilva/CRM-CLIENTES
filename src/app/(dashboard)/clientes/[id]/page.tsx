@@ -42,7 +42,7 @@ import { formatCurrency, formatCPFCNPJ, formatPhone, ORIGEM_LABELS, PORTE_LABELS
 import { cn } from "@/lib/utils/cn";
 import type { Cliente } from "@/types";
 
-type EstagioLead = "NOVO_LEAD" | "CONTATO_INICIAL" | "PRIMEIRO_ORCAMENTO" | "QUALIFICACAO" | "PROPOSTA_ENVIADA" | "NEGOCIACAO" | "FECHADO_GANHO" | "FECHADO_PERDIDO";
+type EstagioLead = "NOVO_LEAD" | "CONTATO_INICIAL" | "PRIMEIRO_ORCAMENTO" | "QUALIFICACAO" | "PROPOSTA_ENVIADA" | "NEGOCIACAO" | "FECHADO_GANHO" | "FECHADO_PERDIDO" | "REENGAJAR";
 
 const ETAPAS: { estagio: EstagioLead; label: string; icon: React.ElementType }[] = [
   { estagio: "NOVO_LEAD",           label: "Entrar em Contato",   icon: PhoneCall },
@@ -80,6 +80,8 @@ function PipelineTracker({
   const [motivoCategoria, setMotivoCategoria] = useState("");
   const [motivoCancelamento, setMotivoCancelamento] = useState("");
   const [dataCancelamento, setDataCancelamento] = useState(hoje);
+  const [reengajar, setReengajar] = useState(false);
+  const [proximoContato, setProximoContato] = useState("");
 
   // Dialog Primeiro Orçamento / Orçamento Final
   const [orcDialog, setOrcDialog] = useState(false);
@@ -96,14 +98,15 @@ function PipelineTracker({
   const MOTIVOS_CANCELAMENTO = ["Prazo", "Preço", "Distância", "Não Realizamos", "Outros"];
 
   const mutation = useMutation({
-    mutationFn: async ({ novoEstagio, motivoPerda, dataFechamento, clientePatch }: {
+    mutationFn: async ({ novoEstagio, motivoPerda, dataFechamento, proximoContato, clientePatch }: {
       novoEstagio: EstagioLead;
       motivoPerda?: string;
       dataFechamento?: string;
+      proximoContato?: string;
       clientePatch?: Record<string, unknown>;
     }) => {
       await (leadId
-        ? axios.patch(`/api/leads/${leadId}/mover`, { estagio: novoEstagio, motivoPerda, dataFechamento })
+        ? axios.patch(`/api/leads/${leadId}/mover`, { estagio: novoEstagio, motivoPerda, dataFechamento, proximoContato })
         : axios.post("/api/leads", { titulo: clienteNome, estagio: novoEstagio, origem: "OUTROS", clienteId }));
 
       const statusMap: Partial<Record<EstagioLead, string>> = {
@@ -130,14 +133,25 @@ function PipelineTracker({
       toast.error("A observação é obrigatória");
       return;
     }
+    if (reengajar && !proximoContato) {
+      toast.error("Informe a data do próximo contato");
+      return;
+    }
     const motivoPerda = motivoCancelamento.trim()
       ? `${motivoCategoria} — ${motivoCancelamento.trim()}`
       : motivoCategoria;
-    mutation.mutate({ novoEstagio: "FECHADO_PERDIDO", motivoPerda, dataFechamento: dataCancelamento });
+    mutation.mutate({
+      novoEstagio: "FECHADO_PERDIDO",
+      motivoPerda,
+      dataFechamento: dataCancelamento,
+      proximoContato: reengajar ? proximoContato : undefined,
+    });
     setCancelDialog(false);
     setMotivoCategoria("");
     setMotivoCancelamento("");
     setDataCancelamento(new Date().toISOString().slice(0, 10));
+    setReengajar(false);
+    setProximoContato("");
   }
 
   const isFechado = estagio === "FECHADO_GANHO" || estagio === "FECHADO_PERDIDO";
@@ -145,6 +159,12 @@ function PipelineTracker({
 
   return (
     <>
+      {estagio === "REENGAJAR" && (
+        <div className="bg-purple-500/10 border border-purple-500/40 rounded-xl p-4 flex items-center gap-2 text-purple-500">
+          <Bell className="w-4 h-4 shrink-0" />
+          <p className="text-sm font-medium">Entrar em Contato Novamente — a data de reengajamento chegou</p>
+        </div>
+      )}
       <div className="bg-card border rounded-xl p-4">
         <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-3">Processo de Venda</p>
         <div className="flex items-center gap-1 flex-wrap">
@@ -218,7 +238,7 @@ function PipelineTracker({
         </div>
       </div>
 
-      <Dialog open={cancelDialog} onOpenChange={(open) => { setCancelDialog(open); if (!open) { setMotivoCategoria(""); setMotivoCancelamento(""); } }}>
+      <Dialog open={cancelDialog} onOpenChange={(open) => { setCancelDialog(open); if (!open) { setMotivoCategoria(""); setMotivoCancelamento(""); setReengajar(false); setProximoContato(""); } }}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-red-500">
@@ -266,14 +286,40 @@ function PipelineTracker({
                 className={motivoCategoria && !motivoCancelamento.trim() ? "border-red-400 focus-visible:ring-red-400" : ""}
               />
             </div>
+            <div className="space-y-2 border-t pt-3">
+              <label className="flex items-center gap-2 text-sm font-medium cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={reengajar}
+                  onChange={(e) => setReengajar(e.target.checked)}
+                  className="w-4 h-4 accent-purple-600"
+                />
+                Entrar em contato novamente
+              </label>
+              {reengajar && (
+                <div className="space-y-1.5 pl-6">
+                  <p className="text-xs text-muted-foreground">Data do próximo contato <span className="text-red-500">*</span></p>
+                  <input
+                    type="date"
+                    value={proximoContato}
+                    min={new Date().toISOString().slice(0, 10)}
+                    onChange={(e) => setProximoContato(e.target.value)}
+                    className={`w-full h-9 rounded-md border px-3 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring ${!proximoContato ? "border-red-400" : "border-input"}`}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Ao chegar essa data, o cliente volta ao topo da lista em roxo, na etapa &quot;Entrar em Contato Novamente&quot;.
+                  </p>
+                </div>
+              )}
+            </div>
           </div>
           <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => { setCancelDialog(false); setMotivoCategoria(""); setMotivoCancelamento(""); }}>
+            <Button variant="outline" onClick={() => { setCancelDialog(false); setMotivoCategoria(""); setMotivoCancelamento(""); setReengajar(false); setProximoContato(""); }}>
               Voltar
             </Button>
             <Button
               variant="destructive"
-              disabled={!dataCancelamento || !motivoCategoria || !motivoCancelamento.trim() || mutation.isPending}
+              disabled={!dataCancelamento || !motivoCategoria || !motivoCancelamento.trim() || (reengajar && !proximoContato) || mutation.isPending}
               onClick={confirmarCancelamento}
             >
               Confirmar cancelamento

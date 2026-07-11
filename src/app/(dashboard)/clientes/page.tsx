@@ -66,6 +66,7 @@ const TEMP_CONFIG: Record<string, { label: string; color: string; icon: string }
 };
 
 const ETAPA_CONFIG: Record<string, { label: string; color: string }> = {
+  REENGAJAR:        { label: "Entrar em Contato Novamente", color: "bg-purple-500/15 text-purple-400 border-purple-500/30" },
   NOVO_LEAD:        { label: "Entrar em Contato",  color: "bg-red-500/15 text-red-400 border-red-500/30" },
   CONTATO_INICIAL:     { label: "Contato Feito",       color: "bg-blue-500/15 text-blue-400 border-blue-500/30" },
   PRIMEIRO_ORCAMENTO: { label: "Primeiro Orçamento",  color: "bg-indigo-500/15 text-indigo-400 border-indigo-500/30" },
@@ -189,6 +190,7 @@ export default function ClientesPage() {
   });
 
   const ESTAGIO_ORDER: Record<string, number> = {
+    REENGAJAR: -1,
     NOVO_LEAD: 0, CONTATO_INICIAL: 1, PRIMEIRO_ORCAMENTO: 2, QUALIFICACAO: 3,
     PROPOSTA_ENVIADA: 4, NEGOCIACAO: 5, FECHADO_GANHO: 6, FECHADO_PERDIDO: 7,
   };

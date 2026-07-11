@@ -48,6 +48,7 @@ enum EstagioLead {
   NEGOCIACAO
   FECHADO_GANHO
   FECHADO_PERDIDO
+  REENGAJAR
 }
 
 enum Temperatura {
@@ -279,6 +280,7 @@ model Lead {
   contatoId      String?
   dataFechamento DateTime?
   motivoPerda    String?
+  proximoContato DateTime?
   deletedAt      DateTime?
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt

@@ -27,6 +27,7 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip as RechartTooltip,
+  Legend,
   ResponsiveContainer,
   PieChart,
   Pie,
@@ -165,6 +166,7 @@ export default function DashboardPage() {
   const leadsPorOrigem = data?.leadsPorOrigem || [];
   const vendasPorOrigem = data?.vendasPorOrigem || [];
   const vendasPorVendedor = data?.vendasPorVendedor || [];
+  const vendedorNomes: string[] = data?.vendedorNomes || [];
   const servicosMaisSolicitados: Array<{ servico: string; total: number }> = data?.servicosMaisSolicitados || [];
 
   // Meta é R$100k/mês por vendedor — soma só quem tem venda no período (aparece em
@@ -369,24 +371,39 @@ export default function DashboardPage() {
           <CardContent>
             {(() => {
               const META_MES = metaMes;
-              const acumulado: Array<{ dia: string; valor: number; acumulado: number }> = [];
-              (vendasMes as Array<{ dia: string; valor: number }>).forEach((item, i) => {
-                const prev = i > 0 ? acumulado[i - 1].acumulado : 0;
-                acumulado.push({ dia: item.dia, valor: item.valor, acumulado: prev + item.valor });
+              // Acumulado do total (vermelho) e de cada vendedor (cor correspondente à barra
+              // dele em "Performance por Vendedor") — cada linha soma dia a dia separadamente.
+              const acumulado: Array<Record<string, string | number>> = [];
+              (vendasMes as Array<Record<string, string | number>>).forEach((item, i) => {
+                const linha: Record<string, string | number> = { dia: item.dia as string };
+                const prevTotal = i > 0 ? (acumulado[i - 1].total as number) : 0;
+                linha.total = prevTotal + Number(item.total || 0);
+                for (const nome of vendedorNomes) {
+                  const prevNome = i > 0 ? Number(acumulado[i - 1][nome] || 0) : 0;
+                  linha[nome] = prevNome + Number(item[nome] || 0);
+                }
+                acumulado.push(linha);
               });
               return acumulado.length > 0 ? (
-                <ResponsiveContainer width="100%" height={200}>
+                <ResponsiveContainer width="100%" height={220}>
                   <LineChart data={acumulado} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.6} />
                     <XAxis dataKey="dia" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} />
-                    <YAxis tickFormatter={(v: number) => `${(v / 1000).toFixed(0)}k`} tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} domain={[0, Math.max(META_MES, ...acumulado.map(d => d.acumulado)) * 1.1]} width={36} />
+                    <YAxis tickFormatter={(v: number) => `${(v / 1000).toFixed(0)}k`} tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} domain={[0, Math.max(META_MES, ...acumulado.map(d => Number(d.total))) * 1.1]} width={36} />
                     <RechartTooltip
-                      formatter={(v: number, name: string) => [formatCurrency(v), name === "acumulado" ? "Acumulado" : "No dia"]}
+                      formatter={(v: number, name: string) => [formatCurrency(v), name]}
                       labelFormatter={(l) => `Dia ${l}`}
                       contentStyle={{ borderRadius: "8px", border: "1px solid hsl(var(--border))", backgroundColor: "hsl(var(--card))", color: "hsl(var(--card-foreground))" }}
                     />
+                    {vendedorNomes.length > 0 && <Legend wrapperStyle={{ fontSize: 11 }} />}
                     <ReferenceLine y={META_MES} stroke="#f59e0b" strokeDasharray="5 3" strokeWidth={1.5} label={{ value: `Meta ${(META_MES / 1000).toFixed(0)}k`, position: "insideTopRight", fontSize: 11, fill: "#f59e0b" }} />
-                    <Line type="monotone" dataKey="acumulado" stroke="#6366f1" strokeWidth={3} dot={{ fill: "#6366f1", r: 5, strokeWidth: 2, stroke: "#fff" }} activeDot={{ r: 7, stroke: "#6366f1", strokeWidth: 2, fill: "#fff" }} />
+                    <Line type="monotone" dataKey="total" name="Total" stroke="#ef4444" strokeWidth={3} dot={{ fill: "#ef4444", r: 5, strokeWidth: 2, stroke: "#fff" }} activeDot={{ r: 7, stroke: "#ef4444", strokeWidth: 2, fill: "#fff" }} />
+                    {vendedorNomes.map((nome, i) => {
+                      const cor = VENDOR_COLORS[i % VENDOR_COLORS.length];
+                      return (
+                        <Line key={nome} type="monotone" dataKey={nome} name={nome} stroke={cor} strokeWidth={2} dot={{ fill: cor, r: 3, strokeWidth: 1, stroke: "#fff" }} activeDot={{ r: 5, stroke: cor, strokeWidth: 2, fill: "#fff" }} />
+                      );
+                    })}
                   </LineChart>
                 </ResponsiveContainer>
               ) : (

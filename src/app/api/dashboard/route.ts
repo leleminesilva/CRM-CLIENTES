@@ -296,6 +296,41 @@ export async function GET(request: NextRequest) {
       `
     );
 
+    // Vendas por dia, por vendedor — só dos vendedores que já aparecem em "Performance por
+    // Vendedor" (top 5), pra desenhar uma linha individual de cada um no mesmo gráfico.
+    let vendasMesPorVendedor: Array<{ dia: string; responsavelId: string; valor: number }> = [];
+    if (vendedorIds.length > 0) {
+      vendasMesPorVendedor = await prisma.$queryRaw<Array<{ dia: string; data_ord: Date; responsavelId: string; valor: number }>>(
+        Prisma.sql`
+          SELECT
+            TO_CHAR(l."dataFechamento", 'DD/MM') AS dia,
+            DATE(l."dataFechamento") AS data_ord,
+            l."responsavelId",
+            COALESCE(SUM(COALESCE(c."valorOrcamento", l."valorEstimado")), 0)::float AS valor
+          FROM leads l
+          LEFT JOIN clientes c ON l."clienteId" = c.id AND c."deletedAt" IS NULL
+          WHERE l."deletedAt" IS NULL
+            AND l.estagio = 'FECHADO_GANHO'::"EstagioLead"
+            AND l."dataFechamento" >= ${de}
+            AND l."dataFechamento" <= ${ate}
+            AND l."responsavelId" IN (${Prisma.join(vendedorIds)})
+            AND (l."clienteId" IS NULL OR c.id IS NOT NULL)
+          GROUP BY TO_CHAR(l."dataFechamento", 'DD/MM'), DATE(l."dataFechamento"), l."responsavelId"
+          ORDER BY data_ord
+        `
+      );
+    }
+
+    // Pivota pra um formato largo (uma coluna por vendedor) — o que o gráfico de linhas espera
+    const vendasMesComVendedores = vendasMesRaw.map((dia) => {
+      const linha: Record<string, string | number> = { dia: dia.dia, total: Number(dia.valor) };
+      for (const v of vendedores) {
+        const registro = vendasMesPorVendedor.find((x) => x.dia === dia.dia && x.responsavelId === v.id);
+        linha[v.nome] = registro ? Number(registro.valor) : 0;
+      }
+      return linha;
+    });
+
     return NextResponse.json({
       data: {
         kpis: {
@@ -311,7 +346,10 @@ export async function GET(request: NextRequest) {
           canceladosPeriodo,
           canceladosValor,
         },
-        vendasMes:         vendasMesRaw,
+        vendasMes:         vendasMesComVendedores,
+        // Mesma ordem de vendasPorVendedor (por valor desc) — garante que a cor de cada
+        // linha aqui bata com a cor da barra dele em "Performance por Vendedor"
+        vendedorNomes:     vendasPorVendedor.map((v) => v.vendedor),
         leadsPorOrigem:    leadsPorOrigem.map((l) => ({ origem: l.origem, total: l._count._all })),
         vendasPorOrigem:   vendasPorOrigem.map((l) => ({ origem: l.origem, total: l._count._all })),
         vendasPorVendedor,

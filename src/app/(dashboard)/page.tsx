@@ -175,7 +175,7 @@ export default function DashboardPage() {
   const kpis = data?.kpis || {};
   const funil = data?.funil || [];
   const vendasMes = Array.isArray(data?.vendasMes) ? data.vendasMes : [];
-  const leadsPorOrigem = data?.leadsPorOrigem || [];
+  const vendasPorOrigem = data?.vendasPorOrigem || [];
   const vendasPorVendedor = data?.vendasPorVendedor || [];
   const servicosMaisSolicitados: Array<{ servico: string; total: number }> = data?.servicosMaisSolicitados || [];
 
@@ -451,18 +451,18 @@ export default function DashboardPage() {
 
       {/* Charts Row 2 */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Origem dos Leads */}
+        {/* Origem das Vendas — só leads fechados ganhos, não todos os leads */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Origem dos Leads</CardTitle>
+            <CardTitle className="text-base">Origem das Vendas</CardTitle>
           </CardHeader>
           <CardContent>
-            {leadsPorOrigem.length > 0 ? (
+            {vendasPorOrigem.length > 0 ? (
               <div className="flex flex-col sm:flex-row items-center gap-4">
                 <ResponsiveContainer width="100%" height={160} className="max-w-[180px] shrink-0">
                   <PieChart>
-                    <Pie data={leadsPorOrigem} cx="50%" cy="50%" innerRadius={45} outerRadius={70} dataKey="total" nameKey="origem" paddingAngle={3}>
-                      {leadsPorOrigem.map((_: unknown, index: number) => (
+                    <Pie data={vendasPorOrigem} cx="50%" cy="50%" innerRadius={45} outerRadius={70} dataKey="total" nameKey="origem" paddingAngle={3}>
+                      {vendasPorOrigem.map((_: unknown, index: number) => (
                         <Cell key={index} fill={PIE_COLORS[index % PIE_COLORS.length]} />
                       ))}
                     </Pie>
@@ -472,7 +472,7 @@ export default function DashboardPage() {
                   </PieChart>
                 </ResponsiveContainer>
                 <div className="flex-1 w-full space-y-2">
-                  {leadsPorOrigem.map((l: { origem: string; total: number }, i: number) => (
+                  {vendasPorOrigem.map((l: { origem: string; total: number }, i: number) => (
                     <div key={l.origem} className="flex items-center justify-between text-sm">
                       <div className="flex items-center gap-2">
                         <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: PIE_COLORS[i % PIE_COLORS.length] }} />
@@ -485,7 +485,7 @@ export default function DashboardPage() {
               </div>
             ) : (
               <div className="flex items-center justify-center h-40 text-muted-foreground">
-                Sem dados para exibir
+                Sem vendas fechadas no período
               </div>
             )}
           </CardContent>

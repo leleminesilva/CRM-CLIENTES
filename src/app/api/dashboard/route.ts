@@ -62,7 +62,7 @@ export async function GET(request: NextRequest) {
       totalClientes,
       leadsAtivos,
       funnelData,
-      leadsPorOrigem,
+      vendasPorOrigem,
       leadsGanhosPeriodo,
       valorNegociacaoAtual,
       receitaFechadaPeriodo,
@@ -104,12 +104,14 @@ export async function GET(request: NextRequest) {
         `
       ),
 
-      // Leads por origem no período
+      // Origem das vendas fechadas no período (só leads FECHADO_GANHO, pelo dataFechamento —
+      // mesmo critério usado em "Vendas Fechadas"/"Receita Fechada" nesse dashboard)
       prisma.lead.groupBy({
         by: ["origem"],
         where: {
           deletedAt: null,
-          createdAt: { gte: de, lte: ate },
+          estagio: "FECHADO_GANHO",
+          dataFechamento: { gte: de, lte: ate },
           OR: [{ clienteId: null }, { cliente: { deletedAt: null } }],
           ...userFilter,
         },
@@ -323,7 +325,7 @@ export async function GET(request: NextRequest) {
         },
         funil:             funnelFormatted,
         vendasMes:         vendasMesRaw,
-        leadsPorOrigem:    leadsPorOrigem.map((l) => ({ origem: l.origem, total: l._count._all })),
+        vendasPorOrigem:   vendasPorOrigem.map((l) => ({ origem: l.origem, total: l._count._all })),
         vendasPorVendedor,
         servicosMaisSolicitados,
       },

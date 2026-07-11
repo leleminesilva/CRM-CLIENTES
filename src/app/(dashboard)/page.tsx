@@ -167,6 +167,12 @@ export default function DashboardPage() {
   const vendasPorVendedor = data?.vendasPorVendedor || [];
   const servicosMaisSolicitados: Array<{ servico: string; total: number }> = data?.servicosMaisSolicitados || [];
 
+  // Meta é R$100k/mês por vendedor. Olhando "Todos os vendedores", soma a meta de cada
+  // vendedor ativo; filtrando por 1 pessoa específica (ou pra quem não é gestor, que só
+  // enxerga a própria meta) volta a ser individual.
+  const totalVendedoresAtivos = Math.max(vendedoresData?.length || 0, 1);
+  const metaMes = isGestor && !vendedorId ? 100000 * totalVendedoresAtivos : 100000;
+
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Header com filtros */}
@@ -349,17 +355,19 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        {/* Vendas por Dia — acumulado vs meta */}
+        {/* Vendas por Dia — acumulado vs meta. Meta é por vendedor (R$100k/mês cada); ao ver
+            "Todos os vendedores" soma a meta de cada um ativo, ao filtrar por 1 pessoa (ou
+            pra quem não é gestor, que só vê a própria meta) volta a ser individual. */}
         <Card>
           <CardHeader>
             <div className="flex items-center justify-between">
               <CardTitle className="text-base">Vendas por Dia</CardTitle>
-              <span className="text-xs text-amber-500 font-medium">Meta: {formatCurrency(100000)}/mês</span>
+              <span className="text-xs text-amber-500 font-medium">Meta: {formatCurrency(metaMes)}/mês</span>
             </div>
           </CardHeader>
           <CardContent>
             {(() => {
-              const META_MES = 100000;
+              const META_MES = metaMes;
               const acumulado: Array<{ dia: string; valor: number; acumulado: number }> = [];
               (vendasMes as Array<{ dia: string; valor: number }>).forEach((item, i) => {
                 const prev = i > 0 ? acumulado[i - 1].acumulado : 0;
@@ -376,7 +384,7 @@ export default function DashboardPage() {
                       labelFormatter={(l) => `Dia ${l}`}
                       contentStyle={{ borderRadius: "8px", border: "1px solid hsl(var(--border))", backgroundColor: "hsl(var(--card))", color: "hsl(var(--card-foreground))" }}
                     />
-                    <ReferenceLine y={META_MES} stroke="#f59e0b" strokeDasharray="5 3" strokeWidth={1.5} label={{ value: "Meta 100k", position: "insideTopRight", fontSize: 11, fill: "#f59e0b" }} />
+                    <ReferenceLine y={META_MES} stroke="#f59e0b" strokeDasharray="5 3" strokeWidth={1.5} label={{ value: `Meta ${(META_MES / 1000).toFixed(0)}k`, position: "insideTopRight", fontSize: 11, fill: "#f59e0b" }} />
                     <Line type="monotone" dataKey="acumulado" stroke="#6366f1" strokeWidth={3} dot={{ fill: "#6366f1", r: 5, strokeWidth: 2, stroke: "#fff" }} activeDot={{ r: 7, stroke: "#6366f1", strokeWidth: 2, fill: "#fff" }} />
                   </LineChart>
                 </ResponsiveContainer>

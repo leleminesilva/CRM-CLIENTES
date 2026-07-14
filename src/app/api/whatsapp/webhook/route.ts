@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { findClienteByPhone } from "@/lib/utils/phone";
+import { findClienteByPhone, normalizeWhatsAppPhone } from "@/lib/utils/phone";
 import { processarAgenteWhatsApp } from "@/lib/whatsapp/agent";
 
 export const dynamic = "force-dynamic";
@@ -39,7 +39,7 @@ export async function POST(request: NextRequest) {
         if (!instancia) continue;
 
         for (const msg of value.messages) {
-          const fromPhone = msg.from as string;
+          const fromPhone = normalizeWhatsAppPhone(msg.from as string);
           const waId = msg.id as string;
           const tipo = msg.type as string;
 

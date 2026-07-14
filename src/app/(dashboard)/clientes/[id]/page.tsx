@@ -65,12 +65,13 @@ function parseBRL(raw: string): number {
 }
 
 function PipelineTracker({
-  leadId, clienteId, clienteNome, estagio, onUpdate,
+  leadId, clienteId, clienteNome, estagio, numeroOrcamentoAtual, onUpdate,
 }: {
   leadId: string | null;
   clienteId: string;
   clienteNome: string;
   estagio: EstagioLead;
+  numeroOrcamentoAtual?: string | null;
   onUpdate: () => void;
 }) {
   const hoje = new Date().toISOString().slice(0, 10);
@@ -92,6 +93,7 @@ function PipelineTracker({
 
   // Dialog Confirmado (FECHADO_GANHO)
   const [confDialog, setConfDialog] = useState(false);
+  const [confNumero, setConfNumero] = useState("");
   const [confValor, setConfValor] = useState("");
   const [confData, setConfData] = useState(hoje);
 
@@ -211,7 +213,7 @@ function PipelineTracker({
           <button
             type="button"
             disabled={mutation.isPending}
-            onClick={() => { setConfValor(""); setConfData(hoje); setConfDialog(true); }}
+            onClick={() => { setConfNumero(numeroOrcamentoAtual || ""); setConfValor(""); setConfData(hoje); setConfDialog(true); }}
             className={cn(
               "flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all border",
               estagio === "FECHADO_GANHO"
@@ -411,6 +413,15 @@ function PipelineTracker({
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="space-y-1.5">
+              <p className="text-sm font-medium">Número do Orçamento <span className="text-red-500">*</span></p>
+              <input
+                value={confNumero}
+                onChange={(e) => setConfNumero(e.target.value)}
+                placeholder="Ex: 11241"
+                className={`w-full h-9 rounded-md border px-3 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring ${!confNumero ? "border-red-400" : "border-input"}`}
+              />
+            </div>
+            <div className="space-y-1.5">
               <p className="text-sm font-medium">Valor (R$) <span className="text-red-500">*</span></p>
               <input
                 type="text"
@@ -436,12 +447,12 @@ function PipelineTracker({
             <Button variant="outline" onClick={() => setConfDialog(false)}>Voltar</Button>
             <Button
               className="bg-emerald-600 hover:bg-emerald-700"
-              disabled={!confValor || isNaN(parseBRL(confValor)) || !confData || mutation.isPending}
+              disabled={!confNumero || !confValor || isNaN(parseBRL(confValor)) || !confData || mutation.isPending}
               onClick={() => {
                 mutation.mutate({
                   novoEstagio: "FECHADO_GANHO",
                   dataFechamento: confData,
-                  clientePatch: { valorOrcamento: parseBRL(confValor), dataVenda: confData },
+                  clientePatch: { numeroOrcamento: confNumero, valorOrcamento: parseBRL(confValor), dataVenda: confData },
                 });
                 setConfDialog(false);
               }}
@@ -844,6 +855,7 @@ export default function ClienteDetalhePage() {
         clienteId={id}
         clienteNome={cliente.nome}
         estagio={(cliente.leads?.[0]?.estagio as EstagioLead) ?? "NOVO_LEAD"}
+        numeroOrcamentoAtual={cliente.numeroOrcamento}
         onUpdate={() => qc.invalidateQueries({ queryKey: ["cliente", id] })}
       />
 

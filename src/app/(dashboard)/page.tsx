@@ -425,9 +425,9 @@ export default function DashboardPage() {
           {vendasPorVendedor.length > 0 ? (
             <div className="space-y-4">
               {vendasPorVendedor.map((v: { vendedor: string; total: number; valor: number }, i: number) => {
-                const max = Math.max(...vendasPorVendedor.map((x: { valor: number }) => x.valor));
-                const pct = max > 0 ? (v.valor / max) * 100 : 0;
-                const barColor = VENDOR_COLORS[i % VENDOR_COLORS.length];
+                const metaIndividual = 100000;
+                const pct = metaIndividual > 0 ? (v.valor / metaIndividual) * 100 : 0;
+                const barColor = pct >= 100 ? "#10b981" : VENDOR_COLORS[i % VENDOR_COLORS.length];
                 return (
                   <div key={v.vendedor} className="space-y-2">
                     <div className="flex justify-between text-sm">
@@ -438,12 +438,15 @@ export default function DashboardPage() {
                       <div className="text-right">
                         <span className="text-muted-foreground text-xs">{v.total} {v.total === 1 ? "venda" : "vendas"}</span>
                         <span className="ml-2 font-bold">{formatCurrency(v.valor)}</span>
+                        <span className="ml-2 font-semibold text-xs" style={{ color: barColor }}>
+                          {pct.toFixed(0)}%
+                        </span>
                       </div>
                     </div>
                     <div className="h-3 bg-muted/60 rounded-full overflow-hidden">
                       <div
                         className="h-full rounded-full transition-all duration-500"
-                        style={{ width: `${Math.max(pct, 1)}%`, backgroundColor: barColor }}
+                        style={{ width: `${Math.min(Math.max(pct, 1), 100)}%`, backgroundColor: barColor }}
                       />
                     </div>
                   </div>

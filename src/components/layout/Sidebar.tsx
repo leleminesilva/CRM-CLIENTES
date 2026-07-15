@@ -5,8 +5,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard, Users,
-  CheckSquare, Calendar, BarChart3, UserCog,
-  Settings, ChevronLeft, ChevronRight, Shield, X, MessageCircle, MessageSquare,
+  CheckSquare, Calendar, BarChart3, UserCog, Search,
+  Settings, ChevronLeft, ChevronRight, Shield, X, MessageCircle, MessageSquare, Bell,
 } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { Logo } from "@/components/Logo";
@@ -29,11 +29,13 @@ const navItems: { href: string; label: string; icon: React.ElementType; roles?: 
   { href: "/agenda",     label: "Agenda",     icon: Calendar },
   { href: "/chat",       label: "Chat",       icon: MessageSquare },
   { href: "/whatsapp",   label: "WhatsApp",   icon: MessageCircle, roles: ["ADMINISTRADOR", "DESENVOLVEDOR"] },
+  { href: "/pesquisa",   label: "Pesquisa",   icon: Search },
 ];
 
 const bottomNavItems: { href: string; label: string; icon: React.ElementType; roles?: Role[] }[] = [
   { href: "/relatorios",    label: "Relatórios",   icon: BarChart3, roles: ["ADMINISTRADOR", "DESENVOLVEDOR", "GESTOR"] },
   { href: "/usuarios",      label: "Usuários",     icon: UserCog,   roles: ["ADMINISTRADOR", "DESENVOLVEDOR"] },
+  { href: "/alerta",        label: "Alerta",       icon: Bell,      roles: ["ADMINISTRADOR", "DESENVOLVEDOR"] },
   { href: "/auditoria",     label: "Auditoria",    icon: Shield,    roles: ["ADMINISTRADOR", "DESENVOLVEDOR"] },
   { href: "/configuracoes", label: "Configurações",icon: Settings },
 ];

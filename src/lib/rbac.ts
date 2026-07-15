@@ -3,6 +3,7 @@ import type { Role } from "@/types";
 type Permission =
   | "dashboard:view"
   | "dashboard:view_all"
+  | "pesquisa:view"
   | "clientes:read"
   | "clientes:create"
   | "clientes:update"
@@ -44,6 +45,7 @@ type Permission =
 const ADMIN_PERMISSIONS: Permission[] = [
   "dashboard:view",
   "dashboard:view_all",
+  "pesquisa:view",
   "clientes:read",
   "clientes:create",
   "clientes:update",
@@ -88,6 +90,7 @@ const PERMISSIONS: Record<Role, Permission[]> = {
   GESTOR: [
     "dashboard:view",
     "dashboard:view_all",
+    "pesquisa:view",
     "clientes:read",
     "clientes:create",
     "clientes:update",
@@ -121,6 +124,7 @@ const PERMISSIONS: Record<Role, Permission[]> = {
   ],
   COMERCIAL: [
     "dashboard:view",
+    "pesquisa:view",
     "clientes:read",
     "clientes:create",
     "clientes:update",
@@ -143,6 +147,7 @@ const PERMISSIONS: Record<Role, Permission[]> = {
   ],
   OPERACIONAL: [
     "dashboard:view",
+    "pesquisa:view",
     "leads:read",
     "oportunidades:read",
     "empresas:read",

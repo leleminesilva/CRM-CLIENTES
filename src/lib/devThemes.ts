@@ -1,4 +1,10 @@
-export type DevThemeId = "vidro-luz" | "painel-comando" | "editorial-premium";
+export type DevThemeId =
+  | "padrao"
+  | "vidro-luz"
+  | "painel-comando"
+  | "editorial-premium"
+  | "blueprint"
+  | "aco-cobre";
 
 export interface DevTheme {
   id: DevThemeId;
@@ -35,6 +41,39 @@ export interface DevTheme {
 }
 
 export const DEV_THEMES: Record<DevThemeId, DevTheme> = {
+  // Não sobrescreve nenhuma variável global — é o visual atual do CRM,
+  // igual pros outros cargos. Serve pra voltar ao normal com 1 clique.
+  padrao: {
+    id: "padrao",
+    label: "Padrão",
+    tagline: "O visual atual do CRM — o mesmo que os outros cargos usam",
+    emoji: "⚪️",
+    fontVar: "inherit",
+    fontMono: false,
+    cardFacet: false,
+    cardBlur: false,
+    eyebrow: "",
+    sidebarBg: "#0a0e17",
+    sidebarBorder: "rgba(255,255,255,0.08)",
+    navActiveBg: "rgba(99,102,241,0.18)",
+    navIndicator: "#6366f1",
+    navHoverBg: "rgba(255,255,255,0.04)",
+    text: "#e5e7eb",
+    muted: "#9ca3af",
+    topbarBg: "rgba(10,14,23,0.9)",
+    avatarBg: "#4f46e5",
+    roleColor: "#818cf8",
+    pageBg: "#0a0e17",
+    cardBg: "#111624",
+    cardBorder: "rgba(255,255,255,0.08)",
+    eyebrowColor: "#818cf8",
+    totalLineColor: "#ef4444",
+    pieColors: ["#6366f1", "#8b5cf6", "#ec4899", "#f59e0b", "#10b981", "#3b82f6"],
+    vendorColors: ["#6366f1", "#10b981", "#f59e0b", "#3b82f6", "#f97316", "#ec4899"],
+    serviceColors: ["#6366f1", "#3b82f6", "#10b981", "#f59e0b", "#f97316", "#ec4899", "#8b5cf6", "#14b8a6"],
+    kpiAccentDefault: "#6366f1",
+  },
+
   "vidro-luz": {
     id: "vidro-luz",
     label: "Vidro & Luz",
@@ -144,7 +183,76 @@ export const DEV_THEMES: Record<DevThemeId, DevTheme> = {
     serviceColors: ["#c9a86a", "#8fa583", "#9c5b4a", "#6b8caf", "#a67c52", "#7d8471", "#b08968", "#5f7161"],
     kpiAccentDefault: "#c9a86a",
   },
+
+  // Planta técnica — mede-se vidro em milímetros, e um projeto de vidraçaria
+  // sempre passa por uma prancha de desenho técnico antes de virar peça.
+  blueprint: {
+    id: "blueprint",
+    label: "Blueprint",
+    tagline: "Prancheta de projeto — grade técnica e linhas de cota em ciano",
+    emoji: "📐",
+    fontVar: "var(--font-dev-mono)",
+    fontMono: true,
+    cardFacet: false,
+    cardBlur: false,
+    eyebrow: "ESC 1:1 · vista técnica",
+    sidebarBg: "#0a1f33",
+    sidebarBorder: "rgba(224,242,255,0.14)",
+    navActiveBg: "rgba(56,189,248,0.16)",
+    navIndicator: "#38bdf8",
+    navHoverBg: "rgba(224,242,255,0.05)",
+    text: "#e0f2ff",
+    muted: "#7fa8c9",
+    topbarBg: "rgba(10,31,51,0.9)",
+    avatarBg: "#38bdf8",
+    roleColor: "#38bdf8",
+    pageBg: "#081a2b",
+    ambientGlow:
+      "repeating-linear-gradient(0deg, rgba(224,242,255,0.035) 0px, rgba(224,242,255,0.035) 1px, transparent 1px, transparent 32px), " +
+      "repeating-linear-gradient(90deg, rgba(224,242,255,0.035) 0px, rgba(224,242,255,0.035) 1px, transparent 1px, transparent 32px)",
+    cardBg: "#0a1f33",
+    cardBorder: "rgba(224,242,255,0.16)",
+    eyebrowColor: "#38bdf8",
+    totalLineColor: "#38bdf8",
+    pieColors: ["#38bdf8", "#e0f2ff", "#7fa8c9", "#facc15", "#fb923c", "#4ade80"],
+    vendorColors: ["#38bdf8", "#e0f2ff", "#facc15", "#7fa8c9", "#4ade80", "#fb923c"],
+    serviceColors: ["#38bdf8", "#e0f2ff", "#7fa8c9", "#facc15", "#fb923c", "#4ade80", "#c4b5fd", "#f472b6"],
+    kpiAccentDefault: "#38bdf8",
+  },
+
+  // Oficina — o lado industrial da vidraçaria: perfis de alumínio, ferragem
+  // de cobre, chapa escovada. Tipografia condensada e pesada, sem enfeite.
+  "aco-cobre": {
+    id: "aco-cobre",
+    label: "Aço & Cobre",
+    tagline: "Industrial e robusto — perfis de alumínio e ferragem de cobre",
+    emoji: "🔩",
+    fontVar: "var(--font-dev-industrial)",
+    fontMono: false,
+    cardFacet: false,
+    cardBlur: false,
+    eyebrow: "OFICINA · DESENVOLVEDOR",
+    sidebarBg: "#17181a",
+    sidebarBorder: "rgba(201,121,63,0.18)",
+    navActiveBg: "rgba(201,121,63,0.16)",
+    navIndicator: "#c9793f",
+    navHoverBg: "rgba(255,255,255,0.04)",
+    text: "#ece8e3",
+    muted: "#8a8f94",
+    topbarBg: "rgba(23,24,26,0.92)",
+    avatarBg: "#c9793f",
+    roleColor: "#c9793f",
+    pageBg: "#131415",
+    cardBg: "#1b1c1e",
+    cardBorder: "rgba(255,255,255,0.08)",
+    eyebrowColor: "#c9793f",
+    totalLineColor: "#c9793f",
+    pieColors: ["#c9793f", "#8a8f94", "#5a6268", "#d4a24c", "#a1a8ad", "#7a4a2a"],
+    vendorColors: ["#c9793f", "#8a8f94", "#d4a24c", "#5a6268", "#a1a8ad", "#7a4a2a"],
+    serviceColors: ["#c9793f", "#8a8f94", "#5a6268", "#d4a24c", "#a1a8ad", "#7a4a2a", "#e2b877", "#4a4d50"],
+    kpiAccentDefault: "#c9793f",
+  },
 };
 
 export const DEV_THEME_LIST = Object.values(DEV_THEMES);
-export const DEFAULT_DEV_THEME: DevThemeId = "vidro-luz";
+export const DEFAULT_DEV_THEME: DevThemeId = "padrao";

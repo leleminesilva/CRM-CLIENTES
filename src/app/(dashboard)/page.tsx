@@ -118,8 +118,8 @@ export default function DashboardPage() {
   const usandoDataCustom = !!(dataInicio && dataFim);
   const { user } = useAuth();
   const isGestor = user?.role === "ADMINISTRADOR" || user?.role === "DESENVOLVEDOR" || user?.role === "GESTOR";
-  const { isDev, theme: devTheme } = useDevTheme();
-  const activeTheme = isDev ? devTheme : undefined;
+  const { isThemed, theme: devTheme } = useDevTheme();
+  const activeTheme = isThemed ? devTheme : undefined;
 
   const { data: primeiroMesData } = useQuery({
     queryKey: ["dashboard-primeiro-mes"],

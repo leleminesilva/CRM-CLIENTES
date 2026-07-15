@@ -167,8 +167,8 @@ export function Topbar() {
     .join("")
     .toUpperCase();
 
-  const { isDev, theme: devTheme } = useDevTheme();
-  const activeTheme = isDev ? devTheme : undefined;
+  const { isThemed, theme: devTheme } = useDevTheme();
+  const activeTheme = isThemed ? devTheme : undefined;
 
   return (
     <header

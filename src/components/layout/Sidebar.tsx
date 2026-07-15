@@ -256,8 +256,8 @@ function SidebarContent({
 export function Sidebar() {
   const [collapsed, setCollapsed] = useState(false);
   const { mobileOpen, closeMobile } = useSidebar();
-  const { isDev, theme } = useDevTheme();
-  const activeTheme = isDev ? theme : undefined;
+  const { isThemed, theme } = useDevTheme();
+  const activeTheme = isThemed ? theme : undefined;
   const newClientesCount = useNewClientesCount();
   const chatNaoLidas = useChatNaoLidas();
   useDocumentTitleBadge(newClientesCount);

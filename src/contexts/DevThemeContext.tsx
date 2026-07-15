@@ -6,6 +6,10 @@ import { DEV_THEMES, DEFAULT_DEV_THEME, type DevThemeId, type DevTheme } from "@
 
 interface DevThemeContextType {
   isDev: boolean;
+  // isDev = tem o cargo Desenvolvedor. isThemed = isDev E escolheu um layout
+  // diferente de "Padrão" — é essa a flag que os componentes devem checar
+  // antes de aplicar qualquer estilo do tema.
+  isThemed: boolean;
   themeId: DevThemeId;
   theme: DevTheme;
   setThemeId: (id: DevThemeId) => void;
@@ -13,6 +17,7 @@ interface DevThemeContextType {
 
 const DevThemeContext = createContext<DevThemeContextType>({
   isDev: false,
+  isThemed: false,
   themeId: DEFAULT_DEV_THEME,
   theme: DEV_THEMES[DEFAULT_DEV_THEME],
   setThemeId: () => {},
@@ -35,8 +40,10 @@ export function DevThemeProvider({ children }: { children: React.ReactNode }) {
     if (user?.id) localStorage.setItem(`devTheme_${user.id}`, id);
   }
 
+  const isThemed = isDev && themeId !== "padrao";
+
   return (
-    <DevThemeContext.Provider value={{ isDev, themeId, theme: DEV_THEMES[themeId], setThemeId }}>
+    <DevThemeContext.Provider value={{ isDev, isThemed, themeId, theme: DEV_THEMES[themeId], setThemeId }}>
       {children}
     </DevThemeContext.Provider>
   );
@@ -49,9 +56,9 @@ export function useDevTheme() {
 // Marca a árvore com data-dev-theme, que os overrides de variáveis CSS em
 // globals.css usam pra recolorir o app inteiro (não só o Dashboard).
 export function DevThemeRoot({ children, className }: { children: React.ReactNode; className?: string }) {
-  const { isDev, themeId } = useDevTheme();
+  const { isThemed, themeId } = useDevTheme();
   return (
-    <div className={className} data-dev-theme={isDev ? themeId : undefined}>
+    <div className={className} data-dev-theme={isThemed ? themeId : undefined}>
       {children}
     </div>
   );

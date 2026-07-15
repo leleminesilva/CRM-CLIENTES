@@ -11,6 +11,8 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { useAuth } from "@/contexts/AuthContext";
+import { useDevTheme } from "@/contexts/DevThemeContext";
+import { DEV_THEME_LIST } from "@/lib/devThemes";
 import { ROLE_LABELS } from "@/lib/utils/formatters";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
@@ -34,6 +36,7 @@ const NOTIF_OPTIONS: { key: keyof Prefs; label: string; desc: string }[] = [
 export default function ConfiguracoesPage() {
   const { theme, setTheme } = useTheme();
   const { user, refreshUser } = useAuth();
+  const { isDev, themeId, setThemeId } = useDevTheme();
   const qc = useQueryClient();
 
   const [senhaAtual, setSenhaAtual] = useState("");
@@ -311,24 +314,68 @@ export default function ConfiguracoesPage() {
             Aparência
           </CardTitle>
         </CardHeader>
-        <CardContent>
-          <Label className="mb-3 block">Tema</Label>
-          <div className="grid grid-cols-3 gap-3">
-            {themes.map(({ value, label, icon: Icon }) => (
-              <button
-                key={value}
-                onClick={() => setTheme(value)}
-                className={`flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-colors ${
-                  theme === value
-                    ? "border-primary bg-primary/5"
-                    : "border-border hover:border-muted-foreground"
-                }`}
-              >
-                <Icon className="w-5 h-5" />
-                <span className="text-sm font-medium">{label}</span>
-              </button>
-            ))}
+        <CardContent className="space-y-6">
+          <div>
+            <Label className="mb-3 block">Tema</Label>
+            <div className="grid grid-cols-3 gap-3">
+              {themes.map(({ value, label, icon: Icon }) => (
+                <button
+                  key={value}
+                  onClick={() => setTheme(value)}
+                  className={`flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-colors ${
+                    theme === value
+                      ? "border-primary bg-primary/5"
+                      : "border-border hover:border-muted-foreground"
+                  }`}
+                >
+                  <Icon className="w-5 h-5" />
+                  <span className="text-sm font-medium">{label}</span>
+                </button>
+              ))}
+            </div>
           </div>
+
+          {/* Layout do painel — exclusivo do cargo Desenvolvedor */}
+          {isDev && (
+            <div>
+              <div className="flex items-center gap-2 mb-3">
+                <Label className="block">Layout do painel</Label>
+                <span className="text-[10px] font-medium uppercase tracking-wide px-1.5 py-0.5 rounded bg-indigo-500/15 text-indigo-400">
+                  Desenvolvedor
+                </span>
+              </div>
+              <div className="grid sm:grid-cols-3 gap-3">
+                {DEV_THEME_LIST.map((t) => (
+                  <button
+                    key={t.id}
+                    onClick={() => setThemeId(t.id)}
+                    className={`text-left p-4 rounded-xl border-2 transition-colors ${
+                      themeId === t.id
+                        ? "border-primary bg-primary/5"
+                        : "border-border hover:border-muted-foreground"
+                    }`}
+                  >
+                    <div
+                      className="h-12 rounded-lg mb-3 flex items-center justify-center text-lg"
+                      style={{ background: t.pageBg, border: `1px solid ${t.cardBorder}` }}
+                    >
+                      <span
+                        className="w-6 h-6 rounded-full"
+                        style={{ background: t.navIndicator ?? t.totalLineColor }}
+                      />
+                    </div>
+                    <p className="text-sm font-semibold flex items-center gap-1.5">
+                      <span>{t.emoji}</span> {t.label}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">{t.tagline}</p>
+                  </button>
+                ))}
+              </div>
+              <p className="text-xs text-muted-foreground mt-3">
+                Aplica no Dashboard e no menu lateral, só pra você. Por enquanto as outras páginas continuam com o visual padrão.
+              </p>
+            </div>
+          )}
         </CardContent>
       </Card>
 

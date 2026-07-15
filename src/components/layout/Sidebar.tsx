@@ -12,6 +12,8 @@ import { cn } from "@/lib/utils/cn";
 import { Logo } from "@/components/Logo";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSidebar } from "@/contexts/SidebarContext";
+import { useDevTheme } from "@/contexts/DevThemeContext";
+import type { DevTheme } from "@/lib/devThemes";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useQuery } from "@tanstack/react-query";
@@ -36,11 +38,18 @@ const bottomNavItems: { href: string; label: string; icon: React.ElementType; ro
   { href: "/configuracoes", label: "Configurações",icon: Settings },
 ];
 
+// Accent pode ser um gradiente (recorta em texto) ou uma cor sólida.
+function accentStyle(accent: string): React.CSSProperties {
+  return accent.includes("gradient")
+    ? { background: accent, WebkitBackgroundClip: "text", backgroundClip: "text", color: "transparent" }
+    : { color: accent };
+}
+
 function NavLink({
-  href, label, icon: Icon, active, collapsed, onClick, badgeCount, isDev,
+  href, label, icon: Icon, active, collapsed, onClick, badgeCount, theme,
 }: {
   href: string; label: string; icon: React.ElementType;
-  active: boolean; collapsed: boolean; onClick?: () => void; badgeCount?: number; isDev?: boolean;
+  active: boolean; collapsed: boolean; onClick?: () => void; badgeCount?: number; theme?: DevTheme;
 }) {
   const showBadge = !!badgeCount && badgeCount > 0;
   const badgeText = badgeCount && badgeCount > 9 ? "9+" : String(badgeCount);
@@ -53,20 +62,19 @@ function NavLink({
           onClick={onClick}
           className={cn(
             "relative flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors",
-            active
-              ? isDev
-                ? "text-white bg-gradient-to-r from-[#4f8dff]/20 to-[#a855f7]/10"
-                : "bg-sidebar-accent text-sidebar-accent-foreground"
-              : isDev
-                ? "text-[#7b869e] hover:text-white hover:bg-white/[0.04]"
+            theme
+              ? active ? "text-white" : "hover:text-white hover:bg-white/[0.04]"
+              : active
+                ? "bg-sidebar-accent text-sidebar-accent-foreground"
                 : "text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-foreground/10",
             collapsed && "justify-center px-2"
           )}
+          style={theme ? { background: active ? theme.navActiveBg : undefined, color: active ? "#fff" : theme.muted } : undefined}
         >
-          {active && isDev && (
+          {active && theme?.navIndicator && (
             <span
-              className="absolute left-0 top-1.5 bottom-1.5 w-[3px] rounded-full bg-gradient-to-b from-[#4f8dff] to-[#a855f7]"
-              style={{ boxShadow: "0 0 8px rgba(79,141,255,0.7)" }}
+              className="absolute left-0 top-1.5 bottom-1.5 w-[3px] rounded-full"
+              style={{ background: theme.navIndicator, boxShadow: `0 0 8px ${theme.totalLineColor}` }}
             />
           )}
           <div className="relative">
@@ -190,13 +198,12 @@ function useDocumentTitleBadge(count: number) {
 }
 
 function SidebarContent({
-  collapsed, onLinkClick, newClientesCount, chatNaoLidas,
+  collapsed, onLinkClick, newClientesCount, chatNaoLidas, theme,
 }: {
-  collapsed: boolean; onLinkClick?: () => void; newClientesCount: number; chatNaoLidas: number;
+  collapsed: boolean; onLinkClick?: () => void; newClientesCount: number; chatNaoLidas: number; theme?: DevTheme;
 }) {
   const pathname = usePathname();
   const { user, loading } = useAuth();
-  const isDev = user?.role === "DESENVOLVEDOR";
 
   const visibleTop = navItems.filter(
     (item) => !item.roles || (!loading && item.roles.includes((user?.role ?? "") as Role))
@@ -220,7 +227,7 @@ function SidebarContent({
               active={active}
               collapsed={collapsed}
               onClick={onLinkClick}
-              isDev={isDev}
+              theme={theme}
               badgeCount={item.href === "/clientes" ? newClientesCount : item.href === "/chat" ? chatNaoLidas : undefined}
             />
           );
@@ -228,12 +235,15 @@ function SidebarContent({
       </nav>
 
       {!loading && visibleBottom.length > 0 && (
-        <div className={cn("mt-4 mx-2 border-t pt-4", isDev ? "border-white/[0.08]" : "border-sidebar-border")}>
+        <div
+          className={cn("mt-4 mx-2 border-t pt-4", !theme && "border-sidebar-border")}
+          style={theme ? { borderColor: theme.sidebarBorder } : undefined}
+        >
           <nav className="space-y-1">
             {visibleBottom.map((item) => {
               const active = pathname.startsWith(item.href);
               return (
-                <NavLink key={item.href} {...item} active={active} collapsed={collapsed} onClick={onLinkClick} isDev={isDev} />
+                <NavLink key={item.href} {...item} active={active} collapsed={collapsed} onClick={onLinkClick} theme={theme} />
               );
             })}
           </nav>
@@ -246,23 +256,26 @@ function SidebarContent({
 export function Sidebar() {
   const [collapsed, setCollapsed] = useState(false);
   const { mobileOpen, closeMobile } = useSidebar();
-  const { user } = useAuth();
-  const isDev = user?.role === "DESENVOLVEDOR";
+  const { isDev, theme } = useDevTheme();
+  const activeTheme = isDev ? theme : undefined;
   const newClientesCount = useNewClientesCount();
   const chatNaoLidas = useChatNaoLidas();
   useDocumentTitleBadge(newClientesCount);
 
   const logo = (
-    <div className={cn("flex items-center h-16 border-b shrink-0", isDev ? "border-white/[0.08]" : "border-sidebar-border", collapsed ? "justify-center px-2" : "gap-3 px-4")}>
-      <Logo height={collapsed ? 28 : 40} className={isDev ? undefined : "invert dark:invert-0"} />
+    <div
+      className={cn("flex items-center h-16 border-b shrink-0", !activeTheme && "border-sidebar-border", collapsed ? "justify-center px-2" : "gap-3 px-4")}
+      style={activeTheme ? { borderColor: activeTheme.sidebarBorder } : undefined}
+    >
+      <Logo height={collapsed ? 28 : 40} className={activeTheme ? undefined : "invert dark:invert-0"} />
       {!collapsed && (
-        <span className="font-black text-base truncate tracking-wide">
-          <span className={isDev ? "text-[#e8ecf5]" : "text-sidebar-foreground"}>INFINITY</span>
+        <span className="font-black text-base truncate tracking-wide" style={activeTheme ? { fontFamily: activeTheme.fontVar } : undefined}>
+          <span style={activeTheme ? { color: activeTheme.text } : undefined} className={activeTheme ? undefined : "text-sidebar-foreground"}>INFINITY</span>
           <span
-            className="ml-1"
-            style={isDev ? { background: "linear-gradient(90deg,#4f8dff,#a855f7,#22d3ee)", WebkitBackgroundClip: "text", backgroundClip: "text", color: "transparent" } : undefined}
+            className={cn("ml-1", !activeTheme && "text-blue-400")}
+            style={activeTheme ? accentStyle(activeTheme.navIndicator ?? activeTheme.totalLineColor) : undefined}
           >
-            <span className={isDev ? undefined : "text-blue-400"}>GLASS</span>
+            GLASS
           </span>
         </span>
       )}
@@ -275,20 +288,19 @@ export function Sidebar() {
       <aside
         className={cn(
           "relative hidden lg:flex flex-col border-r transition-all duration-300 ease-in-out",
-          isDev
-            ? "bg-gradient-to-b from-[#0d111c] to-[#10141f] border-white/[0.08] text-[#e8ecf5]"
-            : "bg-sidebar text-sidebar-foreground border-sidebar-border",
+          !activeTheme && "bg-sidebar text-sidebar-foreground border-sidebar-border",
           collapsed ? "w-16" : "w-64"
         )}
+        style={activeTheme ? { background: activeTheme.sidebarBg, borderColor: activeTheme.sidebarBorder, color: activeTheme.text } : undefined}
       >
-        {isDev && (
+        {activeTheme?.sidebarEdge && (
           <div
             className="absolute top-0 right-[-1px] bottom-0 w-px pointer-events-none opacity-60"
-            style={{ background: "linear-gradient(180deg, transparent, #4f8dff 18%, #a855f7 50%, #22d3ee 82%, transparent)" }}
+            style={{ background: activeTheme.sidebarEdge }}
           />
         )}
         {logo}
-        <SidebarContent collapsed={collapsed} newClientesCount={newClientesCount} chatNaoLidas={chatNaoLidas} />
+        <SidebarContent collapsed={collapsed} newClientesCount={newClientesCount} chatNaoLidas={chatNaoLidas} theme={activeTheme} />
 
         <button
           onClick={() => setCollapsed(!collapsed)}
@@ -310,22 +322,24 @@ export function Sidebar() {
       <aside
         className={cn(
           "fixed top-0 left-0 z-50 h-full w-72 flex flex-col border-r transition-transform duration-300 ease-in-out lg:hidden",
-          isDev
-            ? "bg-gradient-to-b from-[#0d111c] to-[#10141f] border-white/[0.08] text-[#e8ecf5]"
-            : "bg-sidebar text-sidebar-foreground border-sidebar-border",
+          !activeTheme && "bg-sidebar text-sidebar-foreground border-sidebar-border",
           mobileOpen ? "translate-x-0" : "-translate-x-full"
         )}
+        style={activeTheme ? { background: activeTheme.sidebarBg, borderColor: activeTheme.sidebarBorder, color: activeTheme.text } : undefined}
       >
-        <div className={cn("flex items-center justify-between h-16 px-4 border-b shrink-0", isDev ? "border-white/[0.08]" : "border-sidebar-border")}>
+        <div
+          className={cn("flex items-center justify-between h-16 px-4 border-b shrink-0", !activeTheme && "border-sidebar-border")}
+          style={activeTheme ? { borderColor: activeTheme.sidebarBorder } : undefined}
+        >
           <div className="flex items-center gap-3">
-            <Logo height={40} className={isDev ? undefined : "invert dark:invert-0"} />
-            <span className="font-black text-base tracking-wide">
+            <Logo height={40} className={activeTheme ? undefined : "invert dark:invert-0"} />
+            <span className="font-black text-base tracking-wide" style={activeTheme ? { fontFamily: activeTheme.fontVar } : undefined}>
               <span>INFINITY</span>
               <span
-                className="ml-1"
-                style={isDev ? { background: "linear-gradient(90deg,#4f8dff,#a855f7,#22d3ee)", WebkitBackgroundClip: "text", backgroundClip: "text", color: "transparent" } : undefined}
+                className={cn("ml-1", !activeTheme && "text-blue-400")}
+                style={activeTheme ? accentStyle(activeTheme.navIndicator ?? activeTheme.totalLineColor) : undefined}
               >
-                {isDev ? "GLASS" : <span className="text-blue-400">GLASS</span>}
+                GLASS
               </span>
             </span>
           </div>
@@ -333,7 +347,7 @@ export function Sidebar() {
             <X className="w-5 h-5" />
           </button>
         </div>
-        <SidebarContent collapsed={false} onLinkClick={closeMobile} newClientesCount={newClientesCount} chatNaoLidas={chatNaoLidas} />
+        <SidebarContent collapsed={false} onLinkClick={closeMobile} newClientesCount={newClientesCount} chatNaoLidas={chatNaoLidas} theme={activeTheme} />
       </aside>
     </TooltipProvider>
   );

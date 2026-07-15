@@ -45,3 +45,14 @@ export function DevThemeProvider({ children }: { children: React.ReactNode }) {
 export function useDevTheme() {
   return useContext(DevThemeContext);
 }
+
+// Marca a árvore com data-dev-theme, que os overrides de variáveis CSS em
+// globals.css usam pra recolorir o app inteiro (não só o Dashboard).
+export function DevThemeRoot({ children, className }: { children: React.ReactNode; className?: string }) {
+  const { isDev, themeId } = useDevTheme();
+  return (
+    <div className={className} data-dev-theme={isDev ? themeId : undefined}>
+      {children}
+    </div>
+  );
+}

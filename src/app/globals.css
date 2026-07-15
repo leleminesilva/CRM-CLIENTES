@@ -61,6 +61,70 @@
     --sidebar-accent-foreground: 210 20% 98%;
     --sidebar-border: 215 27.9% 15%;
   }
+
+  /* Layouts exclusivos do cargo Desenvolvedor (Configurações → Aparência).
+     Sobrescrevem as mesmas variáveis semânticas usadas em todo o app, então
+     toda página (não só o Dashboard) herda a paleta escolhida automaticamente. */
+  [data-dev-theme="vidro-luz"] {
+    --background: 228 45% 4%;
+    --foreground: 222 39% 94%;
+    --card: 224 37% 8%;
+    --card-foreground: 222 39% 94%;
+    --popover: 224 37% 8%;
+    --popover-foreground: 222 39% 94%;
+    --muted: 223 31% 11%;
+    --muted-foreground: 221 15% 55%;
+    --accent: 221 32% 15%;
+    --accent-foreground: 222 39% 94%;
+    --border: 222 27% 19%;
+    --input: 222 27% 19%;
+    --primary: 219 100% 65%;
+    --ring: 219 100% 65%;
+    --secondary: 223 31% 11%;
+    --secondary-foreground: 222 39% 94%;
+  }
+
+  [data-dev-theme="painel-comando"] {
+    --background: 220 16% 4%;
+    --foreground: 84 10% 90%;
+    --card: 220 11% 5%;
+    --card-foreground: 84 10% 90%;
+    --popover: 220 11% 5%;
+    --popover-foreground: 84 10% 90%;
+    --muted: 90 5% 8%;
+    --muted-foreground: 102 4% 47%;
+    --accent: 100 7% 9%;
+    --accent-foreground: 84 10% 90%;
+    --border: 120 3% 13%;
+    --input: 120 3% 13%;
+    --primary: 95 100% 67%;
+    --primary-foreground: 120 17% 5%;
+    --ring: 95 100% 67%;
+    --secondary: 90 5% 8%;
+    --secondary-foreground: 84 10% 90%;
+    --radius: 0.25rem;
+  }
+
+  [data-dev-theme="editorial-premium"] {
+    --background: 30 24% 7%;
+    --foreground: 39 41% 92%;
+    --card: 30 22% 9%;
+    --card-foreground: 39 41% 92%;
+    --popover: 30 22% 9%;
+    --popover-foreground: 39 41% 92%;
+    --muted: 33 20% 11%;
+    --muted-foreground: 32 11% 56%;
+    --accent: 33 18% 12%;
+    --accent-foreground: 39 41% 92%;
+    --border: 30 16% 15%;
+    --input: 30 16% 15%;
+    --primary: 39 47% 60%;
+    --primary-foreground: 30 24% 8%;
+    --ring: 39 47% 60%;
+    --secondary: 33 20% 11%;
+    --secondary-foreground: 39 41% 92%;
+    --radius: 0.25rem;
+  }
 }
 
 @layer base {

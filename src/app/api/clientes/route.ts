@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { getCurrentUser } from "@/lib/auth";
-import { requirePermission } from "@/lib/rbac";
+import { requirePermission, canViewAll as canViewAllRole } from "@/lib/rbac";
 import { createAuditLog } from "@/lib/audit";
 import prisma from "@/lib/prisma";
 import { clienteSchema } from "@/lib/validators/cliente";
@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
 
     await promoverLeadsParaReengajar();
 
-    const canViewAll = payload.role === "ADMINISTRADOR" || payload.role === "GESTOR";
+    const canViewAll = canViewAllRole(payload.role);
 
     const { searchParams } = new URL(request.url);
     const page = parseInt(searchParams.get("page") || "1");

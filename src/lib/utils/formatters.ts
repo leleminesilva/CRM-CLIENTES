@@ -130,6 +130,7 @@ export const STATUS_OPO_LABELS: Record<string, string> = {
 
 export const ROLE_LABELS: Record<string, string> = {
   ADMINISTRADOR: "Administrador",
+  DESENVOLVEDOR: "Desenvolvedor",
   GESTOR: "Gestor",
   COMERCIAL: "Comercial",
   OPERACIONAL: "Operacional",

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
-import { requirePermission } from "@/lib/rbac";
+import { requirePermission, canViewAll as canViewAllRole } from "@/lib/rbac";
 import { createAuditLog, sanitizeForAudit } from "@/lib/audit";
 import prisma from "@/lib/prisma";
 import { type ClienteInput } from "@/lib/validators/cliente";
@@ -88,7 +88,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
     const payload = await getCurrentUser(request);
     if (!payload) return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
 
-    const canViewAll = payload.role === "ADMINISTRADOR" || payload.role === "GESTOR";
+    const canViewAll = canViewAllRole(payload.role);
 
     const cliente = await prisma.cliente.findFirst({
       where: {
@@ -130,7 +130,7 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
     if (!payload) return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
     requirePermission(payload.role, "clientes:update");
 
-    const canViewAll = payload.role === "ADMINISTRADOR" || payload.role === "GESTOR";
+    const canViewAll = canViewAllRole(payload.role);
     const old = await prisma.cliente.findFirst({
       where: { id: params.id, deletedAt: null, ...(canViewAll ? {} : { responsavelId: payload.userId }) },
     });
@@ -266,7 +266,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     if (!payload) return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
     requirePermission(payload.role, "clientes:update");
 
-    const canViewAll = payload.role === "ADMINISTRADOR" || payload.role === "GESTOR";
+    const canViewAll = canViewAllRole(payload.role);
     const old = await prisma.cliente.findFirst({
       where: { id: params.id, deletedAt: null, ...(canViewAll ? {} : { responsavelId: payload.userId }) },
     });

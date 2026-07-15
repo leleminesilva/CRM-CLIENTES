@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
-import { buildWhereClause } from "@/lib/rbac";
+import { buildWhereClause, canViewAll } from "@/lib/rbac";
 import prisma from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
 import { startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, endOfYear } from "date-fns";
@@ -42,7 +42,7 @@ export async function GET(request: NextRequest) {
     } else {
       ({ de, ate } = getPeriodRange(periodo, mes));
     }
-    const canViewAllUsers = payload.role === "ADMINISTRADOR" || payload.role === "GESTOR";
+    const canViewAllUsers = canViewAll(payload.role);
 
     // Filtro por vendedor específico — só Gestor/Admin pode solicitar
     const vendedorId = canViewAllUsers ? (searchParams.get("vendedorId") || null) : null;

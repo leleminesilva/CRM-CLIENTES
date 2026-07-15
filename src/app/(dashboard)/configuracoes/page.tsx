@@ -48,7 +48,7 @@ export default function ConfiguracoesPage() {
   const [cropSrc, setCropSrc] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const avatarInputRef = useRef<HTMLInputElement>(null);
-  const isAdmin = user?.role === "ADMINISTRADOR";
+  const isAdmin = user?.role === "ADMINISTRADOR" || user?.role === "DESENVOLVEDOR";
 
   function handleAvatarSelect(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];

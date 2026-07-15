@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
+import { isAdmin } from "@/lib/rbac";
 import prisma from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
@@ -12,7 +13,7 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
     const comentario = await prisma.comentario.findFirst({ where: { id: params.id } });
     if (!comentario) return NextResponse.json({ error: "Comentário não encontrado" }, { status: 404 });
 
-    if (comentario.userId !== payload.userId && payload.role !== "ADMINISTRADOR") {
+    if (comentario.userId !== payload.userId && !isAdmin(payload.role)) {
       return NextResponse.json({ error: "Permissão negada" }, { status: 403 });
     }
 

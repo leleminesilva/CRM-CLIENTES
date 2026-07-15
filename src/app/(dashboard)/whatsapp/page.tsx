@@ -622,7 +622,7 @@ function WhatsAppContent() {
   const { user } = useAuth();
   const searchParams = useSearchParams();
   const phoneParam = useMemo(() => searchParams.get("phone"), [searchParams]);
-  const isAdmin = user?.role === "ADMINISTRADOR";
+  const isAdmin = user?.role === "ADMINISTRADOR" || user?.role === "DESENVOLVEDOR";
 
   const [instanciaId, setInstanciaId] = useState<string | null>(null);
   const [conversa, setConversa] = useState<Conversa | null>(null);

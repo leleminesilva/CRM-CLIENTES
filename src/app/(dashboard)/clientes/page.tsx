@@ -132,7 +132,7 @@ export default function ClientesPage() {
   useEffect(() => { sessionStorage.setItem("cf_dataFim", dataFim); }, [dataFim]);
   const qc = useQueryClient();
   const { user } = useAuth();
-  const isAdmin = user?.role === "ADMINISTRADOR";
+  const isAdmin = user?.role === "ADMINISTRADOR" || user?.role === "DESENVOLVEDOR";
 
   const hasActiveFilters = !!(responsavelId || temperatura || servico || estagio || dataInicio || dataFim);
 

@@ -1,4 +1,4 @@
-export type Role = "ADMINISTRADOR" | "GESTOR" | "COMERCIAL" | "OPERACIONAL";
+export type Role = "ADMINISTRADOR" | "DESENVOLVEDOR" | "GESTOR" | "COMERCIAL" | "OPERACIONAL";
 export type Porte = "MICRO" | "PEQUENO" | "MEDIO" | "GRANDE" | "ENTERPRISE";
 export type OrigemCliente =
   | "INDICACAO"

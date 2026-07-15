@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
+import { isAdmin } from "@/lib/rbac";
 import { supabaseAdmin } from "@/lib/supabase";
 import prisma from "@/lib/prisma";
 
@@ -24,7 +25,7 @@ export async function POST(request: NextRequest) {
 
   if (!file) return NextResponse.json({ error: "Arquivo não enviado" }, { status: 400 });
 
-  if (targetUserId !== payload.userId && payload.role !== "ADMINISTRADOR")
+  if (targetUserId !== payload.userId && !isAdmin(payload.role))
     return NextResponse.json({ error: "Acesso negado" }, { status: 403 });
 
   if (!file.type.startsWith("image/"))

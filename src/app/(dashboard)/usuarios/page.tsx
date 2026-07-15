@@ -41,6 +41,7 @@ type UserWithCount = User & {
 
 const ROLE_COLORS: Record<string, "default" | "secondary" | "destructive" | "outline" | "success" | "warning" | "info"> = {
   ADMINISTRADOR: "destructive",
+  DESENVOLVEDOR: "outline",
   GESTOR: "warning",
   COMERCIAL: "info",
   OPERACIONAL: "secondary",
@@ -48,19 +49,20 @@ const ROLE_COLORS: Record<string, "default" | "secondary" | "destructive" | "out
 
 const ROLE_BG: Record<string, string> = {
   ADMINISTRADOR: "from-red-500/10 to-red-500/5",
+  DESENVOLVEDOR: "from-violet-500/10 to-violet-500/5",
   GESTOR:        "from-amber-500/10 to-amber-500/5",
   COMERCIAL:     "from-blue-500/10 to-blue-500/5",
   OPERACIONAL:   "from-slate-500/10 to-slate-500/5",
 };
 
 const PERMISSIONS_TABLE = [
-  { modulo: "Dashboard Geral",   admin: true,  gestor: true,  comercial: "Próprio", operacional: true },
-  { modulo: "Clientes — CRUD",   admin: true,  gestor: true,  comercial: "Próprio", operacional: false },
-  { modulo: "Leads — CRUD",      admin: true,  gestor: true,  comercial: "Próprio", operacional: "Ver" },
-  { modulo: "Oportunidades",     admin: true,  gestor: true,  comercial: "Próprio", operacional: "Ver" },
-  { modulo: "Relatórios",        admin: true,  gestor: true,  comercial: false,     operacional: false },
-  { modulo: "Usuários — CRUD",   admin: true,  gestor: false, comercial: false,     operacional: false },
-  { modulo: "Auditoria",         admin: true,  gestor: false, comercial: false,     operacional: false },
+  { modulo: "Dashboard Geral",   admin: true, dev: true, gestor: true,  comercial: "Próprio", operacional: true },
+  { modulo: "Clientes — CRUD",   admin: true, dev: true, gestor: true,  comercial: "Próprio", operacional: false },
+  { modulo: "Leads — CRUD",      admin: true, dev: true, gestor: true,  comercial: "Próprio", operacional: "Ver" },
+  { modulo: "Oportunidades",     admin: true, dev: true, gestor: true,  comercial: "Próprio", operacional: "Ver" },
+  { modulo: "Relatórios",        admin: true, dev: true, gestor: true,  comercial: false,     operacional: false },
+  { modulo: "Usuários — CRUD",   admin: true, dev: true, gestor: false, comercial: false,     operacional: false },
+  { modulo: "Auditoria",         admin: true, dev: true, gestor: false, comercial: false,     operacional: false },
 ];
 
 const emptyForm = { nome: "", email: "", senha: "", role: "COMERCIAL" };
@@ -135,6 +137,7 @@ function UserFormDialog({
             </Select>
             <p className="text-xs text-muted-foreground">
               {form.role === "ADMINISTRADOR" && "Acesso total ao sistema"}
+              {form.role === "DESENVOLVEDOR" && "Acesso total ao sistema (uso técnico)"}
               {form.role === "GESTOR" && "Visualiza tudo, gerencia equipe"}
               {form.role === "COMERCIAL" && "Gerencia seus próprios clientes e leads"}
               {form.role === "OPERACIONAL" && "Executa tarefas, visão limitada"}
@@ -159,7 +162,7 @@ function UserFormDialog({
 export default function UsuariosPage() {
   const qc = useQueryClient();
   const { user: me, refreshUser } = useAuth();
-  const isAdmin = me?.role === "ADMINISTRADOR";
+  const isAdmin = me?.role === "ADMINISTRADOR" || me?.role === "DESENVOLVEDOR";
   const [search, setSearch] = useState("");
   const [deleteTarget, setDeleteTarget] = useState<UserWithCount | null>(null);
   const [uploadingUserId, setUploadingUserId] = useState<string | null>(null);
@@ -471,6 +474,7 @@ export default function UsuariosPage() {
                 <tr className="border-b bg-muted/50">
                   <th className="text-left p-3 font-medium">Módulo</th>
                   <th className="text-center p-3 font-medium">Administrador</th>
+                  <th className="text-center p-3 font-medium">Desenvolvedor</th>
                   <th className="text-center p-3 font-medium">Gestor</th>
                   <th className="text-center p-3 font-medium">Comercial</th>
                   <th className="text-center p-3 font-medium">Operacional</th>
@@ -480,7 +484,7 @@ export default function UsuariosPage() {
                 {PERMISSIONS_TABLE.map(row => (
                   <tr key={row.modulo} className="border-b last:border-0 hover:bg-muted/30">
                     <td className="p-3 font-medium">{row.modulo}</td>
-                    {[row.admin, row.gestor, row.comercial, row.operacional].map((v, i) => (
+                    {[row.admin, row.dev, row.gestor, row.comercial, row.operacional].map((v, i) => (
                       <td key={i} className="p-3 text-center">
                         {v === true ? (
                           <span className="text-emerald-500 font-bold">✓</span>

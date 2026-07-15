@@ -1,15 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
+import { isAdmin } from "@/lib/rbac";
 import prisma from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
 
-// Only ADMINISTRADOR can call this endpoint
+// Only ADMINISTRADOR/DESENVOLVEDOR can call this endpoint
 export async function POST(request: NextRequest) {
   try {
     const payload = await getCurrentUser(request);
     if (!payload) return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
-    if (payload.role !== "ADMINISTRADOR") return NextResponse.json({ error: "Acesso negado" }, { status: 403 });
+    if (!isAdmin(payload.role)) return NextResponse.json({ error: "Acesso negado" }, { status: 403 });
 
     await prisma.notificacao.createMany({
       data: [

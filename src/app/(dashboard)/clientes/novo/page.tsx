@@ -27,7 +27,7 @@ export default function NovoClientePage() {
   const router = useRouter();
   const qc = useQueryClient();
   const { user } = useAuth();
-  const isGestor = user?.role === "ADMINISTRADOR" || user?.role === "GESTOR";
+  const isGestor = user?.role === "ADMINISTRADOR" || user?.role === "DESENVOLVEDOR" || user?.role === "GESTOR";
   const [buscandoCEP, setBuscandoCEP] = useState(false);
   const [servicosSelecionados, setServicosSelecionados] = useState<string[]>([]);
   const [servicoCustom, setServicoCustom] = useState("");

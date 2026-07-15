@@ -94,7 +94,7 @@ export default function DashboardPage() {
   const [dataFim, setDataFim] = useState("");                  // YYYY-MM-DD
   const usandoDataCustom = !!(dataInicio && dataFim);
   const { user } = useAuth();
-  const isGestor = user?.role === "ADMINISTRADOR" || user?.role === "GESTOR";
+  const isGestor = user?.role === "ADMINISTRADOR" || user?.role === "DESENVOLVEDOR" || user?.role === "GESTOR";
 
   const { data: primeiroMesData } = useQuery({
     queryKey: ["dashboard-primeiro-mes"],

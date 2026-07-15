@@ -134,7 +134,7 @@ function EventCard({ event, compact = false }: { event: AgendaEvent; compact?: b
 export default function AgendaPage() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
-  const isAdmin = user?.role === "ADMINISTRADOR";
+  const isAdmin = user?.role === "ADMINISTRADOR" || user?.role === "DESENVOLVEDOR";
   const TIPOS = isAdmin ? [...TIPOS_BASE, TIPO_NOTIFICACAO] : TIPOS_BASE;
   const [view, setView] = useState<ViewType>("mes");
   const [currentDate, setCurrentDate] = useState(new Date());

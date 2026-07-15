@@ -650,7 +650,7 @@ export default function ClienteDetalhePage() {
   const router = useRouter();
   const qc = useQueryClient();
   const { user } = useAuth();
-  const isAdmin = user?.role === "ADMINISTRADOR";
+  const isAdmin = user?.role === "ADMINISTRADOR" || user?.role === "DESENVOLVEDOR";
 
   // Dialog de exclusão do cliente
   const [deleteDialog, setDeleteDialog] = useState(false);

@@ -33,7 +33,7 @@ function FormGestor({ cliente, usuarios, onSuccess, userRole }: {
   const [servicosSelecionados, setServicosSelecionados] = useState<string[]>([]);
   const [servicoCustom, setServicoCustom] = useState("");
 
-  const isGestor = userRole === "ADMINISTRADOR" || userRole === "GESTOR";
+  const isGestor = userRole === "ADMINISTRADOR" || userRole === "DESENVOLVEDOR" || userRole === "GESTOR";
 
   const { register, handleSubmit, setValue, watch, reset } = useForm<ClienteInput>({
     defaultValues: { origem: "OUTROS", statusOrcamento: "PENDENTE", temperatura: "MORNO" },

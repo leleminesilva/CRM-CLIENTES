@@ -10,7 +10,7 @@ export async function DELETE(
 ) {
   const payload = await getCurrentUser(request);
   if (!payload) return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
-  if (!["ADMINISTRADOR", "GESTOR"].includes(payload.role)) {
+  if (!["ADMINISTRADOR", "DESENVOLVEDOR", "GESTOR"].includes(payload.role)) {
     return NextResponse.json({ error: "Sem permissão" }, { status: 403 });
   }
 
@@ -24,7 +24,7 @@ export async function PATCH(
 ) {
   const payload = await getCurrentUser(request);
   if (!payload) return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
-  if (!["ADMINISTRADOR", "GESTOR"].includes(payload.role)) {
+  if (!["ADMINISTRADOR", "DESENVOLVEDOR", "GESTOR"].includes(payload.role)) {
     return NextResponse.json({ error: "Sem permissão" }, { status: 403 });
   }
 

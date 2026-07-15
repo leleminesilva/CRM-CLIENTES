@@ -40,47 +40,51 @@ type Permission =
   | "configuracoes:view"
   | "configuracoes:update";
 
+// Desenvolvedor tem acesso total, igual Administrador.
+const ADMIN_PERMISSIONS: Permission[] = [
+  "dashboard:view",
+  "dashboard:view_all",
+  "clientes:read",
+  "clientes:create",
+  "clientes:update",
+  "clientes:delete",
+  "clientes:read_all",
+  "leads:read",
+  "leads:create",
+  "leads:update",
+  "leads:delete",
+  "leads:read_all",
+  "oportunidades:read",
+  "oportunidades:create",
+  "oportunidades:update",
+  "oportunidades:delete",
+  "oportunidades:read_all",
+  "empresas:read",
+  "empresas:create",
+  "empresas:update",
+  "empresas:delete",
+  "contatos:read",
+  "contatos:create",
+  "contatos:update",
+  "contatos:delete",
+  "tarefas:read",
+  "tarefas:create",
+  "tarefas:update",
+  "tarefas:delete",
+  "tarefas:read_all",
+  "relatorios:view",
+  "usuarios:read",
+  "usuarios:create",
+  "usuarios:update",
+  "usuarios:delete",
+  "auditoria:view",
+  "configuracoes:view",
+  "configuracoes:update",
+];
+
 const PERMISSIONS: Record<Role, Permission[]> = {
-  ADMINISTRADOR: [
-    "dashboard:view",
-    "dashboard:view_all",
-    "clientes:read",
-    "clientes:create",
-    "clientes:update",
-    "clientes:delete",
-    "clientes:read_all",
-    "leads:read",
-    "leads:create",
-    "leads:update",
-    "leads:delete",
-    "leads:read_all",
-    "oportunidades:read",
-    "oportunidades:create",
-    "oportunidades:update",
-    "oportunidades:delete",
-    "oportunidades:read_all",
-    "empresas:read",
-    "empresas:create",
-    "empresas:update",
-    "empresas:delete",
-    "contatos:read",
-    "contatos:create",
-    "contatos:update",
-    "contatos:delete",
-    "tarefas:read",
-    "tarefas:create",
-    "tarefas:update",
-    "tarefas:delete",
-    "tarefas:read_all",
-    "relatorios:view",
-    "usuarios:read",
-    "usuarios:create",
-    "usuarios:update",
-    "usuarios:delete",
-    "auditoria:view",
-    "configuracoes:view",
-    "configuracoes:update",
-  ],
+  ADMINISTRADOR: ADMIN_PERMISSIONS,
+  DESENVOLVEDOR: ADMIN_PERMISSIONS,
   GESTOR: [
     "dashboard:view",
     "dashboard:view_all",
@@ -161,11 +165,11 @@ export function requirePermission(role: Role, permission: Permission): void {
 }
 
 export function canViewAll(role: Role): boolean {
-  return role === "ADMINISTRADOR" || role === "GESTOR";
+  return role === "ADMINISTRADOR" || role === "DESENVOLVEDOR" || role === "GESTOR";
 }
 
 export function isAdmin(role: Role): boolean {
-  return role === "ADMINISTRADOR";
+  return role === "ADMINISTRADOR" || role === "DESENVOLVEDOR";
 }
 
 export function buildWhereClause(

@@ -18,7 +18,7 @@ import { useQuery } from "@tanstack/react-query";
 import axios from "axios";
 import { tocarNotificacaoNovoCliente } from "@/lib/utils/sound";
 
-type Role = "ADMINISTRADOR" | "GESTOR" | "COMERCIAL" | "OPERACIONAL";
+type Role = "ADMINISTRADOR" | "DESENVOLVEDOR" | "GESTOR" | "COMERCIAL" | "OPERACIONAL";
 
 const navItems: { href: string; label: string; icon: React.ElementType; roles?: Role[] }[] = [
   { href: "/",           label: "Dashboard",  icon: LayoutDashboard },
@@ -26,13 +26,13 @@ const navItems: { href: string; label: string; icon: React.ElementType; roles?: 
   { href: "/tarefas",    label: "Tarefas",    icon: CheckSquare },
   { href: "/agenda",     label: "Agenda",     icon: Calendar },
   { href: "/chat",       label: "Chat",       icon: MessageSquare },
-  { href: "/whatsapp",   label: "WhatsApp",   icon: MessageCircle, roles: ["ADMINISTRADOR"] },
+  { href: "/whatsapp",   label: "WhatsApp",   icon: MessageCircle, roles: ["ADMINISTRADOR", "DESENVOLVEDOR"] },
 ];
 
 const bottomNavItems: { href: string; label: string; icon: React.ElementType; roles?: Role[] }[] = [
-  { href: "/relatorios",    label: "Relatórios",   icon: BarChart3, roles: ["ADMINISTRADOR", "GESTOR"] },
-  { href: "/usuarios",      label: "Usuários",     icon: UserCog,   roles: ["ADMINISTRADOR"] },
-  { href: "/auditoria",     label: "Auditoria",    icon: Shield,    roles: ["ADMINISTRADOR"] },
+  { href: "/relatorios",    label: "Relatórios",   icon: BarChart3, roles: ["ADMINISTRADOR", "DESENVOLVEDOR", "GESTOR"] },
+  { href: "/usuarios",      label: "Usuários",     icon: UserCog,   roles: ["ADMINISTRADOR", "DESENVOLVEDOR"] },
+  { href: "/auditoria",     label: "Auditoria",    icon: Shield,    roles: ["ADMINISTRADOR", "DESENVOLVEDOR"] },
   { href: "/configuracoes", label: "Configurações",icon: Settings },
 ];
 

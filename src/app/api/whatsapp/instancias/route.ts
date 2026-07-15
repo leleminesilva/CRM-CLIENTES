@@ -21,7 +21,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   const payload = await getCurrentUser(request);
   if (!payload) return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
-  if (!["ADMINISTRADOR", "GESTOR"].includes(payload.role)) {
+  if (!["ADMINISTRADOR", "DESENVOLVEDOR", "GESTOR"].includes(payload.role)) {
     return NextResponse.json({ error: "Sem permissão" }, { status: 403 });
   }
 

@@ -26,11 +26,11 @@
     --input: 220 13% 91%;
     --ring: 239 84% 67%;
     --radius: 0.625rem;
-    --sidebar: 224 71.4% 4.1%;
-    --sidebar-foreground: 210 20% 98%;
+    --sidebar: 0 0% 100%;
+    --sidebar-foreground: 224 71.4% 4.1%;
     --sidebar-accent: 239 84% 67%;
     --sidebar-accent-foreground: 210 20% 98%;
-    --sidebar-border: 220 13% 15%;
+    --sidebar-border: 220 13% 91%;
   }
 
   .dark {

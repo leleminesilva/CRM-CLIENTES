@@ -82,9 +82,9 @@ function getInitials(name?: string, phone?: string) {
 }
 
 function StatusIcon({ status }: { status: string }) {
-  if (status === "lida") return <CheckCheck className="w-3.5 h-3.5 text-blue-400" />;
-  if (status === "entregue") return <CheckCheck className="w-3.5 h-3.5 text-muted-foreground" />;
-  return <Check className="w-3.5 h-3.5 text-muted-foreground" />;
+  if (status === "lida") return <CheckCheck className="w-3.5 h-3.5 text-[#53bdeb]" />;
+  if (status === "entregue") return <CheckCheck className="w-3.5 h-3.5 text-black/45 dark:text-white/60" />;
+  return <Check className="w-3.5 h-3.5 text-black/45 dark:text-white/60" />;
 }
 
 // ── Modal de nova instância ────────────────────────────────────────────────
@@ -253,7 +253,7 @@ function ListaConversas({
 
   return (
     <div className="w-full md:w-80 flex flex-col border-r border-border shrink-0">
-      <div className="h-14 flex items-center px-4 border-b border-border gap-2">
+      <div className="h-14 flex items-center px-4 border-b border-border gap-2 bg-[#f0f2f5] dark:bg-[#202c33]">
         <div className="flex-1 min-w-0">
           <p className="font-semibold text-sm truncate">{instancia?.nome ?? "Selecione um número"}</p>
           {instancia?.phoneNumber && (
@@ -262,11 +262,11 @@ function ListaConversas({
         </div>
       </div>
 
-      <div className="p-2 border-b border-border">
+      <div className="p-2 border-b border-border bg-[#f0f2f5] dark:bg-[#202c33]">
         <div className="relative">
-          <Search className="absolute left-2.5 top-2.5 w-4 h-4 text-muted-foreground" />
+          <Search className="absolute left-3 top-2.5 w-4 h-4 text-muted-foreground" />
           <Input
-            className="pl-8 h-9 text-sm"
+            className="pl-9 h-9 text-sm rounded-full bg-white dark:bg-[#2a3942] border-none"
             placeholder="Buscar conversa..."
             value={search}
             onChange={(e) => onSearchChange(e.target.value)}
@@ -424,7 +424,7 @@ function AreaChat({
   return (
     <div className="flex-1 flex flex-col min-w-0">
       {/* Header */}
-      <div className="h-14 flex items-center gap-3 px-4 border-b border-border bg-card shrink-0">
+      <div className="h-14 flex items-center gap-3 px-4 border-b border-border bg-[#f0f2f5] dark:bg-[#202c33] shrink-0">
         <button onClick={onBack} className="md:hidden p-1 -ml-1 rounded hover:bg-accent">
           <ChevronLeft className="w-5 h-5" />
         </button>
@@ -443,7 +443,10 @@ function AreaChat({
       </div>
 
       {/* Mensagens */}
-      <ScrollArea className="flex-1 px-4 py-4" style={{ backgroundImage: "radial-gradient(circle, hsl(var(--muted)/0.3) 1px, transparent 1px)", backgroundSize: "20px 20px" }}>
+      <ScrollArea
+        className="flex-1 px-4 py-4 bg-[#efeae2] dark:bg-[#0b141a] [--wa-dot:rgba(0,0,0,0.06)] dark:[--wa-dot:rgba(255,255,255,0.04)]"
+        style={{ backgroundImage: "radial-gradient(circle, var(--wa-dot) 1px, transparent 1px)", backgroundSize: "22px 22px" }}
+      >
         {isLoading ? (
           <div className="flex justify-center py-8">
             <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
@@ -474,8 +477,8 @@ function AreaChat({
                         className={cn(
                           "max-w-[75%] rounded-2xl px-3.5 py-2 text-sm shadow-sm",
                           msg.direcao === "saida"
-                            ? "bg-green-600 text-white rounded-tr-sm"
-                            : "bg-card text-foreground rounded-tl-sm border border-border"
+                            ? "bg-[#d9fdd3] dark:bg-[#005c4b] text-[#111b21] dark:text-white rounded-tr-sm"
+                            : "bg-white dark:bg-[#202c33] text-[#111b21] dark:text-[#e9edef] rounded-tl-sm border border-black/5 dark:border-white/5"
                         )}
                       >
                         <p className="whitespace-pre-wrap break-words">{msg.conteudo}</p>
@@ -485,7 +488,7 @@ function AreaChat({
                         )}>
                           <span className={cn(
                             "text-[10px]",
-                            msg.direcao === "saida" ? "text-green-200" : "text-muted-foreground"
+                            msg.direcao === "saida" ? "text-black/45 dark:text-white/60" : "text-muted-foreground"
                           )}>
                             {formatMsgTime(msg.enviadaEm)}
                           </span>
@@ -503,7 +506,7 @@ function AreaChat({
       </ScrollArea>
 
       {/* Input */}
-      <div className="p-3 border-t border-border bg-card shrink-0">
+      <div className="p-3 border-t border-border bg-[#f0f2f5] dark:bg-[#202c33] shrink-0">
         <div className="flex items-end gap-2">
           <textarea
             value={texto}
@@ -511,7 +514,7 @@ function AreaChat({
             onKeyDown={handleKeyDown}
             placeholder="Digite uma mensagem... (Enter para enviar)"
             rows={1}
-            className="flex-1 resize-none rounded-xl border border-input bg-background px-3.5 py-2.5 text-sm outline-none focus:ring-2 focus:ring-green-500/30 focus:border-green-500 transition-all min-h-[42px] max-h-32"
+            className="flex-1 resize-none rounded-xl border-none bg-white dark:bg-[#2a3942] px-3.5 py-2.5 text-sm outline-none focus:ring-2 focus:ring-green-500/30 transition-all min-h-[42px] max-h-32"
             style={{ scrollbarWidth: "none" }}
           />
           <Button

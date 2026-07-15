@@ -37,11 +37,29 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { formatCurrency, ORIGEM_LABELS } from "@/lib/utils/formatters";
 import { useAuth } from "@/contexts/AuthContext";
+import { cn } from "@/lib/utils/cn";
 
 const SERVICE_COLORS = ["#6366f1","#3b82f6","#10b981","#f59e0b","#f97316","#ec4899","#8b5cf6","#14b8a6"];
 const VENDOR_COLORS  = ["#6366f1","#10b981","#f59e0b","#3b82f6","#f97316","#ec4899"];
 
 const PIE_COLORS = ["#6366f1", "#8b5cf6", "#ec4899", "#f59e0b", "#10b981", "#3b82f6"];
+
+// Paleta "Vidro & Luz" — layout exclusivo do cargo Desenvolvedor.
+const PRISM_SERVICE_COLORS = ["#4f8dff","#22d3ee","#34d399","#fbbf24","#fb923c","#fb7185","#a855f7","#c084fc"];
+const PRISM_VENDOR_COLORS  = ["#4f8dff","#22d3ee","#fbbf24","#a855f7","#34d399","#fb7185"];
+const PRISM_PIE_COLORS     = ["#4f8dff","#a855f7","#22d3ee","#34d399","#fbbf24","#fb7185"];
+const PRISM_ACCENTS: Record<string, string> = {
+  "bg-indigo-500":  "linear-gradient(90deg,#4f8dff,#a855f7)",
+  "bg-violet-500":  "linear-gradient(90deg,#a855f7,#c084fc)",
+  "bg-blue-500":    "linear-gradient(90deg,#4f8dff,#22d3ee)",
+  "bg-emerald-500": "linear-gradient(90deg,#22d3ee,#34d399)",
+  "bg-green-500":   "linear-gradient(90deg,#34d399,#4ade80)",
+  "bg-amber-500":   "linear-gradient(90deg,#fbbf24,#fb923c)",
+  "bg-orange-500":  "linear-gradient(90deg,#fb923c,#fb7185)",
+  "bg-rose-500":    "linear-gradient(90deg,#fb7185,#f43f5e)",
+  "bg-red-500":     "linear-gradient(90deg,#f43f5e,#dc2626)",
+  "bg-red-700":     "linear-gradient(90deg,#dc2626,#991b1b)",
+};
 
 interface KPICardProps {
   title: string;
@@ -51,22 +69,34 @@ interface KPICardProps {
   prefix?: string;
   color?: string;
   subtitle?: string;
+  themed?: boolean;
 }
 
-function KPICard({ title, value, icon, variacao, prefix = "", color = "bg-indigo-500", subtitle }: KPICardProps) {
+function KPICard({ title, value, icon, variacao, prefix = "", color = "bg-indigo-500", subtitle, themed }: KPICardProps) {
   return (
-    <Card className="hover:shadow-lg transition-all duration-200 hover:-translate-y-0.5 overflow-hidden">
+    <Card
+      className={cn(
+        "hover:shadow-lg transition-all duration-200 hover:-translate-y-0.5 overflow-hidden",
+        themed && "!rounded-none [clip-path:polygon(0_0,100%_0,100%_calc(100%-16px),calc(100%-16px)_100%,0_100%)] !bg-white/[0.04] backdrop-blur-xl !border-white/10 !text-[#e8ecf5]"
+      )}
+    >
       {/* Accent strip */}
-      <div className={`h-1 w-full ${color}`} />
+      <div className={themed ? "h-[3px] w-full" : `h-1 w-full ${color}`} style={themed ? { background: PRISM_ACCENTS[color] ?? PRISM_ACCENTS["bg-indigo-500"] } : undefined} />
       <CardContent className="p-4 md:p-5">
         <div className="flex items-start justify-between gap-2">
           <div className="space-y-1 min-w-0 flex-1">
-            <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide leading-tight">{title}</p>
-            <p className="text-2xl md:text-3xl font-bold truncate leading-none mt-1.5">
+            <p className={cn(
+              "text-xs text-muted-foreground font-medium uppercase tracking-wide leading-tight",
+              themed && "font-mono text-[10px] tracking-[0.09em] !text-[#7b869e]"
+            )}>{title}</p>
+            <p className={cn(
+              "text-2xl md:text-3xl font-bold truncate leading-none mt-1.5",
+              themed && "font-mono tracking-tight [font-variant-numeric:tabular-nums]"
+            )}>
               {prefix}{typeof value === "number" ? value.toLocaleString("pt-BR") : value}
             </p>
             {subtitle && (
-              <p className="text-xs text-muted-foreground mt-1 truncate">{subtitle}</p>
+              <p className={cn("text-xs text-muted-foreground mt-1 truncate", themed && "!text-[#7b869e]")}>{subtitle}</p>
             )}
             {variacao !== undefined && (
               <div className={`flex items-center gap-1 text-xs font-medium mt-1 ${variacao >= 0 ? "text-emerald-500" : "text-red-500"}`}>
@@ -75,7 +105,10 @@ function KPICard({ title, value, icon, variacao, prefix = "", color = "bg-indigo
               </div>
             )}
           </div>
-          <div className={`${color} p-2.5 rounded-xl shrink-0 opacity-90`}>
+          <div
+            className={cn("p-2.5 rounded-xl shrink-0 opacity-90", !themed && color)}
+            style={themed ? { background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)" } : undefined}
+          >
             {icon}
           </div>
         </div>
@@ -95,6 +128,7 @@ export default function DashboardPage() {
   const usandoDataCustom = !!(dataInicio && dataFim);
   const { user } = useAuth();
   const isGestor = user?.role === "ADMINISTRADOR" || user?.role === "DESENVOLVEDOR" || user?.role === "GESTOR";
+  const isDev = user?.role === "DESENVOLVEDOR";
 
   const { data: primeiroMesData } = useQuery({
     queryKey: ["dashboard-primeiro-mes"],
@@ -176,13 +210,57 @@ export default function DashboardPage() {
   const totalVendedoresVendendo = Math.max(vendasPorVendedor.length, 1);
   const metaMes = isGestor && !vendedorId ? 100000 * totalVendedoresVendendo : 100000;
 
+  const activePieColors = isDev ? PRISM_PIE_COLORS : PIE_COLORS;
+  const activeVendorColors = isDev ? PRISM_VENDOR_COLORS : VENDOR_COLORS;
+  const activeServiceColors = isDev ? PRISM_SERVICE_COLORS : SERVICE_COLORS;
+  const themedCard = isDev ? "!bg-white/[0.04] backdrop-blur-xl !border-white/10 !text-[#e8ecf5]" : "";
+  const themedTitle = isDev ? "font-mono !text-[13px] tracking-wide" : "";
+
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div
+      className={cn(
+        "space-y-6 animate-fade-in",
+        isDev && "relative -m-4 md:-m-6 p-4 md:p-6 min-h-[calc(100vh-4rem)] !text-[#e8ecf5]"
+      )}
+      style={isDev ? { background: "#060810" } : undefined}
+    >
+      {isDev && (
+        <div
+          className="absolute inset-0 pointer-events-none"
+          style={{
+            background:
+              "radial-gradient(680px 420px at 14% -6%, rgba(79,141,255,0.14), transparent 60%), " +
+              "radial-gradient(560px 380px at 88% 8%, rgba(168,85,247,0.10), transparent 60%), " +
+              "radial-gradient(520px 360px at 60% 100%, rgba(34,211,238,0.06), transparent 60%)",
+          }}
+        />
+      )}
+      <div className={cn(isDev && "relative z-10 space-y-6")}>
       {/* Header com filtros */}
       <div className="flex items-start justify-between flex-wrap gap-3">
-        <div>
+        <div className="relative">
+          {isDev && (
+            <>
+              <svg className="absolute -top-2 right-0 w-64 h-24 pointer-events-none opacity-90 hidden md:block" viewBox="0 0 260 96" fill="none">
+                <defs>
+                  <linearGradient id="dashboardBeam" x1="0" y1="0" x2="260" y2="48">
+                    <stop offset="0%" stopColor="#4f8dff" stopOpacity="0" />
+                    <stop offset="45%" stopColor="#4f8dff" />
+                    <stop offset="70%" stopColor="#a855f7" />
+                    <stop offset="100%" stopColor="#22d3ee" stopOpacity="0" />
+                  </linearGradient>
+                </defs>
+                <line x1="0" y1="56" x2="260" y2="8" stroke="url(#dashboardBeam)" strokeWidth="1.5" />
+                <line x1="20" y1="80" x2="230" y2="24" stroke="url(#dashboardBeam)" strokeWidth="1" opacity="0.5" />
+              </svg>
+              <p className="font-mono text-[11px] tracking-[0.1em] uppercase text-[#22d3ee] mb-1.5 flex items-center gap-2">
+                <span className="w-1.5 h-1.5 rounded-full bg-[#22d3ee]" style={{ boxShadow: "0 0 8px #22d3ee" }} />
+                Painel exclusivo · Desenvolvedor
+              </p>
+            </>
+          )}
           <h2 className="text-xl md:text-2xl font-bold">Dashboard Executivo</h2>
-          <p className="text-sm text-muted-foreground">Visão geral do desempenho comercial</p>
+          <p className={cn("text-sm text-muted-foreground", isDev && "!text-[#7b869e]")}>Visão geral do desempenho comercial</p>
         </div>
 
         {isGestor && (
@@ -259,69 +337,79 @@ export default function DashboardPage() {
           value={kpis.totalClientes ?? 0}
           icon={<Users className="w-5 h-5 text-white" />}
           color="bg-indigo-500"
+          themed={isDev}
         />
         <KPICard
           title="Leads Ativos"
           value={kpis.leadsAtivos ?? 0}
           icon={<TrendingUp className="w-5 h-5 text-white" />}
           color="bg-violet-500"
+          themed={isDev}
         />
         <KPICard
           title="Oportunidades Abertas"
           value={kpis.oportunidadesAbertas ?? 0}
           icon={<Target className="w-5 h-5 text-white" />}
           color="bg-blue-500"
+          themed={isDev}
         />
         <KPICard
           title="Valor em Negociação"
           value={formatCurrency(kpis.valorNegociacao ?? 0)}
           icon={<DollarSign className="w-5 h-5 text-white" />}
           color="bg-emerald-500"
+          themed={isDev}
         />
         <KPICard
           title="Vendas Fechadas"
           value={kpis.vendasFechadas ?? 0}
           icon={<CheckCircle2 className="w-5 h-5 text-white" />}
           color="bg-green-500"
+          themed={isDev}
         />
         <KPICard
           title="Taxa de Conversão"
           value={`${kpis.taxaConversao ?? 0}%`}
           icon={<Percent className="w-5 h-5 text-white" />}
           color="bg-amber-500"
+          themed={isDev}
         />
         <KPICard
           title="Ticket Médio"
           value={formatCurrency(kpis.ticketMedio ?? 0)}
           icon={<BarChart2 className="w-5 h-5 text-white" />}
           color="bg-orange-500"
+          themed={isDev}
         />
         <KPICard
           title="Receita Fechada"
           value={formatCurrency(kpis.faturamentoPrevisto ?? 0)}
           icon={<Receipt className="w-5 h-5 text-white" />}
           color="bg-rose-500"
+          themed={isDev}
         />
         <KPICard
           title="Cancelamentos"
           value={kpis.canceladosPeriodo ?? 0}
           icon={<XCircle className="w-5 h-5 text-white" />}
           color="bg-red-500"
+          themed={isDev}
         />
         <KPICard
           title="Valor Cancelado"
           value={formatCurrency(kpis.canceladosValor ?? 0)}
           icon={<TrendingDown className="w-5 h-5 text-white" />}
           color="bg-red-700"
+          themed={isDev}
         />
       </div>
 
       {/* Charts Row 1 */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Origem das Vendas — só leads fechados ganhos, não todos os leads */}
-        <Card>
+        <Card className={themedCard}>
           <CardHeader>
-            <CardTitle className="text-base">Origem das Vendas</CardTitle>
+            <CardTitle className={cn("text-base", themedTitle)}>Origem das Vendas</CardTitle>
           </CardHeader>
           <CardContent>
             {vendasPorOrigem.length > 0 ? (
@@ -330,7 +418,7 @@ export default function DashboardPage() {
                   <PieChart>
                     <Pie data={vendasPorOrigem} cx="50%" cy="50%" innerRadius={45} outerRadius={70} dataKey="total" nameKey="origem" paddingAngle={3}>
                       {vendasPorOrigem.map((_: unknown, index: number) => (
-                        <Cell key={index} fill={PIE_COLORS[index % PIE_COLORS.length]} />
+                        <Cell key={index} fill={activePieColors[index % activePieColors.length]} />
                       ))}
                     </Pie>
                     <RechartTooltip
@@ -342,7 +430,7 @@ export default function DashboardPage() {
                   {vendasPorOrigem.map((l: { origem: string; total: number }, i: number) => (
                     <div key={l.origem} className="flex items-center justify-between text-sm">
                       <div className="flex items-center gap-2">
-                        <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: PIE_COLORS[i % PIE_COLORS.length] }} />
+                        <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: activePieColors[i % activePieColors.length] }} />
                         <span className="truncate">{ORIGEM_LABELS[l.origem] || l.origem}</span>
                       </div>
                       <span className="font-medium ml-2">{l.total}</span>
@@ -361,16 +449,17 @@ export default function DashboardPage() {
         {/* Vendas por Dia — acumulado vs meta. Meta é por vendedor (R$100k/mês cada); ao ver
             "Todos os vendedores" soma a meta de cada um ativo, ao filtrar por 1 pessoa (ou
             pra quem não é gestor, que só vê a própria meta) volta a ser individual. */}
-        <Card>
+        <Card className={themedCard}>
           <CardHeader>
             <div className="flex items-center justify-between">
-              <CardTitle className="text-base">Vendas por Dia</CardTitle>
+              <CardTitle className={cn("text-base", themedTitle)}>Vendas por Dia</CardTitle>
               <span className="text-xs text-amber-500 font-medium">Meta: {formatCurrency(metaMes)}/mês</span>
             </div>
           </CardHeader>
           <CardContent>
             {(() => {
               const META_MES = metaMes;
+              const totalLineColor = isDev ? "#4f8dff" : "#ef4444";
               // Acumulado do total (vermelho) e de cada vendedor (cor correspondente à barra
               // dele em "Performance por Vendedor") — cada linha soma dia a dia separadamente.
               const acumulado: Array<Record<string, string | number>> = [];
@@ -397,9 +486,9 @@ export default function DashboardPage() {
                     />
                     {vendedorNomes.length > 0 && <Legend wrapperStyle={{ fontSize: 11 }} />}
                     <ReferenceLine y={META_MES} stroke="#f59e0b" strokeDasharray="5 3" strokeWidth={1.5} label={{ value: `Meta ${(META_MES / 1000).toFixed(0)}k`, position: "insideTopRight", fontSize: 11, fill: "#f59e0b" }} />
-                    <Line type="monotone" dataKey="total" name="Total" stroke="#ef4444" strokeWidth={3} dot={{ fill: "#ef4444", r: 5, strokeWidth: 2, stroke: "#fff" }} activeDot={{ r: 7, stroke: "#ef4444", strokeWidth: 2, fill: "#fff" }} />
+                    <Line type="monotone" dataKey="total" name="Total" stroke={totalLineColor} strokeWidth={3} dot={{ fill: totalLineColor, r: 5, strokeWidth: 2, stroke: "#fff" }} activeDot={{ r: 7, stroke: totalLineColor, strokeWidth: 2, fill: "#fff" }} />
                     {vendedorNomes.map((nome, i) => {
-                      const cor = VENDOR_COLORS[i % VENDOR_COLORS.length];
+                      const cor = activeVendorColors[i % activeVendorColors.length];
                       return (
                         <Line key={nome} type="monotone" dataKey={nome} name={nome} stroke={cor} strokeWidth={2} dot={{ fill: cor, r: 3, strokeWidth: 1, stroke: "#fff" }} activeDot={{ r: 5, stroke: cor, strokeWidth: 2, fill: "#fff" }} />
                       );
@@ -417,9 +506,9 @@ export default function DashboardPage() {
       </div>
 
       {/* Performance por Vendedor — largura total */}
-      <Card>
+      <Card className={themedCard}>
         <CardHeader>
-          <CardTitle className="text-base">Performance por Vendedor</CardTitle>
+          <CardTitle className={cn("text-base", themedTitle)}>Performance por Vendedor</CardTitle>
         </CardHeader>
         <CardContent>
           {vendasPorVendedor.length > 0 ? (
@@ -427,7 +516,7 @@ export default function DashboardPage() {
               {vendasPorVendedor.map((v: { vendedor: string; total: number; valor: number }, i: number) => {
                 const metaIndividual = 100000;
                 const pct = metaIndividual > 0 ? (v.valor / metaIndividual) * 100 : 0;
-                const barColor = pct >= 100 ? "#10b981" : VENDOR_COLORS[i % VENDOR_COLORS.length];
+                const barColor = pct >= 100 ? "#10b981" : activeVendorColors[i % activeVendorColors.length];
                 return (
                   <div key={v.vendedor} className="space-y-2">
                     <div className="flex justify-between text-sm">
@@ -464,9 +553,9 @@ export default function DashboardPage() {
       {/* Charts Row 2 */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Origem dos Leads */}
-        <Card>
+        <Card className={themedCard}>
           <CardHeader>
-            <CardTitle className="text-base">Origem dos Leads</CardTitle>
+            <CardTitle className={cn("text-base", themedTitle)}>Origem dos Leads</CardTitle>
           </CardHeader>
           <CardContent>
             {leadsPorOrigem.length > 0 ? (
@@ -475,7 +564,7 @@ export default function DashboardPage() {
                   <PieChart>
                     <Pie data={leadsPorOrigem} cx="50%" cy="50%" innerRadius={45} outerRadius={70} dataKey="total" nameKey="origem" paddingAngle={3}>
                       {leadsPorOrigem.map((_: unknown, index: number) => (
-                        <Cell key={index} fill={PIE_COLORS[index % PIE_COLORS.length]} />
+                        <Cell key={index} fill={activePieColors[index % activePieColors.length]} />
                       ))}
                     </Pie>
                     <RechartTooltip
@@ -487,7 +576,7 @@ export default function DashboardPage() {
                   {leadsPorOrigem.map((l: { origem: string; total: number }, i: number) => (
                     <div key={l.origem} className="flex items-center justify-between text-sm">
                       <div className="flex items-center gap-2">
-                        <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: PIE_COLORS[i % PIE_COLORS.length] }} />
+                        <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: activePieColors[i % activePieColors.length] }} />
                         <span className="truncate">{ORIGEM_LABELS[l.origem] || l.origem}</span>
                       </div>
                       <span className="font-medium ml-2">{l.total}</span>
@@ -505,9 +594,9 @@ export default function DashboardPage() {
 
         {/* Serviços Mais Solicitados — só Gestor/Admin */}
         {isGestor ? (
-          <Card>
+          <Card className={themedCard}>
             <CardHeader>
-              <CardTitle className="text-base flex items-center gap-2">
+              <CardTitle className={cn("text-base flex items-center gap-2", themedTitle)}>
                 Serviços Mais Solicitados
                 <span className="text-xs font-normal text-muted-foreground bg-muted px-2 py-0.5 rounded-full">Gestores</span>
               </CardTitle>
@@ -524,7 +613,7 @@ export default function DashboardPage() {
                       <div key={s.servico} className="space-y-1">
                         <div className="flex justify-between text-sm">
                           <div className="flex items-center gap-2">
-                            <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: SERVICE_COLORS[i % SERVICE_COLORS.length] }} />
+                            <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: activeServiceColors[i % activeServiceColors.length] }} />
                             <span className="font-medium">{s.servico}</span>
                           </div>
                           <span className="text-muted-foreground text-xs">{s.total} {s.total === 1 ? "cliente" : "clientes"} · {pctReal}%</span>
@@ -532,7 +621,7 @@ export default function DashboardPage() {
                         <div className="h-8 bg-muted/60 rounded-lg overflow-hidden">
                           <div
                             className="h-full rounded-lg flex items-center pl-3 text-white text-xs font-semibold transition-all duration-500"
-                            style={{ width: `${Math.max(pct, 4)}%`, backgroundColor: SERVICE_COLORS[i % SERVICE_COLORS.length] }}
+                            style={{ width: `${Math.max(pct, 4)}%`, backgroundColor: activeServiceColors[i % activeServiceColors.length] }}
                           >
                             {pct > 15 && s.servico}
                           </div>
@@ -549,6 +638,7 @@ export default function DashboardPage() {
             </CardContent>
           </Card>
         ) : null}
+      </div>
       </div>
     </div>
   );

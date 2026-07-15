@@ -20,6 +20,7 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { ROLE_LABELS, hojeISO } from "@/lib/utils/formatters";
 import { useSidebar } from "@/contexts/SidebarContext";
+import { cn } from "@/lib/utils/cn";
 
 const TIPO_TASK_COLORS: Record<string, string> = {
   LIGACAO: "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300",
@@ -165,8 +166,16 @@ export function Topbar() {
     .join("")
     .toUpperCase();
 
+  const isDev = user?.role === "DESENVOLVEDOR";
+
   return (
-    <header className="h-16 border-b bg-background/95 backdrop-blur-sm flex items-center px-4 md:px-6 gap-3 sticky top-0 z-30">
+    <header
+      className={cn(
+        "h-16 border-b flex items-center px-4 md:px-6 gap-3 sticky top-0 z-30",
+        isDev ? "border-white/[0.08]" : "bg-background/95 backdrop-blur-sm"
+      )}
+      style={isDev ? { background: "rgba(13,17,28,0.85)", backdropFilter: "blur(20px)" } : undefined}
+    >
       {/* Hamburger — mobile only */}
       <Button variant="ghost" size="icon" onClick={openMobile} className="lg:hidden text-muted-foreground">
         <Menu className="w-5 h-5" />
@@ -330,11 +339,16 @@ export function Topbar() {
             <Button variant="ghost" className="flex items-center gap-2 h-9 px-2">
               <Avatar className="w-8 h-8">
                 <AvatarImage src={user?.avatar || undefined} />
-                <AvatarFallback className="bg-indigo-600 text-white text-xs">{initials}</AvatarFallback>
+                <AvatarFallback
+                  className={cn("text-white text-xs", !isDev && "bg-indigo-600")}
+                  style={isDev ? { background: "linear-gradient(135deg,#4f8dff,#a855f7)" } : undefined}
+                >
+                  {initials}
+                </AvatarFallback>
               </Avatar>
               <div className="hidden md:block text-left">
                 <p className="text-sm font-medium leading-none">{user?.nome}</p>
-                <p className="text-xs text-muted-foreground">{ROLE_LABELS[user?.role || ""] || user?.role}</p>
+                <p className={cn("text-xs", isDev ? "text-[#22d3ee] font-mono" : "text-muted-foreground")}>{ROLE_LABELS[user?.role || ""] || user?.role}</p>
               </div>
               <ChevronDown className="w-4 h-4 text-muted-foreground" />
             </Button>

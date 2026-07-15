@@ -37,10 +37,10 @@ const bottomNavItems: { href: string; label: string; icon: React.ElementType; ro
 ];
 
 function NavLink({
-  href, label, icon: Icon, active, collapsed, onClick, badgeCount,
+  href, label, icon: Icon, active, collapsed, onClick, badgeCount, isDev,
 }: {
   href: string; label: string; icon: React.ElementType;
-  active: boolean; collapsed: boolean; onClick?: () => void; badgeCount?: number;
+  active: boolean; collapsed: boolean; onClick?: () => void; badgeCount?: number; isDev?: boolean;
 }) {
   const showBadge = !!badgeCount && badgeCount > 0;
   const badgeText = badgeCount && badgeCount > 9 ? "9+" : String(badgeCount);
@@ -52,13 +52,23 @@ function NavLink({
           href={href}
           onClick={onClick}
           className={cn(
-            "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors",
+            "relative flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors",
             active
-              ? "bg-sidebar-accent text-sidebar-accent-foreground"
-              : "text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-foreground/10",
+              ? isDev
+                ? "text-white bg-gradient-to-r from-[#4f8dff]/20 to-[#a855f7]/10"
+                : "bg-sidebar-accent text-sidebar-accent-foreground"
+              : isDev
+                ? "text-[#7b869e] hover:text-white hover:bg-white/[0.04]"
+                : "text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-foreground/10",
             collapsed && "justify-center px-2"
           )}
         >
+          {active && isDev && (
+            <span
+              className="absolute left-0 top-1.5 bottom-1.5 w-[3px] rounded-full bg-gradient-to-b from-[#4f8dff] to-[#a855f7]"
+              style={{ boxShadow: "0 0 8px rgba(79,141,255,0.7)" }}
+            />
+          )}
           <div className="relative">
             <Icon className="w-5 h-5 shrink-0" />
             {showBadge && collapsed && (
@@ -186,6 +196,7 @@ function SidebarContent({
 }) {
   const pathname = usePathname();
   const { user, loading } = useAuth();
+  const isDev = user?.role === "DESENVOLVEDOR";
 
   const visibleTop = navItems.filter(
     (item) => !item.roles || (!loading && item.roles.includes((user?.role ?? "") as Role))
@@ -209,6 +220,7 @@ function SidebarContent({
               active={active}
               collapsed={collapsed}
               onClick={onLinkClick}
+              isDev={isDev}
               badgeCount={item.href === "/clientes" ? newClientesCount : item.href === "/chat" ? chatNaoLidas : undefined}
             />
           );
@@ -216,12 +228,12 @@ function SidebarContent({
       </nav>
 
       {!loading && visibleBottom.length > 0 && (
-        <div className="mt-4 mx-2 border-t border-sidebar-border pt-4">
+        <div className={cn("mt-4 mx-2 border-t pt-4", isDev ? "border-white/[0.08]" : "border-sidebar-border")}>
           <nav className="space-y-1">
             {visibleBottom.map((item) => {
               const active = pathname.startsWith(item.href);
               return (
-                <NavLink key={item.href} {...item} active={active} collapsed={collapsed} onClick={onLinkClick} />
+                <NavLink key={item.href} {...item} active={active} collapsed={collapsed} onClick={onLinkClick} isDev={isDev} />
               );
             })}
           </nav>
@@ -234,17 +246,24 @@ function SidebarContent({
 export function Sidebar() {
   const [collapsed, setCollapsed] = useState(false);
   const { mobileOpen, closeMobile } = useSidebar();
+  const { user } = useAuth();
+  const isDev = user?.role === "DESENVOLVEDOR";
   const newClientesCount = useNewClientesCount();
   const chatNaoLidas = useChatNaoLidas();
   useDocumentTitleBadge(newClientesCount);
 
   const logo = (
-    <div className={cn("flex items-center h-16 border-b border-sidebar-border shrink-0", collapsed ? "justify-center px-2" : "gap-3 px-4")}>
-      <Logo height={collapsed ? 28 : 40} className="invert dark:invert-0" />
+    <div className={cn("flex items-center h-16 border-b shrink-0", isDev ? "border-white/[0.08]" : "border-sidebar-border", collapsed ? "justify-center px-2" : "gap-3 px-4")}>
+      <Logo height={collapsed ? 28 : 40} className={isDev ? undefined : "invert dark:invert-0"} />
       {!collapsed && (
         <span className="font-black text-base truncate tracking-wide">
-          <span className="text-sidebar-foreground">INFINITY</span>
-          <span className="text-blue-400 ml-1">GLASS</span>
+          <span className={isDev ? "text-[#e8ecf5]" : "text-sidebar-foreground"}>INFINITY</span>
+          <span
+            className="ml-1"
+            style={isDev ? { background: "linear-gradient(90deg,#4f8dff,#a855f7,#22d3ee)", WebkitBackgroundClip: "text", backgroundClip: "text", color: "transparent" } : undefined}
+          >
+            <span className={isDev ? undefined : "text-blue-400"}>GLASS</span>
+          </span>
         </span>
       )}
     </div>
@@ -255,10 +274,19 @@ export function Sidebar() {
       {/* ── Desktop sidebar ── */}
       <aside
         className={cn(
-          "relative hidden lg:flex flex-col bg-sidebar text-sidebar-foreground border-r border-sidebar-border transition-all duration-300 ease-in-out",
+          "relative hidden lg:flex flex-col border-r transition-all duration-300 ease-in-out",
+          isDev
+            ? "bg-gradient-to-b from-[#0d111c] to-[#10141f] border-white/[0.08] text-[#e8ecf5]"
+            : "bg-sidebar text-sidebar-foreground border-sidebar-border",
           collapsed ? "w-16" : "w-64"
         )}
       >
+        {isDev && (
+          <div
+            className="absolute top-0 right-[-1px] bottom-0 w-px pointer-events-none opacity-60"
+            style={{ background: "linear-gradient(180deg, transparent, #4f8dff 18%, #a855f7 50%, #22d3ee 82%, transparent)" }}
+          />
+        )}
         {logo}
         <SidebarContent collapsed={collapsed} newClientesCount={newClientesCount} chatNaoLidas={chatNaoLidas} />
 
@@ -281,16 +309,24 @@ export function Sidebar() {
       {/* ── Mobile drawer ── */}
       <aside
         className={cn(
-          "fixed top-0 left-0 z-50 h-full w-72 flex flex-col bg-sidebar text-sidebar-foreground border-r border-sidebar-border transition-transform duration-300 ease-in-out lg:hidden",
+          "fixed top-0 left-0 z-50 h-full w-72 flex flex-col border-r transition-transform duration-300 ease-in-out lg:hidden",
+          isDev
+            ? "bg-gradient-to-b from-[#0d111c] to-[#10141f] border-white/[0.08] text-[#e8ecf5]"
+            : "bg-sidebar text-sidebar-foreground border-sidebar-border",
           mobileOpen ? "translate-x-0" : "-translate-x-full"
         )}
       >
-        <div className="flex items-center justify-between h-16 px-4 border-b border-sidebar-border shrink-0">
+        <div className={cn("flex items-center justify-between h-16 px-4 border-b shrink-0", isDev ? "border-white/[0.08]" : "border-sidebar-border")}>
           <div className="flex items-center gap-3">
-            <Logo height={40} className="invert dark:invert-0" />
+            <Logo height={40} className={isDev ? undefined : "invert dark:invert-0"} />
             <span className="font-black text-base tracking-wide">
               <span>INFINITY</span>
-              <span className="text-blue-400 ml-1">GLASS</span>
+              <span
+                className="ml-1"
+                style={isDev ? { background: "linear-gradient(90deg,#4f8dff,#a855f7,#22d3ee)", WebkitBackgroundClip: "text", backgroundClip: "text", color: "transparent" } : undefined}
+              >
+                {isDev ? "GLASS" : <span className="text-blue-400">GLASS</span>}
+              </span>
             </span>
           </div>
           <button onClick={closeMobile} className="p-1.5 rounded-lg hover:bg-sidebar-foreground/10 transition-colors">

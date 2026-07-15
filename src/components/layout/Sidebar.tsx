@@ -240,7 +240,7 @@ export function Sidebar() {
 
   const logo = (
     <div className={cn("flex items-center h-16 border-b border-sidebar-border shrink-0", collapsed ? "justify-center px-2" : "gap-3 px-4")}>
-      <Logo height={collapsed ? 28 : 40} />
+      <Logo height={collapsed ? 28 : 40} className="invert dark:invert-0" />
       {!collapsed && (
         <span className="font-black text-base truncate tracking-wide">
           <span className="text-sidebar-foreground">INFINITY</span>
@@ -287,7 +287,7 @@ export function Sidebar() {
       >
         <div className="flex items-center justify-between h-16 px-4 border-b border-sidebar-border shrink-0">
           <div className="flex items-center gap-3">
-            <Logo height={40} />
+            <Logo height={40} className="invert dark:invert-0" />
             <span className="font-black text-base tracking-wide">
               <span>INFINITY</span>
               <span className="text-blue-400 ml-1">GLASS</span>

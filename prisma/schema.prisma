@@ -147,6 +147,9 @@ model User {
   chatMensagensEnviadas  ChatMensagem[] @relation("ChatMensagensEnviadas")
   chatMensagensRecebidas ChatMensagem[] @relation("ChatMensagensRecebidas")
   chatLeitura            ChatLeitura?
+  alertasRecebidos       Alerta[]       @relation("AlertasRecebidos")
+  alertasCriados         Alerta[]       @relation("AlertasCriados")
+  alertasLeituras        AlertaLeitura[]
 
   @@map("users")
 }
@@ -584,3 +587,30 @@ enum HandoffReason {
   CLIENTE_PEDIU_HUMANO
   SERVICO_NAO_RECONHECIDO
 }
+
+model Alerta {
+  id             String          @id @default(cuid())
+  titulo         String
+  mensagem       String
+  criadoEm       DateTime        @default(now())
+  destinoUserId  String?
+  destinoUser    User?           @relation("AlertasRecebidos", fields: [destinoUserId], references: [id], onDelete: Cascade)
+  criadorId      String
+  criador        User            @relation("AlertasCriados", fields: [criadorId], references: [id], onDelete: Cascade)
+  leituras       AlertaLeitura[]
+
+  @@map("alertas")
+}
+
+model AlertaLeitura {
+  id       String   @id @default(cuid())
+  alertaId String
+  alerta   Alerta   @relation(fields: [alertaId], references: [id], onDelete: Cascade)
+  userId   String
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lidoEm   DateTime @default(now())
+
+  @@unique([alertaId, userId])
+  @@map("alertas_leituras")
+}
+

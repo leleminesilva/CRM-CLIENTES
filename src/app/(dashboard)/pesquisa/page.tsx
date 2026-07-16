@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import axios from "axios";
-import { Search as SearchIcon, ExternalLink } from "lucide-react";
+import { Search as SearchIcon, ExternalLink, Sparkles } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -15,6 +15,11 @@ interface ResultadoPesquisa {
   date?: string | null;
 }
 
+interface ResumoPesquisa {
+  texto: string;
+  citacoes: { title: string; url: string }[];
+}
+
 export default function PesquisaPage() {
   const [termo, setTermo] = useState("");
   const [busca, setBusca] = useState("");
@@ -23,12 +28,13 @@ export default function PesquisaPage() {
     queryKey: ["pesquisa", busca],
     queryFn: async () => {
       const { data } = await axios.get(`/api/pesquisa?q=${encodeURIComponent(busca)}`);
-      return data as { results: ResultadoPesquisa[] };
+      return data as { results: ResultadoPesquisa[]; resumo: ResumoPesquisa | null };
     },
     enabled: busca.length > 0,
   });
 
   const resultados = data?.results ?? [];
+  const resumo = data?.resumo ?? null;
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -82,6 +88,31 @@ export default function PesquisaPage() {
         <Card className="p-12 text-center text-muted-foreground">
           <SearchIcon className="w-8 h-8 mx-auto mb-3 opacity-40" />
           <p>Nenhum resultado encontrado</p>
+        </Card>
+      )}
+
+      {!isLoading && resumo && (
+        <Card className="p-4 border-blue-500/30 bg-blue-500/[0.03]">
+          <h3 className="font-medium flex items-center gap-1.5 text-sm mb-2">
+            <Sparkles className="w-4 h-4 text-blue-500" />
+            Resumo
+          </h3>
+          <p className="text-sm whitespace-pre-line leading-relaxed">{resumo.texto}</p>
+          {resumo.citacoes.length > 0 && (
+            <div className="flex flex-wrap gap-2 mt-3 pt-3 border-t">
+              {resumo.citacoes.map((c) => (
+                <a
+                  key={c.url}
+                  href={c.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs px-2 py-1 rounded-full bg-muted hover:bg-muted/70 text-muted-foreground hover:text-foreground transition-colors truncate max-w-[220px]"
+                >
+                  {c.title}
+                </a>
+              ))}
+            </div>
+          )}
         </Card>
       )}
 

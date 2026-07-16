@@ -158,10 +158,19 @@ export default function ClientesPage() {
     enabled: isAdmin,
   });
 
+  const PAGE_SIZE = 100;
+  // Etapa/Temperatura/Responsável são ordenados no client, então quando ativos
+  // precisamos do conjunto filtrado inteiro (não só a página atual) — senão cada
+  // página é ordenada isoladamente e a sequência "recomeça" a cada 100 itens.
+  const clientSortActive = etapaSort > 0 || tempSort > 0 || respSort > 0;
+
   const { data, isLoading } = useQuery({
-    queryKey: ["clientes", page, search, responsavelId, temperatura, servico, estagio, dataInicio, dataFim, sortMode],
+    queryKey: ["clientes", page, search, responsavelId, temperatura, servico, estagio, dataInicio, dataFim, sortMode, clientSortActive],
     queryFn: async () => {
-      const params = new URLSearchParams({ page: String(page), limit: "100" });
+      const params = new URLSearchParams({
+        page: clientSortActive ? "1" : String(page),
+        limit: clientSortActive ? "5000" : String(PAGE_SIZE),
+      });
       if (search) params.set("search", search);
       if (responsavelId) params.set("responsavelId", responsavelId);
       if (temperatura) params.set("temperatura", temperatura);
@@ -198,7 +207,7 @@ export default function ClientesPage() {
   const TEMP_ORDER: Record<string, number> = { QUENTE: 0, MORNO: 1, FRIO: 2 };
 
   const clientesRaw: Cliente[] = data?.data || [];
-  const clientes = (() => {
+  const clientesOrdenados = (() => {
     if (etapaSort > 0) {
       return [...clientesRaw].sort((a, b) => {
         const ea = (a as unknown as { leads?: { estagio: string }[] }).leads?.[0]?.estagio ?? "";
@@ -223,7 +232,12 @@ export default function ClientesPage() {
     return clientesRaw;
   })();
   const total = data?.total || 0;
-  const totalPages = data?.totalPages || 1;
+  // Com sort client-side ativo já buscamos o conjunto inteiro (não a página do
+  // backend), então a paginação exibida também precisa ser fatiada no client.
+  const clientes = clientSortActive
+    ? clientesOrdenados.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+    : clientesOrdenados;
+  const totalPages = clientSortActive ? Math.max(1, Math.ceil(total / PAGE_SIZE)) : (data?.totalPages || 1);
 
   const ActionMenu = ({ c }: { c: Cliente }) => (
     <DropdownMenu>

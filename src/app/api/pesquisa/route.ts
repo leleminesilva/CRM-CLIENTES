@@ -19,9 +19,33 @@ export async function GET(request: NextRequest) {
     }
 
     const client = new Perplexity({ apiKey: process.env.PERPLEXITY_API_KEY });
-    const search = await client.search.create({ query, max_results: 10 });
 
-    return NextResponse.json({ results: search.results });
+    const [searchResult, resumoResult] = await Promise.allSettled([
+      client.search.create({ query, max_results: 10 }),
+      client.responses.create({ preset: "pro-search", input: query }),
+    ]);
+
+    if (searchResult.status === "rejected") console.error("Erro em search.create:", searchResult.reason);
+    if (resumoResult.status === "rejected") console.error("Erro em responses.create:", resumoResult.reason);
+
+    const results = searchResult.status === "fulfilled" ? searchResult.value.results : [];
+
+    let resumo: { texto: string; citacoes: { title: string; url: string }[] } | null = null;
+    if (resumoResult.status === "fulfilled") {
+      const texto = resumoResult.value.output_text ?? "";
+      const citacoes = new Map<string, string>();
+      for (const item of resumoResult.value.output) {
+        if (item.type !== "message") continue;
+        for (const part of item.content) {
+          for (const ann of part.annotations ?? []) {
+            if (ann.url) citacoes.set(ann.url, ann.title || ann.url);
+          }
+        }
+      }
+      resumo = texto ? { texto, citacoes: Array.from(citacoes, ([url, title]) => ({ url, title })) } : null;
+    }
+
+    return NextResponse.json({ results, resumo });
   } catch (error) {
     console.error("Erro na pesquisa:", error);
     return NextResponse.json({ error: "Erro ao pesquisar" }, { status: 500 });

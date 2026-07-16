@@ -330,3 +330,22 @@ export interface JWTPayload {
   iat: number;
   exp: number;
 }
+
+export interface Alerta {
+  id: string;
+  titulo: string;
+  mensagem: string;
+  criadoEm: string;
+  destinoUserId?: string | null;
+  destinoUser?: User | null;
+  criadorId: string;
+  criador?: User | null;
+}
+
+export interface AlertaLeitura {
+  id: string;
+  alertaId: string;
+  userId: string;
+  lidoEm: string;
+}
+

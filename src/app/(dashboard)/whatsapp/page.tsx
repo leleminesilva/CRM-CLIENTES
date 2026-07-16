@@ -25,13 +25,14 @@ import { useAuth } from "@/contexts/AuthContext";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
-interface Instancia {
+interface Sessao {
   id: string;
   nome: string;
-  phoneNumberId: string;
-  phoneNumber?: string;
+  numero?: string | null;
+  status: "ONLINE" | "OFFLINE" | "RECONNECTING" | "WAITING_QR" | "ERROR" | "UNKNOWN";
+  healthStatus: "HEALTHY" | "STALE" | "UNKNOWN";
   ativo: boolean;
-  _count?: { conversas: number };
+  atendente: { id: string; nome: string } | null;
 }
 
 interface Mensagem {
@@ -45,7 +46,7 @@ interface Mensagem {
 
 interface Conversa {
   id: string;
-  instanciaId: string;
+  sessaoId: string;
   contatoPhone: string;
   contatoNome?: string;
   naoLidas: number;
@@ -87,9 +88,11 @@ function StatusIcon({ status }: { status: string }) {
   return <Check className="w-3.5 h-3.5 text-black/45 dark:text-white/60" />;
 }
 
-// ── Modal de nova instância ────────────────────────────────────────────────
+// ── Modal de nova sessão ───────────────────────────────────────────────────
+// Fase 1: só cria o registro da sessão (status WAITING_QR). A exibição do QR
+// Code ao vivo (via Realtime, sem polling) é Fase 2 — ver docs/architecture/whatsapp.md.
 
-function ModalInstancia({
+function ModalNovaSessao({
   open,
   onClose,
   onSaved,
@@ -99,26 +102,23 @@ function ModalInstancia({
   onSaved: () => void;
 }) {
   const [nome, setNome] = useState("");
-  const [phoneNumberId, setPhoneNumberId] = useState("");
-  const [accessToken, setAccessToken] = useState("");
-  const [phoneNumber, setPhoneNumber] = useState("");
   const [loading, setLoading] = useState(false);
 
   async function handleSave() {
-    if (!nome || !phoneNumberId || !accessToken) {
-      toast.error("Preencha todos os campos obrigatórios");
+    if (!nome) {
+      toast.error("Preencha o nome da sessão");
       return;
     }
     setLoading(true);
     try {
-      await axios.post("/api/whatsapp/instancias", { nome, phoneNumberId, accessToken, phoneNumber });
-      toast.success("Número conectado com sucesso!");
+      await axios.post("/api/whatsapp/sessoes", { nome });
+      toast.success("Sessão criada — aguardando conexão via QR Code");
       onSaved();
       onClose();
-      setNome(""); setPhoneNumberId(""); setAccessToken(""); setPhoneNumber("");
+      setNome("");
     } catch (e: unknown) {
       const msg = (e as { response?: { data?: { error?: string } } })?.response?.data?.error;
-      toast.error(msg ?? "Erro ao salvar");
+      toast.error(msg ?? "Erro ao criar sessão");
     } finally {
       setLoading(false);
     }
@@ -130,34 +130,19 @@ function ModalInstancia({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Smartphone className="w-5 h-5 text-green-500" />
-            Conectar número WhatsApp
+            Nova sessão WhatsApp
           </DialogTitle>
         </DialogHeader>
 
         <div className="space-y-4 py-2">
           <p className="text-sm text-muted-foreground">
-            Você precisará dos dados do seu App no{" "}
-            <span className="font-medium text-foreground">Meta for Developers</span>{" "}
-            (developers.facebook.com).
+            A conexão é feita escaneando um QR Code pelo WhatsApp do celular — nenhuma credencial
+            é digitada aqui. A exibição do QR Code entra na próxima etapa deste módulo.
           </p>
 
           <div className="space-y-2">
-            <Label>Nome do número <span className="text-red-500">*</span></Label>
+            <Label>Nome da sessão <span className="text-red-500">*</span></Label>
             <Input placeholder="Ex: Comercial, Suporte..." value={nome} onChange={(e) => setNome(e.target.value)} />
-          </div>
-          <div className="space-y-2">
-            <Label>Phone Number ID <span className="text-red-500">*</span></Label>
-            <Input placeholder="ID do número no Meta" value={phoneNumberId} onChange={(e) => setPhoneNumberId(e.target.value)} />
-            <p className="text-xs text-muted-foreground">WhatsApp → Phone Numbers → ID</p>
-          </div>
-          <div className="space-y-2">
-            <Label>Access Token <span className="text-red-500">*</span></Label>
-            <Input placeholder="Token permanente do App" value={accessToken} onChange={(e) => setAccessToken(e.target.value)} />
-            <p className="text-xs text-muted-foreground">System User Access Token (não expira)</p>
-          </div>
-          <div className="space-y-2">
-            <Label>Número de telefone</Label>
-            <Input placeholder="+55 11 99999-9999" value={phoneNumber} onChange={(e) => setPhoneNumber(e.target.value)} />
           </div>
         </div>
 
@@ -165,7 +150,7 @@ function ModalInstancia({
           <Button variant="outline" onClick={onClose}>Cancelar</Button>
           <Button onClick={handleSave} disabled={loading} className="bg-green-600 hover:bg-green-700 text-white">
             {loading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-            Conectar
+            Criar sessão
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -173,16 +158,25 @@ function ModalInstancia({
   );
 }
 
-// ── Painel de instâncias ───────────────────────────────────────────────────
+// ── Painel de sessões ──────────────────────────────────────────────────────
 
-function PainelInstancias({
-  instancias,
+const STATUS_DOT: Record<Sessao["status"], string> = {
+  ONLINE: "bg-green-500",
+  WAITING_QR: "bg-amber-500",
+  RECONNECTING: "bg-amber-500",
+  OFFLINE: "bg-muted-foreground",
+  ERROR: "bg-red-500",
+  UNKNOWN: "bg-muted-foreground",
+};
+
+function PainelSessoes({
+  sessoes,
   selected,
   onSelect,
   onAdd,
   isAdmin,
 }: {
-  instancias: Instancia[];
+  sessoes: Sessao[];
   selected: string | null;
   onSelect: (id: string) => void;
   onAdd: () => void;
@@ -195,29 +189,27 @@ function PainelInstancias({
       </div>
       <ScrollArea className="flex-1">
         <div className="py-2 flex flex-col items-center gap-2 px-2">
-          {instancias.map((inst) => (
+          {sessoes.map((s) => (
             <button
-              key={inst.id}
-              onClick={() => onSelect(inst.id)}
-              title={inst.nome}
+              key={s.id}
+              onClick={() => onSelect(s.id)}
+              title={`${s.nome} — ${s.status}`}
               className={cn(
                 "relative w-10 h-10 rounded-xl flex items-center justify-center text-xs font-bold transition-all",
-                selected === inst.id
+                selected === s.id
                   ? "bg-green-600 text-white shadow-lg scale-105"
                   : "bg-muted text-muted-foreground hover:bg-accent"
               )}
             >
-              {getInitials(inst.nome)}
-              {inst.ativo && (
-                <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-500 rounded-full border-2 border-background" />
-              )}
+              {getInitials(s.nome)}
+              <span className={cn("absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-background", STATUS_DOT[s.status])} />
             </button>
           ))}
         </div>
       </ScrollArea>
       {isAdmin && (
         <div className="p-2 border-t border-border flex flex-col items-center gap-1">
-          <Button size="icon" variant="ghost" className="w-10 h-10 rounded-xl" onClick={onAdd} title="Adicionar número">
+          <Button size="icon" variant="ghost" className="w-10 h-10 rounded-xl" onClick={onAdd} title="Nova sessão">
             <Plus className="w-4 h-4" />
           </Button>
         </div>
@@ -230,14 +222,14 @@ function PainelInstancias({
 
 function ListaConversas({
   conversas,
-  instancia,
+  sessao,
   selectedId,
   onSelect,
   search,
   onSearchChange,
 }: {
   conversas: Conversa[];
-  instancia: Instancia | undefined;
+  sessao: Sessao | undefined;
   selectedId: string | null;
   onSelect: (c: Conversa) => void;
   search: string;
@@ -255,9 +247,9 @@ function ListaConversas({
     <div className="w-full md:w-80 flex flex-col border-r border-border shrink-0">
       <div className="h-14 flex items-center px-4 border-b border-border gap-2 bg-[#f0f2f5] dark:bg-[#202c33]">
         <div className="flex-1 min-w-0">
-          <p className="font-semibold text-sm truncate">{instancia?.nome ?? "Selecione um número"}</p>
-          {instancia?.phoneNumber && (
-            <p className="text-xs text-muted-foreground">{formatPhone(instancia.phoneNumber)}</p>
+          <p className="font-semibold text-sm truncate">{sessao?.nome ?? "Selecione uma sessão"}</p>
+          {sessao?.numero && (
+            <p className="text-xs text-muted-foreground">{formatPhone(sessao.numero)}</p>
           )}
         </div>
       </div>
@@ -538,12 +530,12 @@ function AreaChat({
 // ── Painel de configurações ────────────────────────────────────────────────
 
 function PainelConfig({
-  instancias,
+  sessoes,
   onDelete,
   onAdd,
   isAdmin,
 }: {
-  instancias: Instancia[];
+  sessoes: Sessao[];
   onDelete: (id: string) => void;
   onAdd: () => void;
   isAdmin: boolean;
@@ -553,35 +545,37 @@ function PainelConfig({
       <div>
         <h2 className="text-lg font-semibold flex items-center gap-2">
           <Settings className="w-5 h-5" />
-          Números conectados
+          Sessões WhatsApp
         </h2>
         <p className="text-sm text-muted-foreground mt-1">
-          Gerencie os números WhatsApp Business conectados ao CRM.
+          Gerencie as sessões WhatsApp conectadas ao CRM via gateway próprio (sem migrar número pra Meta).
         </p>
       </div>
 
       <div className="space-y-3 max-w-xl">
-        {instancias.map((inst) => (
-          <div key={inst.id} className="flex items-center gap-3 p-4 rounded-xl border border-border bg-card">
+        {sessoes.map((s) => (
+          <div key={s.id} className="flex items-center gap-3 p-4 rounded-xl border border-border bg-card">
             <div className="w-10 h-10 rounded-xl bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 flex items-center justify-center text-sm font-bold">
-              {getInitials(inst.nome)}
+              {getInitials(s.nome)}
             </div>
             <div className="flex-1 min-w-0">
-              <p className="font-medium text-sm">{inst.nome}</p>
+              <p className="font-medium text-sm">{s.nome}</p>
               <p className="text-xs text-muted-foreground truncate">
-                {inst.phoneNumber ? formatPhone(inst.phoneNumber) : `ID: ${inst.phoneNumberId}`}
+                {s.numero ? formatPhone(s.numero) : "Aguardando conexão via QR Code"}
               </p>
-              <p className="text-xs text-muted-foreground">{inst._count?.conversas ?? 0} conversa(s)</p>
+              <p className="text-xs text-muted-foreground">
+                {s.atendente ? `Atendente: ${s.atendente.nome}` : "Não atribuído"}
+              </p>
             </div>
-            <Badge variant={inst.ativo ? "default" : "secondary"} className={inst.ativo ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400" : ""}>
-              {inst.ativo ? "Ativo" : "Inativo"}
+            <Badge variant={s.status === "ONLINE" ? "default" : "secondary"} className={s.status === "ONLINE" ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400" : ""}>
+              {s.status}
             </Badge>
             {isAdmin && (
               <Button
                 size="icon"
                 variant="ghost"
                 className="text-destructive hover:text-destructive hover:bg-destructive/10 w-8 h-8"
-                onClick={() => onDelete(inst.id)}
+                onClick={() => onDelete(s.id)}
               >
                 <Trash2 className="w-4 h-4" />
               </Button>
@@ -592,25 +586,9 @@ function PainelConfig({
         {isAdmin && (
           <Button variant="outline" className="w-full" onClick={onAdd}>
             <Plus className="w-4 h-4 mr-2" />
-            Conectar novo número
+            Nova sessão
           </Button>
         )}
-      </div>
-
-      <div className="max-w-xl rounded-xl border border-amber-200 bg-amber-50 dark:border-amber-900/50 dark:bg-amber-900/10 p-4">
-        <p className="text-sm font-medium text-amber-800 dark:text-amber-400 mb-2">Como configurar o Webhook na Meta</p>
-        <ol className="text-xs text-amber-700 dark:text-amber-500 space-y-1 list-decimal list-inside">
-          <li>Acesse developers.facebook.com → seu App → WhatsApp → Configuração</li>
-          <li>Em &quot;Webhooks&quot;, clique em &quot;Editar&quot;</li>
-          <li>
-            URL do callback:{" "}
-            <code className="bg-amber-100 dark:bg-amber-900/30 px-1 rounded font-mono">
-              https://seu-dominio.vercel.app/api/whatsapp/webhook
-            </code>
-          </li>
-          <li>Token de verificação: o valor de <code className="font-mono bg-amber-100 dark:bg-amber-900/30 px-1 rounded">WHATSAPP_WEBHOOK_TOKEN</code> no .env</li>
-          <li>Inscreva-se em: <strong>messages</strong></li>
-        </ol>
       </div>
     </div>
   );
@@ -622,35 +600,39 @@ function WhatsAppContent() {
   const { user } = useAuth();
   const searchParams = useSearchParams();
   const phoneParam = useMemo(() => searchParams.get("phone"), [searchParams]);
-  const isAdmin = user?.role === "ADMINISTRADOR" || user?.role === "DESENVOLVEDOR";
+  // Fase 1: módulo restrito só a Desenvolvedor (ver src/lib/rbac.ts e
+  // docs/architecture/whatsapp.md) — o escopo por atendenteId pra outros
+  // cargos já está pronto no backend, só dormente até ser liberado.
+  const isAdmin = user?.role === "DESENVOLVEDOR";
 
-  const [instanciaId, setInstanciaId] = useState<string | null>(null);
+  const [sessaoId, setSessaoId] = useState<string | null>(null);
   const [conversa, setConversa] = useState<Conversa | null>(null);
   const [searchConversa, setSearchConversa] = useState("");
   const [modalAberto, setModalAberto] = useState(false);
   const [painelConfig, setPainelConfig] = useState(false);
   const queryClient = useQueryClient();
 
-  const { data: instancias = [] } = useQuery({
-    queryKey: ["wa-instancias"],
+  const { data: sessoes = [] } = useQuery({
+    queryKey: ["wa-sessoes"],
     queryFn: async () => {
-      const { data } = await axios.get("/api/whatsapp/instancias");
-      return data as Instancia[];
+      const { data } = await axios.get("/api/whatsapp/sessoes");
+      return data as Sessao[];
     },
+    enabled: isAdmin,
   });
 
   const { data: conversas = [] } = useQuery({
-    queryKey: ["wa-conversas", instanciaId],
+    queryKey: ["wa-conversas", sessaoId],
     queryFn: async () => {
-      const params = instanciaId ? `?instanciaId=${instanciaId}` : "";
+      const params = sessaoId ? `?sessaoId=${sessaoId}` : "";
       const { data } = await axios.get(`/api/whatsapp/conversas${params}`);
       return data as Conversa[];
     },
-    enabled: !!instanciaId,
+    enabled: !!sessaoId,
     refetchInterval: 5000,
   });
 
-  // Busca todas conversas quando vem via ?phone= para encontrar em qualquer instância
+  // Busca todas conversas quando vem via ?phone= para encontrar em qualquer sessão
   const { data: todasConversas = [] } = useQuery({
     queryKey: ["wa-conversas-todas"],
     queryFn: async () => {
@@ -661,10 +643,10 @@ function WhatsAppContent() {
   });
 
   useEffect(() => {
-    if (instancias.length > 0 && !instanciaId) {
-      setInstanciaId(instancias[0].id);
+    if (sessoes.length > 0 && !sessaoId) {
+      setSessaoId(sessoes[0].id);
     }
-  }, [instancias, instanciaId]);
+  }, [sessoes, sessaoId]);
 
   // Auto-abre conversa quando vem de /clientes via ?phone=
   useEffect(() => {
@@ -674,25 +656,25 @@ function WhatsAppContent() {
       c.contatoPhone.replace(/\D/g, "").endsWith(tail)
     );
     if (match) {
-      setInstanciaId(match.instanciaId);
+      setSessaoId(match.sessaoId);
       setConversa(match);
       setPainelConfig(false);
     }
   }, [phoneParam, todasConversas]);
 
-  const deletarInstancia = useCallback(async (id: string) => {
-    if (!confirm("Deseja remover este número? Todas as conversas serão excluídas.")) return;
+  const deletarSessao = useCallback(async (id: string) => {
+    if (!confirm("Deseja remover esta sessão? O histórico de conversas é mantido.")) return;
     try {
-      await axios.delete(`/api/whatsapp/instancias/${id}`);
-      queryClient.invalidateQueries({ queryKey: ["wa-instancias"] });
-      if (instanciaId === id) setInstanciaId(null);
-      toast.success("Número removido");
+      await axios.delete(`/api/whatsapp/sessoes/${id}`);
+      queryClient.invalidateQueries({ queryKey: ["wa-sessoes"] });
+      if (sessaoId === id) setSessaoId(null);
+      toast.success("Sessão removida");
     } catch {
-      toast.error("Erro ao remover número");
+      toast.error("Erro ao remover sessão");
     }
-  }, [instanciaId, queryClient]);
+  }, [sessaoId, queryClient]);
 
-  const instanciaAtual = instancias.find((i) => i.id === instanciaId);
+  const sessaoAtual = sessoes.find((s) => s.id === sessaoId);
   const painelChat = conversa !== null;
 
   if (user && !isAdmin) {
@@ -702,7 +684,7 @@ function WhatsAppContent() {
         <div>
           <h2 className="text-xl font-semibold">Acesso restrito</h2>
           <p className="text-muted-foreground mt-1 text-sm">
-            O módulo WhatsApp está disponível apenas para administradores.
+            O módulo WhatsApp está em validação e disponível apenas para Desenvolvedor por enquanto.
           </p>
         </div>
       </div>
@@ -711,38 +693,38 @@ function WhatsAppContent() {
 
   return (
     <div className="h-full flex overflow-hidden rounded-xl border border-border bg-background shadow-sm -m-4 md:-m-6">
-      {/* Painel de instâncias */}
-      <PainelInstancias
-        instancias={instancias}
-        selected={instanciaId}
-        onSelect={(id) => { setInstanciaId(id); setConversa(null); setPainelConfig(false); }}
+      {/* Painel de sessões */}
+      <PainelSessoes
+        sessoes={sessoes}
+        selected={sessaoId}
+        onSelect={(id) => { setSessaoId(id); setConversa(null); setPainelConfig(false); }}
         onAdd={() => setModalAberto(true)}
         isAdmin={isAdmin}
       />
 
-      {/* Se não há instâncias, mostra onboarding */}
-      {instancias.length === 0 ? (
+      {/* Se não há sessões, mostra onboarding */}
+      {sessoes.length === 0 ? (
         <div className="flex-1 flex flex-col items-center justify-center gap-4 p-8 text-center">
           <div className="w-20 h-20 rounded-2xl bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
             <MessageCircle className="w-10 h-10 text-green-600" />
           </div>
           <div>
-            <h2 className="text-xl font-semibold">Conecte seu WhatsApp Business</h2>
+            <h2 className="text-xl font-semibold">Conecte um WhatsApp</h2>
             <p className="text-muted-foreground mt-2 max-w-sm">
-              Adicione os números WhatsApp Business da sua empresa para visualizar e responder mensagens diretamente pelo CRM.
+              Crie uma sessão pra conectar um WhatsApp ao CRM via QR Code — sem migrar o número pra Meta.
             </p>
           </div>
           {isAdmin && (
             <Button onClick={() => setModalAberto(true)} className="bg-green-600 hover:bg-green-700 text-white gap-2">
               <Plus className="w-4 h-4" />
-              Conectar primeiro número
+              Criar primeira sessão
             </Button>
           )}
         </div>
       ) : painelConfig ? (
         <PainelConfig
-          instancias={instancias}
-          onDelete={deletarInstancia}
+          sessoes={sessoes}
+          onDelete={deletarSessao}
           onAdd={() => setModalAberto(true)}
           isAdmin={isAdmin}
         />
@@ -752,7 +734,7 @@ function WhatsAppContent() {
           <div className={cn("flex flex-col border-r border-border", painelChat ? "hidden md:flex md:w-80" : "flex flex-1 md:flex-none md:w-80")}>
             <ListaConversas
               conversas={conversas}
-              instancia={instanciaAtual}
+              sessao={sessaoAtual}
               selectedId={conversa?.id ?? null}
               onSelect={(c) => setConversa(c)}
               search={searchConversa}
@@ -771,7 +753,7 @@ function WhatsAppContent() {
       )}
 
       {/* Botão de configurações */}
-      {instancias.length > 0 && isAdmin && (
+      {sessoes.length > 0 && isAdmin && (
         <button
           onClick={() => { setPainelConfig(!painelConfig); setConversa(null); }}
           className={cn(
@@ -784,10 +766,10 @@ function WhatsAppContent() {
         </button>
       )}
 
-      <ModalInstancia
+      <ModalNovaSessao
         open={modalAberto}
         onClose={() => setModalAberto(false)}
-        onSaved={() => queryClient.invalidateQueries({ queryKey: ["wa-instancias"] })}
+        onSaved={() => queryClient.invalidateQueries({ queryKey: ["wa-sessoes"] })}
       />
     </div>
   );

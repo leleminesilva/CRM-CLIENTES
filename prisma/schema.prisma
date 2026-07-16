@@ -150,6 +150,7 @@ model User {
   alertasRecebidos       Alerta[]       @relation("AlertasRecebidos")
   alertasCriados         Alerta[]       @relation("AlertasCriados")
   alertasLeituras        AlertaLeitura[]
+  whatsappSessoes        WhatsAppSessao[] @relation("WhatsAppAtendente")
 
   @@map("users")
 }
@@ -496,27 +497,97 @@ model AuditLog {
 }
 
 // ==========================================
-// WHATSAPP BUSINESS API
+// WHATSAPP — gateway self-hosted (Evolution API), ver docs/architecture/whatsapp.md
 // ==========================================
 
-model WhatsAppInstancia {
-  id            String   @id @default(cuid())
-  nome          String
-  phoneNumberId String   @unique
-  accessToken   String
-  phoneNumber   String?
-  ativo         Boolean  @default(true)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+enum WhatsAppProvider {
+  EVOLUTION
+  META
+  WPPCONNECT
+  GREEN_API
+  UNKNOWN
+}
 
+enum WhatsAppSessaoStatus {
+  ONLINE
+  OFFLINE
+  RECONNECTING
+  WAITING_QR
+  ERROR
+  UNKNOWN
+}
+
+enum WhatsAppSessaoEvento {
+  CONECTOU
+  DESCONECTOU
+  QR_GERADO
+  QR_EXPIROU
+  ERRO
+  RECONECTOU
+  REINICIOU
+  ATUALIZOU
+}
+
+enum WhatsAppMensagemStatus {
+  ENVIANDO
+  ENVIADA
+  ENTREGUE
+  LIDA
+  FALHOU
+}
+
+model WhatsAppSessao {
+  id                     String                @id @default(cuid())
+  nome                   String
+  numero                 String?
+  provider               WhatsAppProvider      @default(EVOLUTION)
+  providerVersion        String?
+  providerSessionId      String                @unique
+  status                 WhatsAppSessaoStatus  @default(UNKNOWN)
+  ultimoPing             DateTime?
+  ultimaMensagemRecebida DateTime?
+  lastError              String?
+  lastErrorAt            DateTime?
+  atendenteId            String?
+  empresaId              String?
+  ativo                  Boolean               @default(true)
+  createdAt              DateTime              @default(now())
+  updatedAt              DateTime              @updatedAt
+
+  atendente User? @relation("WhatsAppAtendente", fields: [atendenteId], references: [id])
   conversas WhatsAppConversa[]
+  logs      WhatsAppSessaoLog[]
 
-  @@map("whatsapp_instancias")
+  @@index([atendenteId])
+  @@map("whatsapp_sessoes")
+}
+
+model WhatsAppSessaoLog {
+  id        String               @id @default(cuid())
+  sessaoId  String
+  evento    WhatsAppSessaoEvento
+  detalhe   String?
+  createdAt DateTime             @default(now())
+
+  sessao WhatsAppSessao @relation(fields: [sessaoId], references: [id], onDelete: Cascade)
+
+  @@index([sessaoId])
+  @@map("whatsapp_sessao_logs")
+}
+
+// Dedup de entrega de webhook (idempotência) — ver docs/architecture/whatsapp.md
+model WhatsAppWebhookEvent {
+  id              String   @id @default(cuid())
+  providerEventId String   @unique
+  tipo            String
+  recebidoEm      DateTime @default(now())
+
+  @@map("whatsapp_webhook_events")
 }
 
 model WhatsAppConversa {
   id           String    @id @default(cuid())
-  instanciaId  String
+  sessaoId     String
   contatoPhone String
   contatoNome  String?
   clienteId    String?
@@ -525,25 +596,33 @@ model WhatsAppConversa {
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
-  instancia   WhatsAppInstancia    @relation(fields: [instanciaId], references: [id], onDelete: Cascade)
+  // Restrict (não Cascade): excluir uma sessão nunca pode apagar histórico de
+  // conversas junto — é por isso que essa arquitetura existe. "Excluir sessão"
+  // na prática é soft-delete (WhatsAppSessao.ativo = false), então essa
+  // restrição nunca deveria ser acionada em uso normal; existe como rede de
+  // segurança contra um DELETE direto acidental na tabela de sessões.
+  sessao      WhatsAppSessao       @relation(fields: [sessaoId], references: [id], onDelete: Restrict)
   mensagens   WhatsAppMensagem[]
   agentEstado WhatsAppAgentEstado?
 
-  @@unique([instanciaId, contatoPhone])
-  @@index([instanciaId])
+  @@unique([sessaoId, contatoPhone])
+  @@index([sessaoId])
   @@map("whatsapp_conversas")
 }
 
 model WhatsAppMensagem {
-  id         String   @id @default(cuid())
-  conversaId String
-  waId       String?  @unique
-  direcao    String   // 'entrada' | 'saida'
-  tipo       String   @default("texto")
-  conteudo   String
-  mediaUrl   String?
-  status     String   @default("enviada")
-  enviadaEm  DateTime @default(now())
+  id                String                  @id @default(cuid())
+  conversaId        String
+  providerMessageId String?                 @unique
+  direcao           String   // 'entrada' | 'saida'
+  tipo              String   @default("texto")
+  conteudo          String
+  mediaUrl          String?
+  status            WhatsAppMensagemStatus  @default(ENVIANDO)
+  enviadaEm         DateTime @default(now())
+  entregueEm        DateTime?
+  lidaEm            DateTime?
+  falhouEm          DateTime?
 
   conversa WhatsAppConversa @relation(fields: [conversaId], references: [id], onDelete: Cascade)
 

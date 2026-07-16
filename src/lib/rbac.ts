@@ -39,7 +39,9 @@ type Permission =
   | "usuarios:delete"
   | "auditoria:view"
   | "configuracoes:view"
-  | "configuracoes:update";
+  | "configuracoes:update"
+  | "whatsapp:manage_sessoes"
+  | "whatsapp:use";
 
 // Desenvolvedor tem acesso total, igual Administrador.
 const ADMIN_PERMISSIONS: Permission[] = [
@@ -86,7 +88,10 @@ const ADMIN_PERMISSIONS: Permission[] = [
 
 const PERMISSIONS: Record<Role, Permission[]> = {
   ADMINISTRADOR: ADMIN_PERMISSIONS,
-  DESENVOLVEDOR: ADMIN_PERMISSIONS,
+  // WhatsApp (gateway self-hosted) fica restrito só a Desenvolvedor por
+  // enquanto, deliberadamente à parte de ADMIN_PERMISSIONS — feature nova,
+  // ainda não validada em produção. Ver docs/architecture/whatsapp.md.
+  DESENVOLVEDOR: [...ADMIN_PERMISSIONS, "whatsapp:manage_sessoes", "whatsapp:use"],
   GESTOR: [
     "dashboard:view",
     "dashboard:view_all",

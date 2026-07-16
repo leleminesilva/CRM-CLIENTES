@@ -1,54 +1,30 @@
 import prisma from "@/lib/prisma";
-import type { WhatsAppConversa, WhatsAppInstancia } from "@prisma/client";
+import type { WhatsAppConversa, WhatsAppSessao } from "@prisma/client";
+import { getProvider } from "./providers";
 
-type ConversaComInstancia = WhatsAppConversa & { instancia: WhatsAppInstancia };
+type ConversaComSessao = WhatsAppConversa & { sessao: WhatsAppSessao };
 
 /**
- * Sends a WhatsApp text message via the Meta Graph API and persists it as an
- * outbound WhatsAppMensagem. Shared by the authenticated /enviar route and
- * the reception AI agent (which runs inside the webhook, with no user
- * session to call that route through).
+ * Envia uma mensagem de texto através do provider da sessão e persiste como
+ * WhatsAppMensagem de saída. Compartilhado pela rota autenticada /enviar e
+ * pelo agente de triagem (que roda dentro do webhook, sem sessão de usuário
+ * pra chamar essa rota).
  */
-export async function sendWhatsAppMessage(
-  conversa: ConversaComInstancia,
-  mensagem: string
-) {
-  const { phoneNumberId, accessToken } = conversa.instancia;
-
-  const metaRes = await fetch(
-    `https://graph.facebook.com/v19.0/${phoneNumberId}/messages`,
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        messaging_product: "whatsapp",
-        to: conversa.contatoPhone,
-        type: "text",
-        text: { body: mensagem },
-      }),
-    }
-  );
-
-  if (!metaRes.ok) {
-    const err = await metaRes.json();
-    console.error("[WA Send]", err);
-    throw new Error(err?.error?.message ?? "Erro ao enviar mensagem");
-  }
-
-  const metaData = await metaRes.json();
-  const waId = metaData?.messages?.[0]?.id as string | undefined;
+export async function sendWhatsAppMessage(conversa: ConversaComSessao, mensagem: string) {
+  const provider = getProvider(conversa.sessao.provider);
+  const { providerMessageId } = await provider.sendMessage(conversa.sessao.providerSessionId, conversa.contatoPhone, {
+    tipo: "texto",
+    conteudo: mensagem,
+  });
 
   const novaMensagem = await prisma.whatsAppMensagem.create({
     data: {
       conversaId: conversa.id,
-      waId,
+      providerMessageId,
       direcao: "saida",
       tipo: "texto",
       conteudo: mensagem,
-      status: "enviada",
+      status: "ENVIADA",
     },
   });
 

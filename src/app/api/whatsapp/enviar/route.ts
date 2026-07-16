@@ -18,7 +18,7 @@ export async function POST(request: NextRequest) {
 
   const conversa = await prisma.whatsAppConversa.findUnique({
     where: { id: conversaId },
-    include: { instancia: true },
+    include: { sessao: true },
   });
 
   if (!conversa) {

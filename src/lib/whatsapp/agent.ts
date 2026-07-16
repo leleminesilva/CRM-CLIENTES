@@ -7,7 +7,7 @@ import { formatBrazilianPhone } from "@/lib/utils/phone";
 import { sendWhatsAppMessage } from "./send";
 import { EXTRAIR_LEAD_TOOL, buildColetaSystemPrompt } from "./prompts/coleta";
 import { INTERPRETAR_CONFIRMACAO_TOOL, buildConfirmacaoSystemPrompt } from "./prompts/confirmacao";
-import type { WhatsAppConversa, WhatsAppInstancia, WhatsAppMensagem, HandoffReason } from "@prisma/client";
+import type { WhatsAppConversa, WhatsAppSessao, WhatsAppMensagem, HandoffReason } from "@prisma/client";
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 const MODEL = "claude-haiku-4-5-20251001";
@@ -16,7 +16,7 @@ const AGENT_VERSION = "1.0";
 const SYSTEM_BOT_EMAIL = "whatsapp-bot@infinityglass.internal";
 const MSG_HANDOFF = "Vou chamar alguém da nossa equipe para continuar seu atendimento por aqui, só um momento! 🙂";
 
-type ConversaComInstancia = WhatsAppConversa & { instancia: WhatsAppInstancia };
+type ConversaComSessao = WhatsAppConversa & { sessao: WhatsAppSessao };
 
 function logAgentEvent(evento: string, dados: Record<string, unknown> = {}) {
   console.log(JSON.stringify({ agente: "whatsapp-recepcao", evento, ...dados, ts: new Date().toISOString() }));
@@ -165,7 +165,7 @@ async function criarClienteDoBot(
   return cliente;
 }
 
-async function transferirParaHumano(conversa: ConversaComInstancia, motivo: HandoffReason, tentativas: number) {
+async function transferirParaHumano(conversa: ConversaComSessao, motivo: HandoffReason, tentativas: number) {
   await prisma.whatsAppAgentEstado.update({
     where: { conversaId: conversa.id },
     data: { estado: "HUMANO", motivoTransferencia: motivo, tentativas },
@@ -174,7 +174,7 @@ async function transferirParaHumano(conversa: ConversaComInstancia, motivo: Hand
   await sendWhatsAppMessage(conversa, MSG_HANDOFF);
 }
 
-export async function processarAgenteWhatsApp(conversa: ConversaComInstancia) {
+export async function processarAgenteWhatsApp(conversa: ConversaComSessao) {
   try {
     let estadoAtual = await prisma.whatsAppAgentEstado.upsert({
       where: { conversaId: conversa.id },

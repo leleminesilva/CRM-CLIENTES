@@ -9,10 +9,10 @@ export async function GET(request: NextRequest) {
   if (!payload) return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
 
   const { searchParams } = new URL(request.url);
-  const instanciaId = searchParams.get("instanciaId");
+  const sessaoId = searchParams.get("sessaoId");
 
   const conversas = await prisma.whatsAppConversa.findMany({
-    where: instanciaId ? { instanciaId } : undefined,
+    where: sessaoId ? { sessaoId } : undefined,
     orderBy: { ultimaMsgEm: "desc" },
     include: {
       mensagens: {

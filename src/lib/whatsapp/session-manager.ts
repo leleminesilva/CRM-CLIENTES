@@ -1,6 +1,7 @@
 import prisma from "@/lib/prisma";
 import type { WhatsAppSessao, WhatsAppSessaoStatus, WhatsAppSessaoEvento } from "@prisma/client";
 import { getProvider } from "./providers";
+import { publicarSessao } from "./realtime";
 
 // Isola o lado técnico da conexão (lifecycle, health, transição de estado)
 // das regras de negócio, que ficam no WhatsAppService — ver
@@ -51,6 +52,7 @@ async function atualizarStatus(sessaoId: string, novoStatus: WhatsAppSessaoStatu
       ...(opts?.erro ? { lastError: opts.erro, lastErrorAt: new Date() } : {}),
     },
   });
+  await publicarSessao(sessaoId, { status: novoStatus, lastError: opts?.erro ?? null });
 }
 
 // Lock leve por sessão: evita duas operações de lifecycle concorrentes na

@@ -86,6 +86,16 @@ export const WhatsAppService = {
   async reatribuirAtendente(sessaoId: string, atendenteId: string | null): Promise<WhatsAppSessao> {
     return SessionManager.reatribuirAtendente(sessaoId, atendenteId);
   },
+
+  async listarLogs(sessaoId: string, payload: JWTPayload) {
+    const sessao = await prisma.whatsAppSessao.findUniqueOrThrow({ where: { id: sessaoId } });
+    if (semPosse(sessao, payload)) throw new PosseError();
+    return prisma.whatsAppSessaoLog.findMany({
+      where: { sessaoId },
+      orderBy: { createdAt: "desc" },
+      take: 50,
+    });
+  },
 };
 
 export class PosseError extends Error {

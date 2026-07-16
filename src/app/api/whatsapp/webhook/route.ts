@@ -5,6 +5,17 @@ import { processarAgenteWhatsApp } from "@/lib/whatsapp/agent";
 import { getProvider } from "@/lib/whatsapp/providers";
 import { emit } from "@/lib/whatsapp/events";
 import { waLogger } from "@/lib/whatsapp/logger";
+import { publicarSessao } from "@/lib/whatsapp/realtime";
+import type { WhatsAppSessaoEvento, WhatsAppSessaoStatus } from "@prisma/client";
+
+function eventoDoStatus(status: WhatsAppSessaoStatus, temQrCode: boolean): WhatsAppSessaoEvento {
+  if (temQrCode) return "QR_GERADO";
+  if (status === "ONLINE") return "CONECTOU";
+  if (status === "OFFLINE") return "DESCONECTOU";
+  if (status === "RECONNECTING") return "RECONECTOU";
+  if (status === "ERROR") return "ERRO";
+  return "ATUALIZOU";
+}
 
 export const dynamic = "force-dynamic";
 
@@ -39,10 +50,16 @@ export async function POST(request: NextRequest) {
           where: { providerSessionId: evento.data.providerSessionId },
         });
         if (!sessao) continue;
+
         await prisma.whatsAppSessao.update({
           where: { id: sessao.id },
           data: { status: evento.data.status, ultimoPing: new Date() },
         });
+        await prisma.whatsAppSessaoLog.create({
+          data: { sessaoId: sessao.id, evento: eventoDoStatus(evento.data.status, !!evento.data.qrCode) },
+        });
+        // Broadcast efêmero — o QR nunca é persistido, só repassado ao vivo.
+        await publicarSessao(sessao.id, { status: evento.data.status, qrCode: evento.data.qrCode ?? null });
         continue;
       }
 

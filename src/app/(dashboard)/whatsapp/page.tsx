@@ -9,7 +9,7 @@ import { ptBR } from "date-fns/locale";
 import {
   MessageCircle, Plus, Trash2, Phone, Send,
   Loader2, Settings, ChevronLeft, Check, CheckCheck,
-  Search, Smartphone,
+  Search, Smartphone, RefreshCw, PowerOff, ChevronDown, ChevronUp, History,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,6 +22,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils/cn";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/lib/supabase";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -89,8 +90,38 @@ function StatusIcon({ status }: { status: string }) {
 }
 
 // ── Modal de nova sessão ───────────────────────────────────────────────────
-// Fase 1: só cria o registro da sessão (status WAITING_QR). A exibição do QR
-// Code ao vivo (via Realtime, sem polling) é Fase 2 — ver docs/architecture/whatsapp.md.
+// QR Code chega ao vivo via Supabase Realtime (broadcast efêmero, nunca
+// persistido) — sem polling. GET /qrcode é só o fallback caso o broadcast
+// tenha passado antes da tela abrir. Ver docs/architecture/whatsapp.md.
+
+function useQrCodeAoVivo(sessaoId: string | null) {
+  const [qrCode, setQrCode] = useState<string | null>(null);
+  const [status, setStatus] = useState<Sessao["status"]>("UNKNOWN");
+
+  useEffect(() => {
+    if (!sessaoId) return;
+    setQrCode(null);
+    setStatus("UNKNOWN");
+
+    // Fallback: busca o que já existir antes de assinar o canal.
+    axios.get(`/api/whatsapp/sessoes/${sessaoId}/qrcode`).then(({ data }) => {
+      setQrCode(data.qrCode ?? null);
+      setStatus(data.status);
+    }).catch(() => {});
+
+    const channel = supabase.channel(`whatsapp-sessao-${sessaoId}`);
+    channel.on("broadcast", { event: "sessao_atualizada" }, ({ payload }) => {
+      if (payload.qrCode !== undefined) setQrCode(payload.qrCode);
+      if (payload.status) setStatus(payload.status);
+    }).subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [sessaoId]);
+
+  return { qrCode, status };
+}
 
 function ModalNovaSessao({
   open,
@@ -103,6 +134,8 @@ function ModalNovaSessao({
 }) {
   const [nome, setNome] = useState("");
   const [loading, setLoading] = useState(false);
+  const [sessaoCriadaId, setSessaoCriadaId] = useState<string | null>(null);
+  const { qrCode, status } = useQrCodeAoVivo(sessaoCriadaId);
 
   async function handleSave() {
     if (!nome) {
@@ -111,11 +144,9 @@ function ModalNovaSessao({
     }
     setLoading(true);
     try {
-      await axios.post("/api/whatsapp/sessoes", { nome });
-      toast.success("Sessão criada — aguardando conexão via QR Code");
+      const { data } = await axios.post("/api/whatsapp/sessoes", { nome });
+      setSessaoCriadaId(data.id);
       onSaved();
-      onClose();
-      setNome("");
     } catch (e: unknown) {
       const msg = (e as { response?: { data?: { error?: string } } })?.response?.data?.error;
       toast.error(msg ?? "Erro ao criar sessão");
@@ -124,35 +155,66 @@ function ModalNovaSessao({
     }
   }
 
+  function handleClose() {
+    setNome("");
+    setSessaoCriadaId(null);
+    onClose();
+  }
+
+  useEffect(() => {
+    if (status === "ONLINE" && sessaoCriadaId) {
+      toast.success("WhatsApp conectado!");
+      handleClose();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status]);
+
   return (
-    <Dialog open={open} onOpenChange={onClose}>
+    <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Smartphone className="w-5 h-5 text-green-500" />
-            Nova sessão WhatsApp
+            {sessaoCriadaId ? "Escaneie o QR Code" : "Nova sessão WhatsApp"}
           </DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-4 py-2">
-          <p className="text-sm text-muted-foreground">
-            A conexão é feita escaneando um QR Code pelo WhatsApp do celular — nenhuma credencial
-            é digitada aqui. A exibição do QR Code entra na próxima etapa deste módulo.
-          </p>
-
-          <div className="space-y-2">
-            <Label>Nome da sessão <span className="text-red-500">*</span></Label>
-            <Input placeholder="Ex: Comercial, Suporte..." value={nome} onChange={(e) => setNome(e.target.value)} />
+        {!sessaoCriadaId ? (
+          <>
+            <div className="space-y-4 py-2">
+              <p className="text-sm text-muted-foreground">
+                A conexão é feita escaneando um QR Code pelo WhatsApp do celular — nenhuma credencial
+                é digitada aqui.
+              </p>
+              <div className="space-y-2">
+                <Label>Nome da sessão <span className="text-red-500">*</span></Label>
+                <Input placeholder="Ex: Comercial, Suporte..." value={nome} onChange={(e) => setNome(e.target.value)} />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={handleClose}>Cancelar</Button>
+              <Button onClick={handleSave} disabled={loading} className="bg-green-600 hover:bg-green-700 text-white">
+                {loading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                Criar sessão
+              </Button>
+            </DialogFooter>
+          </>
+        ) : (
+          <div className="flex flex-col items-center gap-4 py-4">
+            {qrCode ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={qrCode} alt="QR Code do WhatsApp" className="w-56 h-56 rounded-lg border border-border" />
+            ) : (
+              <div className="w-56 h-56 rounded-lg border border-border flex items-center justify-center bg-muted">
+                <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+              </div>
+            )}
+            <p className="text-sm text-muted-foreground text-center">
+              WhatsApp → Aparelhos conectados → Conectar um aparelho
+            </p>
+            <Badge variant="secondary">{status}</Badge>
           </div>
-        </div>
-
-        <DialogFooter>
-          <Button variant="outline" onClick={onClose}>Cancelar</Button>
-          <Button onClick={handleSave} disabled={loading} className="bg-green-600 hover:bg-green-700 text-white">
-            {loading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-            Criar sessão
-          </Button>
-        </DialogFooter>
+        )}
       </DialogContent>
     </Dialog>
   );
@@ -529,6 +591,134 @@ function AreaChat({
 
 // ── Painel de configurações ────────────────────────────────────────────────
 
+const HEALTH_BADGE: Record<Sessao["healthStatus"], string> = {
+  HEALTHY: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
+  STALE: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
+  UNKNOWN: "",
+};
+
+interface LogSessao {
+  id: string;
+  evento: string;
+  detalhe: string | null;
+  createdAt: string;
+}
+
+function LinhaSessao({
+  sessao,
+  isAdmin,
+  onDelete,
+}: {
+  sessao: Sessao;
+  isAdmin: boolean;
+  onDelete: (id: string) => void;
+}) {
+  const [logsAbertos, setLogsAbertos] = useState(false);
+  const queryClient = useQueryClient();
+
+  const { data: logs = [], isLoading: loadingLogs } = useQuery({
+    queryKey: ["wa-logs", sessao.id],
+    queryFn: async () => {
+      const { data } = await axios.get(`/api/whatsapp/sessoes/${sessao.id}/logs`);
+      return data as LogSessao[];
+    },
+    enabled: logsAbertos,
+  });
+
+  const desconectar = useMutation({
+    mutationFn: () => axios.post(`/api/whatsapp/sessoes/${sessao.id}/desconectar`),
+    onSuccess: () => {
+      toast.success("Sessão desconectada");
+      queryClient.invalidateQueries({ queryKey: ["wa-sessoes"] });
+    },
+    onError: (e: unknown) => {
+      const msg = (e as { response?: { data?: { error?: string } } })?.response?.data?.error;
+      toast.error(msg ?? "Erro ao desconectar");
+    },
+  });
+
+  const reiniciar = useMutation({
+    mutationFn: () => axios.post(`/api/whatsapp/sessoes/${sessao.id}/reiniciar`),
+    onSuccess: () => {
+      toast.success("Reconexão iniciada");
+      queryClient.invalidateQueries({ queryKey: ["wa-sessoes"] });
+    },
+    onError: (e: unknown) => {
+      const msg = (e as { response?: { data?: { error?: string } } })?.response?.data?.error;
+      toast.error(msg ?? "Erro ao reiniciar");
+    },
+  });
+
+  return (
+    <div className="rounded-xl border border-border bg-card overflow-hidden">
+      <div className="flex items-center gap-3 p-4">
+        <div className="w-10 h-10 rounded-xl bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 flex items-center justify-center text-sm font-bold shrink-0">
+          {getInitials(sessao.nome)}
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="font-medium text-sm">{sessao.nome}</p>
+          <p className="text-xs text-muted-foreground truncate">
+            {sessao.numero ? formatPhone(sessao.numero) : "Aguardando conexão via QR Code"}
+          </p>
+          <p className="text-xs text-muted-foreground">
+            {sessao.atendente ? `Atendente: ${sessao.atendente.nome}` : "Não atribuído"}
+          </p>
+        </div>
+        <div className="flex flex-col items-end gap-1 shrink-0">
+          <Badge variant={sessao.status === "ONLINE" ? "default" : "secondary"} className={sessao.status === "ONLINE" ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400" : ""}>
+            {sessao.status}
+          </Badge>
+          {sessao.healthStatus !== "UNKNOWN" && (
+            <Badge variant="secondary" className={cn("text-[10px]", HEALTH_BADGE[sessao.healthStatus])}>
+              {sessao.healthStatus === "STALE" ? "sem sinal há tempo" : "saudável"}
+            </Badge>
+          )}
+        </div>
+        {isAdmin && (
+          <div className="flex items-center gap-1 shrink-0">
+            <Button size="icon" variant="ghost" className="w-8 h-8" title="Reiniciar" onClick={() => reiniciar.mutate()} disabled={reiniciar.isPending}>
+              <RefreshCw className={cn("w-4 h-4", reiniciar.isPending && "animate-spin")} />
+            </Button>
+            <Button size="icon" variant="ghost" className="w-8 h-8" title="Desconectar" onClick={() => desconectar.mutate()} disabled={desconectar.isPending}>
+              <PowerOff className="w-4 h-4" />
+            </Button>
+            <Button size="icon" variant="ghost" className="w-8 h-8" title="Histórico" onClick={() => setLogsAbertos((v) => !v)}>
+              <History className="w-4 h-4" />
+              {logsAbertos ? <ChevronUp className="w-3 h-3 -ml-1" /> : <ChevronDown className="w-3 h-3 -ml-1" />}
+            </Button>
+            <Button
+              size="icon"
+              variant="ghost"
+              className="text-destructive hover:text-destructive hover:bg-destructive/10 w-8 h-8"
+              title="Remover sessão"
+              onClick={() => onDelete(sessao.id)}
+            >
+              <Trash2 className="w-4 h-4" />
+            </Button>
+          </div>
+        )}
+      </div>
+
+      {logsAbertos && (
+        <div className="border-t border-border bg-muted/30 px-4 py-3 text-xs space-y-1.5 max-h-48 overflow-auto">
+          {loadingLogs ? (
+            <p className="text-muted-foreground">Carregando...</p>
+          ) : logs.length === 0 ? (
+            <p className="text-muted-foreground">Nenhum evento registrado ainda.</p>
+          ) : (
+            logs.map((log) => (
+              <div key={log.id} className="flex items-center justify-between gap-2 text-muted-foreground">
+                <span className="font-medium text-foreground">{log.evento}</span>
+                <span>{format(new Date(log.createdAt), "dd/MM HH:mm")}</span>
+              </div>
+            ))
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function PainelConfig({
   sessoes,
   onDelete,
@@ -554,33 +744,7 @@ function PainelConfig({
 
       <div className="space-y-3 max-w-xl">
         {sessoes.map((s) => (
-          <div key={s.id} className="flex items-center gap-3 p-4 rounded-xl border border-border bg-card">
-            <div className="w-10 h-10 rounded-xl bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 flex items-center justify-center text-sm font-bold">
-              {getInitials(s.nome)}
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="font-medium text-sm">{s.nome}</p>
-              <p className="text-xs text-muted-foreground truncate">
-                {s.numero ? formatPhone(s.numero) : "Aguardando conexão via QR Code"}
-              </p>
-              <p className="text-xs text-muted-foreground">
-                {s.atendente ? `Atendente: ${s.atendente.nome}` : "Não atribuído"}
-              </p>
-            </div>
-            <Badge variant={s.status === "ONLINE" ? "default" : "secondary"} className={s.status === "ONLINE" ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400" : ""}>
-              {s.status}
-            </Badge>
-            {isAdmin && (
-              <Button
-                size="icon"
-                variant="ghost"
-                className="text-destructive hover:text-destructive hover:bg-destructive/10 w-8 h-8"
-                onClick={() => onDelete(s.id)}
-              >
-                <Trash2 className="w-4 h-4" />
-              </Button>
-            )}
-          </div>
+          <LinhaSessao key={s.id} sessao={s} isAdmin={isAdmin} onDelete={onDelete} />
         ))}
 
         {isAdmin && (

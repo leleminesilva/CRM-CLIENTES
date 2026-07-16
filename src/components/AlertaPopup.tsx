@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
-import { Megaphone, AlertCircle, X, Bell } from "lucide-react";
+import { Megaphone, AlertCircle } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 
@@ -65,6 +65,7 @@ export function AlertaPopup() {
 
   function fechar() {
     // Ao clicar em entendido, marca na DB e passa pro próximo
+    if (!atual) return;
     lerMutation.mutate(atual.id);
     setAtual(null);
   }

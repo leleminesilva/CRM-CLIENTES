@@ -1,6 +1,6 @@
 # Arquitetura do módulo WhatsApp
 
-> Documento vivo — atualizar a cada fase implementada (ver plano de fases no final). Última atualização: **Fase 2 implementada** (Fase 1 — fundação — já estava pronta: schema, `IWhatsAppProvider`/`EvolutionProvider`, `SessionManager`, `WhatsAppService`, pipeline de eventos, RBAC restrito a Desenvolvedor, código Meta removido). Fase 2 adicionou: rotas de ciclo de vida completas (`qrcode`, `desconectar`, `reiniciar`, `logs`), broadcast efêmero via Supabase Realtime (QR ao vivo e mudança de status sem polling, ver `src/lib/whatsapp/realtime.ts`), e a UI de gerenciamento (fluxo de QR no modal de criação, health badge, ações de reconectar/desconectar, aba de histórico de auditoria por sessão). Validado localmente: typecheck/lint/build limpos, fluxo completo testado ponta a ponta contra uma sessão real no banco (falha de provider → transição de estado → `lastError` → log de auditoria, tudo sem quebrar a resposta). A criação de sessão real (handshake com o gateway) só funciona quando a VPS existir (Fase 5). Duas rodadas de revisão arquitetural antes da implementação trouxeram uma lista maior de refinamentos (ConnectionManager separado, DI registry, circuit breaker, storage adapter plugável, métricas, reestrutura DDD em `src/modules/`, entre outros) — deliberadamente **não** incorporados: nesta escala (um provider, um punhado de sessões, zero tráfego em produção ainda), o custo de manter essas camadas supera o benefício. Ver [Fora de escopo (arquitetura)](#fora-de-escopo-arquitetura) pra lista completa com o motivo de cada corte.
+> Documento vivo — atualizar a cada fase implementada (ver plano de fases no final). Última atualização: **Fase 3 implementada** (mensageria + mídia). Fases 1 (fundação) e 2 (ciclo de vida da sessão + Realtime) já estavam prontas. Fase 3 adicionou: handlers do pipeline de eventos substituindo lógica inline (`MessageReceived` dispara o agente de triagem e cria notificação pro atendente; `ConversationUpdated` publica no Realtime); parsing de mensagens de mídia no `EvolutionProvider`; bucket privado `whatsapp-media` no Supabase Storage (nunca público — mediaUrl no banco guarda o caminho, não uma URL; URLs assinadas de curta duração são geradas sob demanda tanto pra servir ao frontend quanto pra entregar ao gateway); `send.ts` e a rota `/enviar` com suporte a anexo; composer da UI com botão de anexo e renderização de imagem/vídeo/áudio/documento nas bolhas; polling da conversa aberta removido em favor de Realtime. Validado ponta a ponta contra infraestrutura real (Supabase Storage de verdade, não simulado): mensagem de texto recebida, mensagem com imagem em base64 recebida → upload → URL assinada resolvendo pra o arquivo correto, notificação criada, envio de anexo funcionando até o ponto que depende do gateway (Fase 5). Duas rodadas de revisão arquitetural antes da implementação trouxeram uma lista maior de refinamentos (ConnectionManager separado, DI registry, circuit breaker, storage adapter plugável, métricas, reestrutura DDD em `src/modules/`, entre outros) — deliberadamente **não** incorporados: nesta escala (um provider, um punhado de sessões, zero tráfego em produção ainda), o custo de manter essas camadas supera o benefício. Ver [Fora de escopo (arquitetura)](#fora-de-escopo-arquitetura) pra lista completa com o motivo de cada corte.
 
 ## Visão geral
 
@@ -261,11 +261,10 @@ function on<T>(eventType: string, handler: (event: DomainEvent<T>) => void | Pro
 
 | Evento | Disparado quando | Handlers de hoje |
 |---|---|---|
-| `MessageReceived` | mensagem nova chega pelo webhook | atualiza conversa, dispara agente de triagem se número desconhecido |
-| `ConversationUpdated` | conversa muda (nova msg, lida, etc.) | publica no Realtime |
-| `LeadUpdated` | agente cria/atualiza um Lead a partir da conversa | (reservado — hoje o agente já faz isso direto, migra pra handler na Fase 3) |
+| `MessageReceived` | mensagem nova chega pelo webhook | (1) dispara o agente de triagem se número desconhecido — `src/lib/whatsapp/handlers.ts`; (2) cria `Notificacao` (tipo `WHATSAPP_MENSAGEM`) pro atendente da sessão, com dedup de 5min pra não spammar |
+| `ConversationUpdated` | conversa muda (nova msg recebida) | publica no Realtime (`publicarConversa`) — o chat aberto invalida a query em vez de dar polling |
+| `LeadUpdated` | — | não implementado — o agente ainda cria o Lead direto em `criarClienteDoBot` (sem mudança, "sem mudança de comportamento" era o requisito). Fica como ponto de extensão futuro caso outra coisa precise reagir à criação do lead. |
 | *(futuro)* IA | — | nenhum handler ainda — pipeline pronto pra receber |
-| Notificações | — | (reservado, nenhum handler ainda) |
 
 **Como adicionar um handler novo**: em qualquer arquivo, `import { on } from "@/lib/whatsapp/events"` e registrar `on("MessageReceived", async (event) => { ... })`. Nenhuma rota ou o webhook precisam ser tocados.
 
@@ -336,11 +335,11 @@ O que é persistido vs. efêmero:
 
 ## Como funciona o upload de mídia
 
-Hoje (código antigo baseado em Meta) o webhook só grava um placeholder tipo `"[Áudio]"` — não baixa nem guarda o arquivo. Na nova arquitetura:
-
-- **Recebendo**: o `NormalizedMessage.media` traz a mídia (URL ou base64) → `WhatsAppService` baixa/decodifica o conteúdo e sobe pro **Supabase Storage** (já é o storage do projeto) → salva a URL resultante em `WhatsAppMensagem.mediaUrl`.
-- **Enviando**: a UI de conversa ganha um botão de anexo → o arquivo sobe pro Supabase Storage primeiro → a URL é passada como `NormalizedMedia` pro `provider.sendMessage()`.
-- Tipos suportados: imagem, vídeo, áudio, documento (PDF e afins). Providers que não suportam mídia (`capabilities.supportsMedia === false`) simplesmente não mostram a opção de anexo na UI.
+Bucket `whatsapp-media` no Supabase Storage, **privado** (nunca público) — mídia de WhatsApp pode incluir documento, endereço, contrato, ou seja, dado potencialmente sensível. `WhatsAppMensagem.mediaUrl` guarda o **caminho** no bucket (`{sessaoId}/{conversaId}/{timestamp}.ext`), nunca uma URL — URLs assinadas são geradas sob demanda (`src/lib/whatsapp/media.ts`), com validade curta:
+- **Recebendo**: `EvolutionProvider.parseWebhook()` extrai o base64 da mídia do payload (assumindo o gateway configurado em modo base64 — mídia do WhatsApp é criptografada ponta a ponta, então a URL bruta do Baileys não é utilizável sem isso; verificar contra a instância real na Fase 5) → o webhook decodifica e sobe pro Storage → salva o caminho em `mediaUrl`.
+- **Servindo ao frontend**: `GET /api/whatsapp/conversas/[id]` converte cada caminho em URL assinada (1h de validade) na hora de responder — nunca expõe um link permanente.
+- **Enviando**: a UI ganha um botão de anexo → o arquivo sobe pro Storage via `POST /enviar` (agora `multipart/form-data`) → uma URL assinada de validade curta (10min, só o tempo do gateway buscar) é gerada e passada pro `provider.sendMessage()`.
+- Tipos suportados: imagem, vídeo, áudio, documento (PDF e afins), renderizados na bolha do chat conforme o tipo. Providers que não suportam mídia (`capabilities.supportsMedia === false`) simplesmente não mostram a opção de anexo na UI (ainda não aplicado à UI — hoje só existe o provider Evolution, que suporta).
 
 ## Como funciona a auditoria
 
@@ -400,7 +399,7 @@ Ver plano completo em `/Users/leandromedeiros/.claude/plans/zippy-riding-clover.
 - **Fase 0** ✅ — documentação, antes de qualquer código.
 - **Fase 1** ✅ — schema (incluindo `providerVersion`, `lastError`/`lastErrorAt`, `WhatsAppWebhookEvent`), `IWhatsAppProvider`/`EvolutionProvider` (com `capabilities` e DTOs normalizados versionados), `SessionManager` (com máquina de estados e lock leve por sessão), `WhatsAppService`, pipeline de eventos com envelope estruturado (incluindo `correlationId`), idempotência de webhook, retry/timeout, logging estruturado, RBAC, remoção do código Meta.
 - **Fase 2** ✅ — ciclo de vida da sessão (rotas `qrcode`/`desconectar`/`reiniciar`/`logs`), broadcast via Supabase Realtime (`src/lib/whatsapp/realtime.ts`), UI de gerenciamento (QR ao vivo, health badge, ações, histórico de auditoria).
-- **Fase 3** — mensageria + mídia.
+- **Fase 3** ✅ — handlers do pipeline de eventos substituindo lógica inline, mídia (bucket privado + URLs assinadas), `send.ts`/`/enviar` com anexo, UI de composer com anexo, Realtime na conversa aberta.
 - **Fase 4** — segurança/escopo por atendente.
 - **Fase 5** — provisionamento real da VPS/Docker/Evolution.
 

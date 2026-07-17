@@ -1,12 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { findClienteByPhone, normalizeWhatsAppPhone } from "@/lib/utils/phone";
-import { processarAgenteWhatsApp } from "@/lib/whatsapp/agent";
+import { normalizeWhatsAppPhone } from "@/lib/utils/phone";
 import { getProvider } from "@/lib/whatsapp/providers";
 import { emit } from "@/lib/whatsapp/events";
+import { registrarHandlersWhatsApp } from "@/lib/whatsapp/handlers";
 import { waLogger } from "@/lib/whatsapp/logger";
 import { publicarSessao } from "@/lib/whatsapp/realtime";
+import { uploadMedia, caminhoMedia } from "@/lib/whatsapp/media";
 import type { WhatsAppSessaoEvento, WhatsAppSessaoStatus } from "@prisma/client";
+
+// Registra os handlers uma vez por cold start — ver src/lib/whatsapp/handlers.ts.
+registrarHandlersWhatsApp();
 
 function eventoDoStatus(status: WhatsAppSessaoStatus, temQrCode: boolean): WhatsAppSessaoEvento {
   if (temQrCode) return "QR_GERADO";
@@ -21,10 +25,9 @@ export const dynamic = "force-dynamic";
 
 // Recebe webhooks do gateway (Evolution API). Verificação de assinatura é
 // feita via EVOLUTION_API_KEY na URL/header configurado no gateway (não há
-// handshake tipo hub.challenge da Meta aqui). Ver docs/architecture/whatsapp.md
-// — idempotência (Fase 1) já implementada; parsing completo de mídia e
-// confirmações de entrega/leitura, e os handlers do pipeline de eventos
-// (ConversationUpdated/LeadUpdated/notificações), são Fase 3.
+// handshake tipo hub.challenge da Meta aqui). Idempotência, confirmações de
+// entrega/leitura e os handlers do pipeline de eventos (ver
+// src/lib/whatsapp/handlers.ts) já implementados. Ver docs/architecture/whatsapp.md.
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
@@ -110,6 +113,20 @@ export async function POST(request: NextRequest) {
         data: { ultimaMensagemRecebida: msg.timestamp },
       });
 
+      // Mídia recebida (se o gateway entregou o conteúdo — ver comentário em
+      // extrairConteudoMensagem no EvolutionProvider) sobe pro Storage antes
+      // de gravar a mensagem, guardando só o caminho, nunca uma URL pública.
+      let mediaPath: string | undefined;
+      if (msg.media?.base64) {
+        try {
+          const caminho = caminhoMedia(sessao.id, conversa.id, msg.media.mimeType, msg.media.filename);
+          await uploadMedia(caminho, Buffer.from(msg.media.base64, "base64"), msg.media.mimeType);
+          mediaPath = caminho;
+        } catch (err) {
+          waLogger.error("falha ao subir mídia recebida", { erro: err, sessionId: sessao.id, conversationId: conversa.id });
+        }
+      }
+
       await prisma.whatsAppMensagem.create({
         data: {
           conversaId: conversa.id,
@@ -117,21 +134,16 @@ export async function POST(request: NextRequest) {
           direcao: "entrada",
           tipo: msg.tipo,
           conteudo: msg.conteudo ?? "",
+          mediaUrl: mediaPath,
           enviadaEm: msg.timestamp,
+          // ENTREGUE (não o default ENVIANDO) — o enum de status modela o
+          // ciclo de vida de envio, que não se aplica a mensagens recebidas.
+          status: "ENTREGUE",
         },
       });
 
-      await emit("MessageReceived", { conversaId: conversa.id, sessaoId: sessao.id }, correlationId);
-
-      if (!conversa.clienteId) {
-        const clienteExistente = await findClienteByPhone(fromPhone);
-        if (!clienteExistente) {
-          const agentEstado = await prisma.whatsAppAgentEstado.findUnique({ where: { conversaId: conversa.id } });
-          if (agentEstado?.estado !== "HUMANO" && agentEstado?.estado !== "CONCLUIDO") {
-            await processarAgenteWhatsApp({ ...conversa, sessao });
-          }
-        }
-      }
+      await emit("MessageReceived", { conversaId: conversa.id, sessaoId: sessao.id, fromPhone }, correlationId);
+      await emit("ConversationUpdated", { conversaId: conversa.id }, correlationId);
     }
 
     return NextResponse.json({ ok: true });

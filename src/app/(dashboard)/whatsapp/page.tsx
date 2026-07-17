@@ -10,6 +10,7 @@ import {
   MessageCircle, Plus, Trash2, Phone, Send,
   Loader2, Settings, ChevronLeft, Check, CheckCheck,
   Search, Smartphone, RefreshCw, PowerOff, ChevronDown, ChevronUp, History,
+  Paperclip, FileText, X as XIcon, Download,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -41,6 +42,7 @@ interface Mensagem {
   direcao: "entrada" | "saida";
   tipo: string;
   conteudo: string;
+  mediaUrl?: string | null;
   status: string;
   enviadaEm: string;
 }
@@ -391,6 +393,32 @@ function ListaConversas({
 
 // ── Área do chat ───────────────────────────────────────────────────────────
 
+function BolhaMedia({ msg }: { msg: Mensagem }) {
+  if (!msg.mediaUrl) return null;
+  if (msg.tipo === "imagem") {
+    // eslint-disable-next-line @next/next/no-img-element
+    return <img src={msg.mediaUrl} alt={msg.conteudo || "Imagem"} className="rounded-lg max-w-full max-h-64 mb-1.5" />;
+  }
+  if (msg.tipo === "video") {
+    return <video src={msg.mediaUrl} controls className="rounded-lg max-w-full max-h-64 mb-1.5" />;
+  }
+  if (msg.tipo === "audio") {
+    return <audio src={msg.mediaUrl} controls className="mb-1.5 max-w-full" />;
+  }
+  return (
+    <a
+      href={msg.mediaUrl}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="flex items-center gap-2 bg-black/5 dark:bg-white/5 rounded-lg px-3 py-2 mb-1.5 hover:bg-black/10 dark:hover:bg-white/10 transition-colors"
+    >
+      <FileText className="w-5 h-5 shrink-0" />
+      <span className="text-sm truncate">{msg.conteudo || "Documento"}</span>
+      <Download className="w-4 h-4 shrink-0 ml-auto opacity-60" />
+    </a>
+  );
+}
+
 function AreaChat({
   conversa,
   onBack,
@@ -399,7 +427,9 @@ function AreaChat({
   onBack: () => void;
 }) {
   const [texto, setTexto] = useState("");
+  const [arquivo, setArquivo] = useState<File | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const queryClient = useQueryClient();
 
   const { data, isLoading } = useQuery({
@@ -409,21 +439,37 @@ function AreaChat({
       return data as { mensagens: Mensagem[] };
     },
     enabled: !!conversa?.id,
-    refetchInterval: 4000,
   });
 
+  // Sem polling — o webhook emite ConversationUpdated, que publica nesse
+  // canal (ver src/lib/whatsapp/handlers.ts e realtime.ts). A conversa em
+  // aberto invalida a query e busca o que mudou.
+  useEffect(() => {
+    if (!conversa?.id) return;
+    const channel = supabase.channel(`whatsapp-conversa-${conversa.id}`);
+    channel.on("broadcast", { event: "conversa_atualizada" }, () => {
+      queryClient.invalidateQueries({ queryKey: ["wa-mensagens", conversa.id] });
+      queryClient.invalidateQueries({ queryKey: ["wa-conversas"] });
+    }).subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [conversa?.id, queryClient]);
+
   const enviar = useMutation({
-    mutationFn: async (mensagem: string) => {
-      const { data } = await axios.post("/api/whatsapp/enviar", {
-        conversaId: conversa!.id,
-        mensagem,
-      });
+    mutationFn: async ({ mensagem, file }: { mensagem?: string; file?: File | null }) => {
+      const formData = new FormData();
+      formData.append("conversaId", conversa!.id);
+      if (mensagem) formData.append("mensagem", mensagem);
+      if (file) formData.append("file", file);
+      const { data } = await axios.post("/api/whatsapp/enviar", formData);
       return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["wa-mensagens", conversa?.id] });
       queryClient.invalidateQueries({ queryKey: ["wa-conversas"] });
       setTexto("");
+      setArquivo(null);
     },
     onError: (e: unknown) => {
       const msg = (e as { response?: { data?: { error?: string } } })?.response?.data?.error;
@@ -435,10 +481,15 @@ function AreaChat({
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [data?.mensagens]);
 
+  function handleEnviar() {
+    if (!texto.trim() && !arquivo) return;
+    enviar.mutate({ mensagem: texto.trim() || undefined, file: arquivo });
+  }
+
   function handleKeyDown(e: React.KeyboardEvent) {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
-      if (texto.trim()) enviar.mutate(texto.trim());
+      handleEnviar();
     }
   }
 
@@ -535,7 +586,10 @@ function AreaChat({
                             : "bg-white dark:bg-[#202c33] text-[#111b21] dark:text-[#e9edef] rounded-tl-sm border border-black/5 dark:border-white/5"
                         )}
                       >
-                        <p className="whitespace-pre-wrap break-words">{msg.conteudo}</p>
+                        <BolhaMedia msg={msg} />
+                        {(msg.tipo === "texto" || msg.conteudo) && msg.tipo !== "documento" && (
+                          <p className="whitespace-pre-wrap break-words">{msg.conteudo}</p>
+                        )}
                         <div className={cn(
                           "flex items-center gap-1 mt-1",
                           msg.direcao === "saida" ? "justify-end" : "justify-start"
@@ -561,7 +615,31 @@ function AreaChat({
 
       {/* Input */}
       <div className="p-3 border-t border-border bg-[#f0f2f5] dark:bg-[#202c33] shrink-0">
+        {arquivo && (
+          <div className="flex items-center gap-2 bg-white dark:bg-[#2a3942] rounded-lg px-3 py-2 mb-2 text-sm">
+            <Paperclip className="w-4 h-4 shrink-0 text-muted-foreground" />
+            <span className="truncate flex-1">{arquivo.name}</span>
+            <button onClick={() => setArquivo(null)} className="text-muted-foreground hover:text-foreground">
+              <XIcon className="w-4 h-4" />
+            </button>
+          </div>
+        )}
         <div className="flex items-end gap-2">
+          <input
+            ref={fileInputRef}
+            type="file"
+            className="hidden"
+            onChange={(e) => setArquivo(e.target.files?.[0] ?? null)}
+          />
+          <Button
+            size="icon"
+            variant="ghost"
+            className="w-10 h-10 rounded-xl shrink-0"
+            onClick={() => fileInputRef.current?.click()}
+            title="Anexar arquivo"
+          >
+            <Paperclip className="w-4 h-4" />
+          </Button>
           <textarea
             value={texto}
             onChange={(e) => setTexto(e.target.value)}
@@ -573,8 +651,8 @@ function AreaChat({
           />
           <Button
             size="icon"
-            disabled={!texto.trim() || enviar.isPending}
-            onClick={() => texto.trim() && enviar.mutate(texto.trim())}
+            disabled={(!texto.trim() && !arquivo) || enviar.isPending}
+            onClick={handleEnviar}
             className="w-10 h-10 rounded-xl bg-green-600 hover:bg-green-700 text-white shrink-0"
           >
             {enviar.isPending ? (

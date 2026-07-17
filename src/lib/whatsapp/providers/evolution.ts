@@ -3,6 +3,7 @@ import type {
   IWhatsAppProvider,
   ProviderCapabilities,
   MensagemPayload,
+  NormalizedMedia,
   NormalizedWebhookEvent,
 } from "./types";
 import type { WhatsAppSessaoStatus } from "@prisma/client";
@@ -11,10 +12,54 @@ import type { WhatsAppSessaoStatus } from "@prisma/client";
 // Único arquivo do sistema que conhece o formato de request/response dela — ver
 // docs/architecture/whatsapp.md. Os paths/payloads abaixo seguem o contrato conhecido
 // da Evolution API v2, mas ainda não foram verificados contra uma instância real rodando
-// (isso acontece na Fase 2/5, quando a VPS existir) — ajustar aqui, e só aqui, se divergir.
+// (isso acontece na Fase 5, quando a VPS existir) — ajustar aqui, e só aqui, se divergir.
 
 const TIMEOUT_MS = 15_000;
 const MAX_RETRIES = 3;
+
+type TipoMensagem = "texto" | "imagem" | "video" | "audio" | "documento";
+
+// Mídia no WhatsApp é criptografada ponta a ponta — o campo "url" bruto do
+// Baileys aponta pra um blob cifrado no CDN da Meta, sem uso direto. A
+// Evolution API tem uma opção de configuração (webhook em modo base64) que
+// entrega o conteúdo já decodificado no próprio payload; é o que assumimos
+// aqui. Se o gateway não estiver configurado assim, a mensagem ainda é
+// registrada (tipo + legenda), só sem o arquivo em si — precisa verificar
+// contra a instância real na Fase 5.
+function extrairConteudoMensagem(
+  message: Record<string, unknown> | undefined,
+  data: Record<string, unknown>
+): { tipo: TipoMensagem; conteudo?: string; media?: NormalizedMedia } {
+  if (!message) return { tipo: "texto", conteudo: "" };
+
+  const texto = (message.conversation as string) ?? (message.extendedTextMessage as { text?: string })?.text;
+  if (texto !== undefined) return { tipo: "texto", conteudo: texto };
+
+  const tiposMidia: { chave: string; tipo: TipoMensagem }[] = [
+    { chave: "imageMessage", tipo: "imagem" },
+    { chave: "videoMessage", tipo: "video" },
+    { chave: "audioMessage", tipo: "audio" },
+    { chave: "documentMessage", tipo: "documento" },
+  ];
+
+  for (const { chave, tipo } of tiposMidia) {
+    const submensagem = message[chave] as Record<string, unknown> | undefined;
+    if (!submensagem) continue;
+
+    const base64 = (submensagem.base64 as string) ?? (data.base64 as string) ?? undefined;
+    return {
+      tipo,
+      conteudo: (submensagem.caption as string) ?? undefined,
+      media: {
+        base64,
+        mimeType: (submensagem.mimetype as string) ?? "application/octet-stream",
+        filename: (submensagem.fileName as string) ?? undefined,
+      },
+    };
+  }
+
+  return { tipo: "texto", conteudo: "" };
+}
 
 function baseUrl(): string {
   const url = process.env.EVOLUTION_API_URL;
@@ -162,8 +207,8 @@ export class EvolutionProvider implements IWhatsAppProvider {
       const key = data.key as Record<string, unknown> | undefined;
       if (key?.fromMe) return []; // eco da própria mensagem enviada, já persistida no envio
       const message = data.message as Record<string, unknown> | undefined;
-      const conteudo =
-        (message?.conversation as string) ?? (message?.extendedTextMessage as { text?: string })?.text ?? "";
+      const { tipo, conteudo, media } = extrairConteudoMensagem(message, data);
+
       return [
         {
           schemaVersion: 1,
@@ -172,8 +217,9 @@ export class EvolutionProvider implements IWhatsAppProvider {
           data: {
             providerMessageId: (key?.id as string) ?? providerEventId,
             fromPhone: ((key?.remoteJid as string) ?? "").replace(/@.*/, ""),
-            tipo: "texto",
+            tipo,
             conteudo,
+            media,
             timestamp: new Date(Number(data.messageTimestamp ?? Date.now() / 1000) * 1000),
             contatoNome: data.pushName as string | undefined,
           },

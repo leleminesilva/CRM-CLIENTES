@@ -109,6 +109,7 @@ enum TipoNotificacao {
   CLIENTE_SEM_CONTATO
   ORCAMENTO_PENDENTE
   SISTEMA
+  WHATSAPP_MENSAGEM
 }
 
 enum StatusOrcamentoCliente {

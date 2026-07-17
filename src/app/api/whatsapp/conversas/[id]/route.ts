@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
+import { hasPermission, canViewAll } from "@/lib/rbac";
 import prisma from "@/lib/prisma";
 import { signedUrlMedia } from "@/lib/whatsapp/media";
 import { waLogger } from "@/lib/whatsapp/logger";
@@ -12,6 +13,18 @@ export async function GET(
 ) {
   const payload = await getCurrentUser(request);
   if (!payload) return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
+  if (!hasPermission(payload.role, "whatsapp:use")) {
+    return NextResponse.json({ error: "Sem permissão" }, { status: 403 });
+  }
+
+  const conversa = await prisma.whatsAppConversa.findUnique({
+    where: { id: params.id },
+    select: { sessao: { select: { atendenteId: true } } },
+  });
+  if (!conversa) return NextResponse.json({ error: "Conversa não encontrada" }, { status: 404 });
+  if (!canViewAll(payload.role) && conversa.sessao.atendenteId !== payload.userId) {
+    return NextResponse.json({ error: "Você não tem acesso a esta conversa" }, { status: 403 });
+  }
 
   const { searchParams } = new URL(request.url);
   const page = parseInt(searchParams.get("page") || "1");

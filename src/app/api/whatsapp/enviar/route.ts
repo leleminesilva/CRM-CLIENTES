@@ -1,16 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
+import { hasPermission, canViewAll } from "@/lib/rbac";
 import prisma from "@/lib/prisma";
 import { sendWhatsAppMessage, sendWhatsAppMedia } from "@/lib/whatsapp/send";
 import { uploadMedia, caminhoMedia, tipoDoMime } from "@/lib/whatsapp/media";
 
 export const dynamic = "force-dynamic";
 
-// Escopo por atendente (whatsapp:use + posse) é Fase 4 — esta rota ainda só
-// exige estar autenticado, igual antes. Ver docs/architecture/whatsapp.md.
 export async function POST(request: NextRequest) {
   const payload = await getCurrentUser(request);
   if (!payload) return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
+  if (!hasPermission(payload.role, "whatsapp:use")) {
+    return NextResponse.json({ error: "Sem permissão" }, { status: 403 });
+  }
 
   const formData = await request.formData();
   const conversaId = formData.get("conversaId") as string | null;
@@ -28,6 +30,9 @@ export async function POST(request: NextRequest) {
 
   if (!conversa) {
     return NextResponse.json({ error: "Conversa não encontrada" }, { status: 404 });
+  }
+  if (!canViewAll(payload.role) && conversa.sessao.atendenteId !== payload.userId) {
+    return NextResponse.json({ error: "Você não tem acesso a esta conversa" }, { status: 403 });
   }
 
   try {

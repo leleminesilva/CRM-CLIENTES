@@ -73,12 +73,14 @@ function UserFormDialog({
   defaultValues,
   onSubmit,
   isPending,
+  allowDevRole,
 }: {
   trigger: React.ReactNode;
   title: string;
   defaultValues?: Partial<typeof emptyForm>;
   onSubmit: (values: typeof emptyForm) => void;
   isPending: boolean;
+  allowDevRole: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({ ...emptyForm, ...defaultValues });
@@ -90,6 +92,10 @@ function UserFormDialog({
 
   const valid = form.nome.trim().length >= 2 && form.email.includes("@") &&
     (defaultValues?.email ? true : form.senha.length >= 6);
+
+  const roleOptions = Object.entries(ROLE_LABELS).filter(
+    ([v]) => v !== "DESENVOLVEDOR" || allowDevRole || v === defaultValues?.role
+  );
 
   return (
     <Dialog open={open} onOpenChange={handleOpen}>
@@ -130,14 +136,14 @@ function UserFormDialog({
             <Select value={form.role} onValueChange={v => setForm(f => ({ ...f, role: v }))}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
-                {Object.entries(ROLE_LABELS).map(([v, l]) => (
+                {roleOptions.map(([v, l]) => (
                   <SelectItem key={v} value={v}>{l}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
             <p className="text-xs text-muted-foreground">
               {form.role === "ADMINISTRADOR" && "Acesso total ao sistema"}
-              {form.role === "DESENVOLVEDOR" && "Acesso total ao sistema (uso técnico)"}
+              {form.role === "DESENVOLVEDOR" && allowDevRole && "Acesso total ao sistema (uso técnico)"}
               {form.role === "GESTOR" && "Visualiza tudo, gerencia equipe"}
               {form.role === "COMERCIAL" && "Gerencia seus próprios clientes e leads"}
               {form.role === "OPERACIONAL" && "Executa tarefas, visão limitada"}
@@ -163,6 +169,7 @@ export default function UsuariosPage() {
   const qc = useQueryClient();
   const { user: me, refreshUser } = useAuth();
   const isAdmin = me?.role === "ADMINISTRADOR" || me?.role === "DESENVOLVEDOR";
+  const isDev = me?.role === "DESENVOLVEDOR";
   const [search, setSearch] = useState("");
   const [deleteTarget, setDeleteTarget] = useState<UserWithCount | null>(null);
   const [uploadingUserId, setUploadingUserId] = useState<string | null>(null);
@@ -269,6 +276,7 @@ export default function UsuariosPage() {
           }
           onSubmit={values => createMutation.mutate(values)}
           isPending={createMutation.isPending}
+          allowDevRole={isDev}
         />
       </div>
 
@@ -380,6 +388,7 @@ export default function UsuariosPage() {
                         updateMutation.mutate({ id: u.id, ...payload });
                       }}
                       isPending={updateMutation.isPending}
+                      allowDevRole={isDev}
                     />
                     <DropdownMenuSeparator />
                     <DropdownMenuItem
@@ -474,7 +483,7 @@ export default function UsuariosPage() {
                 <tr className="border-b bg-muted/50">
                   <th className="text-left p-3 font-medium">Módulo</th>
                   <th className="text-center p-3 font-medium">Administrador</th>
-                  <th className="text-center p-3 font-medium">Desenvolvedor</th>
+                  {isDev && <th className="text-center p-3 font-medium">Desenvolvedor</th>}
                   <th className="text-center p-3 font-medium">Gestor</th>
                   <th className="text-center p-3 font-medium">Comercial</th>
                   <th className="text-center p-3 font-medium">Operacional</th>
@@ -484,7 +493,7 @@ export default function UsuariosPage() {
                 {PERMISSIONS_TABLE.map(row => (
                   <tr key={row.modulo} className="border-b last:border-0 hover:bg-muted/30">
                     <td className="p-3 font-medium">{row.modulo}</td>
-                    {[row.admin, row.dev, row.gestor, row.comercial, row.operacional].map((v, i) => (
+                    {[row.admin, ...(isDev ? [row.dev] : []), row.gestor, row.comercial, row.operacional].map((v, i) => (
                       <td key={i} className="p-3 text-center">
                         {v === true ? (
                           <span className="text-emerald-500 font-bold">✓</span>

@@ -3,6 +3,7 @@ import { Topbar } from "@/components/layout/Topbar";
 import { SidebarProvider } from "@/contexts/SidebarContext";
 import { DevThemeProvider, DevThemeRoot } from "@/contexts/DevThemeContext";
 import { AlertaSistema } from "@/components/AlertaSistema";
+import { AlertaPopup } from "@/components/AlertaPopup";
 import { LembreteAgenda } from "@/components/LembreteAgenda";
 import { DEV_FONT_VARIABLES } from "@/lib/devThemeFonts";
 
@@ -26,6 +27,7 @@ export default function DashboardLayout({
           </div>
         </DevThemeRoot>
         <AlertaSistema />
+        <AlertaPopup />
         <LembreteAgenda />
       </DevThemeProvider>
     </SidebarProvider>

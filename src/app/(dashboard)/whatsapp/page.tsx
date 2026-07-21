@@ -24,6 +24,7 @@ import { cn } from "@/lib/utils/cn";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/lib/supabase";
+import { WHATSAPP_STANDBY } from "@/lib/rbac";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -918,6 +919,20 @@ function WhatsAppContent() {
 
   const sessaoAtual = sessoes.find((s) => s.id === sessaoId);
   const painelChat = conversa !== null;
+
+  if (WHATSAPP_STANDBY) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full gap-4 text-center">
+        <MessageCircle className="w-16 h-16 text-muted-foreground opacity-30" />
+        <div>
+          <h2 className="text-xl font-semibold">Sistema em standby</h2>
+          <p className="text-muted-foreground mt-1 text-sm max-w-sm">
+            O módulo WhatsApp está temporariamente pausado para todos os cargos, inclusive Desenvolvedor.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   if (user && !isAdmin) {
     return (

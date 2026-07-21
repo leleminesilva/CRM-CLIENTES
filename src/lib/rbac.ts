@@ -1,5 +1,11 @@
 import type { Role } from "@/types";
 
+// Módulo WhatsApp em standby: Fase 5 (VPS/Evolution real) ainda não
+// provisionada e a migração de schema mais recente (whatsapp_conversas)
+// ficou inconsistente em produção — pausado até resolver, sem mexer em dados.
+// Reverter: virar pra `false`. Ver docs/architecture/whatsapp.md.
+export const WHATSAPP_STANDBY = true;
+
 type Permission =
   | "dashboard:view"
   | "dashboard:view_all"
@@ -165,6 +171,9 @@ const PERMISSIONS: Record<Role, Permission[]> = {
 };
 
 export function hasPermission(role: Role, permission: Permission): boolean {
+  if (WHATSAPP_STANDBY && (permission === "whatsapp:use" || permission === "whatsapp:manage_sessoes")) {
+    return false;
+  }
   return PERMISSIONS[role]?.includes(permission) ?? false;
 }
 

@@ -7,6 +7,7 @@ import { registrarHandlersWhatsApp } from "@/lib/whatsapp/handlers";
 import { waLogger } from "@/lib/whatsapp/logger";
 import { publicarSessao } from "@/lib/whatsapp/realtime";
 import { uploadMedia, caminhoMedia } from "@/lib/whatsapp/media";
+import { WHATSAPP_STANDBY } from "@/lib/rbac";
 import type { WhatsAppSessaoEvento, WhatsAppSessaoStatus } from "@prisma/client";
 
 // Registra os handlers uma vez por cold start — ver src/lib/whatsapp/handlers.ts.
@@ -29,6 +30,10 @@ export const dynamic = "force-dynamic";
 // entrega/leitura e os handlers do pipeline de eventos (ver
 // src/lib/whatsapp/handlers.ts) já implementados. Ver docs/architecture/whatsapp.md.
 export async function POST(request: NextRequest) {
+  // Módulo em standby (ver src/lib/rbac.ts): não processa nem grava nada,
+  // só responde 200 pro gateway não ficar reentregando o evento.
+  if (WHATSAPP_STANDBY) return NextResponse.json({ ok: true });
+
   try {
     const body = await request.json();
     const provider = getProvider("EVOLUTION");

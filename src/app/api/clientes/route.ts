@@ -77,28 +77,12 @@ export async function GET(request: NextRequest) {
     if (servico) where.servicoBuscado = { contains: servico, mode: "insensitive" };
     if (estagio) where.leads = { some: { estagio, deletedAt: null } };
     if (dataInicio || dataFim) {
-      const limite2d = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000);
-      const rangeFilter = {
-        ...(dataInicio ? { gte: new Date(dataInicio) } : {}),
-        ...(dataFim ? { lte: new Date(`${dataFim}T23:59:59.999Z`) } : {}),
-      };
-      // Inclui clientes do período OU clientes parados há 2+ dias (não fechados)
+      // Filtra estritamente por data de inclusão (createdAt) do cliente.
       andConditions.push({
-        OR: [
-          { createdAt: rangeFilter },
-          {
-            updatedAt: { lt: limite2d },
-            revisadoEm: null,
-            statusOrcamento: { notIn: ["APROVADO", "NAO_APROVADO"] },
-            leads: { none: { estagio: { in: ["FECHADO_GANHO", "FECHADO_PERDIDO"] }, deletedAt: null } },
-          },
-          {
-            updatedAt: { lt: limite2d },
-            revisadoEm: { lt: limite2d },
-            statusOrcamento: { notIn: ["APROVADO", "NAO_APROVADO"] },
-            leads: { none: { estagio: { in: ["FECHADO_GANHO", "FECHADO_PERDIDO"] }, deletedAt: null } },
-          },
-        ],
+        createdAt: {
+          ...(dataInicio ? { gte: new Date(dataInicio) } : {}),
+          ...(dataFim ? { lte: new Date(`${dataFim}T23:59:59.999Z`) } : {}),
+        },
       });
     }
 

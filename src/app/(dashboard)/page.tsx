@@ -179,7 +179,7 @@ export default function DashboardPage() {
     return (
       <div className="space-y-6 animate-pulse">
         <div className="h-8 bg-muted rounded w-48" />
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {[...Array(8)].map((_, i) => <div key={i} className="h-28 bg-muted rounded-xl" />)}
         </div>
       </div>
@@ -315,7 +315,7 @@ export default function DashboardPage() {
       </div>
 
       {/* KPIs Grid */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <KPICard
           title="Total de Clientes"
           value={kpis.totalClientes ?? 0}

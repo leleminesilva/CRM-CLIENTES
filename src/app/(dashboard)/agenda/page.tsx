@@ -213,60 +213,62 @@ export default function AgendaPage() {
     const MAX_VISIBLE = 4;
 
     return (
-      <div className="flex flex-col h-full">
-        {/* Cabeçalho dos dias */}
-        <div className="grid grid-cols-7 border-b">
-          {days.map((day) => (
-            <div
-              key={day.toISOString()}
-              className={cn(
-                "p-3 text-center border-r last:border-r-0 cursor-pointer hover:bg-accent/40 transition-colors",
-                isToday(day) && "bg-indigo-950/40"
-              )}
-              onClick={() => { setCurrentDate(day); setView("dia"); }}
-            >
-              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                {format(day, "EEE", { locale: ptBR })}
-              </p>
-              <p className={cn(
-                "text-lg font-bold mt-0.5",
-                isToday(day) ? "text-indigo-400" : "text-foreground"
-              )}>
-                {format(day, "d")}
-              </p>
-            </div>
-          ))}
-        </div>
-
-        {/* Corpo com eventos */}
-        <div className="grid grid-cols-7 flex-1 divide-x overflow-hidden">
-          {days.map((day) => {
-            const dayEvents = eventsForDay(day);
-            const visible = dayEvents.slice(0, MAX_VISIBLE);
-            const extra = dayEvents.length - MAX_VISIBLE;
-            return (
+      <div className="h-full overflow-x-auto scrollbar-thin">
+        <div className="flex flex-col h-full min-w-[700px]">
+          {/* Cabeçalho dos dias */}
+          <div className="grid grid-cols-7 border-b">
+            {days.map((day) => (
               <div
                 key={day.toISOString()}
                 className={cn(
-                  "p-2 flex flex-col gap-1 overflow-hidden min-h-0",
-                  isToday(day) && "bg-indigo-950/20"
+                  "p-3 text-center border-r last:border-r-0 cursor-pointer hover:bg-accent/40 transition-colors",
+                  isToday(day) && "bg-indigo-950/40"
                 )}
+                onClick={() => { setCurrentDate(day); setView("dia"); }}
               >
-                {visible.map((ev) => <EventCard key={ev.id} event={ev} compact />)}
-                {extra > 0 && (
-                  <button
-                    className="text-xs text-indigo-400 font-medium hover:underline text-left"
-                    onClick={() => { setCurrentDate(day); setView("dia"); }}
-                  >
-                    +{extra} mais
-                  </button>
-                )}
-                {dayEvents.length === 0 && (
-                  <p className="text-xs text-muted-foreground/40 text-center mt-2">—</p>
-                )}
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                  {format(day, "EEE", { locale: ptBR })}
+                </p>
+                <p className={cn(
+                  "text-lg font-bold mt-0.5",
+                  isToday(day) ? "text-indigo-400" : "text-foreground"
+                )}>
+                  {format(day, "d")}
+                </p>
               </div>
-            );
-          })}
+            ))}
+          </div>
+
+          {/* Corpo com eventos */}
+          <div className="grid grid-cols-7 flex-1 divide-x overflow-hidden">
+            {days.map((day) => {
+              const dayEvents = eventsForDay(day);
+              const visible = dayEvents.slice(0, MAX_VISIBLE);
+              const extra = dayEvents.length - MAX_VISIBLE;
+              return (
+                <div
+                  key={day.toISOString()}
+                  className={cn(
+                    "p-2 flex flex-col gap-1 overflow-hidden min-h-0",
+                    isToday(day) && "bg-indigo-950/20"
+                  )}
+                >
+                  {visible.map((ev) => <EventCard key={ev.id} event={ev} compact />)}
+                  {extra > 0 && (
+                    <button
+                      className="text-xs text-indigo-400 font-medium hover:underline text-left"
+                      onClick={() => { setCurrentDate(day); setView("dia"); }}
+                    >
+                      +{extra} mais
+                    </button>
+                  )}
+                  {dayEvents.length === 0 && (
+                    <p className="text-xs text-muted-foreground/40 text-center mt-2">—</p>
+                  )}
+                </div>
+              );
+            })}
+          </div>
         </div>
       </div>
     );
@@ -406,18 +408,21 @@ export default function AgendaPage() {
       {/* Calendário */}
       <div className="bg-card border rounded-xl overflow-hidden flex flex-col flex-1 min-h-0">
         {/* Toolbar */}
-        <div className="flex items-center justify-between px-4 py-3 border-b shrink-0">
-          <div className="flex items-center gap-1">
-            <Button variant="outline" size="sm" onClick={navToday}>Hoje</Button>
-            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={navPrev}>
-              <ChevronLeft className="w-4 h-4" />
-            </Button>
-            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={navNext}>
-              <ChevronRight className="w-4 h-4" />
-            </Button>
+        <div className="flex flex-col gap-2 px-3 sm:px-4 py-3 border-b shrink-0 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center justify-between gap-1 sm:justify-start">
+            <div className="flex items-center gap-1">
+              <Button variant="outline" size="sm" onClick={navToday}>Hoje</Button>
+              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={navPrev}>
+                <ChevronLeft className="w-4 h-4" />
+              </Button>
+              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={navNext}>
+                <ChevronRight className="w-4 h-4" />
+              </Button>
+            </div>
+            <p className="font-semibold text-sm capitalize sm:hidden">{titleLabel()}</p>
           </div>
 
-          <p className="font-semibold text-sm capitalize">{titleLabel()}</p>
+          <p className="hidden sm:block font-semibold text-sm capitalize">{titleLabel()}</p>
 
           <div className="flex items-center gap-1 bg-muted p-1 rounded-lg">
             {(["mes", "semana", "dia", "agenda"] as ViewType[]).map((v) => (
@@ -425,7 +430,7 @@ export default function AgendaPage() {
                 key={v}
                 size="sm"
                 variant={view === v ? "default" : "ghost"}
-                className={cn("h-7 px-3 text-xs capitalize", view === v && "bg-background shadow-sm")}
+                className={cn("h-7 flex-1 sm:flex-none px-2 sm:px-3 text-xs capitalize", view === v && "bg-background shadow-sm")}
                 onClick={() => setView(v)}
               >
                 {v === "mes" ? "Mês" : v === "semana" ? "Semana" : v === "dia" ? "Dia" : "Agenda"}
@@ -437,33 +442,37 @@ export default function AgendaPage() {
         {/* Conteúdo da view */}
         <div className="flex-1 min-h-0 overflow-hidden">
           {view === "mes" && (
-            <Calendar
-              localizer={localizer}
-              events={events}
-              startAccessor="start"
-              endAccessor="end"
-              style={{ height: "100%", padding: "16px" }}
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              eventPropGetter={eventStyleGetter as any}
-              date={currentDate}
-              view="month"
-              onNavigate={setCurrentDate}
-              onView={() => {}}
-              toolbar={false}
-              messages={{
-                next: "Próximo", previous: "Anterior", today: "Hoje",
-                month: "Mês", week: "Semana", day: "Dia", agenda: "Agenda",
-                date: "Data", time: "Hora", event: "Evento",
-                noEventsInRange: "Nenhuma tarefa neste período",
-                allDay: "Dia inteiro",
-              }}
-              culture="pt-BR"
-              onSelectSlot={(s: { start: Date }) => {
-                setForm((f) => ({ ...f, dataVencimento: format(s.start, "yyyy-MM-dd") }));
-                setOpen(true);
-              }}
-              selectable
-            />
+            <div className="h-full overflow-x-auto scrollbar-thin">
+              <div className="min-w-[640px] h-full">
+                <Calendar
+                  localizer={localizer}
+                  events={events}
+                  startAccessor="start"
+                  endAccessor="end"
+                  style={{ height: "100%", padding: "16px" }}
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                  eventPropGetter={eventStyleGetter as any}
+                  date={currentDate}
+                  view="month"
+                  onNavigate={setCurrentDate}
+                  onView={() => {}}
+                  toolbar={false}
+                  messages={{
+                    next: "Próximo", previous: "Anterior", today: "Hoje",
+                    month: "Mês", week: "Semana", day: "Dia", agenda: "Agenda",
+                    date: "Data", time: "Hora", event: "Evento",
+                    noEventsInRange: "Nenhuma tarefa neste período",
+                    allDay: "Dia inteiro",
+                  }}
+                  culture="pt-BR"
+                  onSelectSlot={(s: { start: Date }) => {
+                    setForm((f) => ({ ...f, dataVencimento: format(s.start, "yyyy-MM-dd") }));
+                    setOpen(true);
+                  }}
+                  selectable
+                />
+              </div>
+            </div>
           )}
 
           {view === "semana" && <WeekView />}

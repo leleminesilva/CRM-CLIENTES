@@ -281,19 +281,19 @@ export default function UsuariosPage() {
       </div>
 
       {/* KPI Row */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-3 gap-2 sm:gap-4">
         {[
           { label: "Total", value: usuarios.length, icon: Users,     color: "text-indigo-600" },
           { label: "Ativos",  value: ativos,         icon: UserCheck, color: "text-emerald-600" },
           { label: "Inativos",value: inativos,       icon: UserX,     color: "text-red-500" },
         ].map(s => (
-          <Card key={s.label} className="p-4 flex items-center gap-3">
-            <div className={`p-2 rounded-lg bg-muted ${s.color}`}>
-              <s.icon className="w-5 h-5" />
+          <Card key={s.label} className="p-3 sm:p-4 flex items-center gap-2 sm:gap-3 min-w-0">
+            <div className={`p-1.5 sm:p-2 rounded-lg bg-muted shrink-0 ${s.color}`}>
+              <s.icon className="w-4 h-4 sm:w-5 sm:h-5" />
             </div>
-            <div>
-              <p className="text-2xl font-bold">{s.value}</p>
-              <p className="text-xs text-muted-foreground">{s.label}</p>
+            <div className="min-w-0">
+              <p className="text-lg sm:text-2xl font-bold truncate">{s.value}</p>
+              <p className="text-xs text-muted-foreground truncate">{s.label}</p>
             </div>
           </Card>
         ))}

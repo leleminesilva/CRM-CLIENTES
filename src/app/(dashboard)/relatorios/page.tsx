@@ -176,13 +176,13 @@ export default function RelatoriosPage() {
           </div>
 
           {loadingComercial ? (
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               {[...Array(8)].map((_, i) => <div key={i} className="h-24 bg-muted animate-pulse rounded-xl" />)}
             </div>
           ) : (
             <>
               {/* KPIs */}
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 <KPICard title="Leads Gerados" value={comercial?.leadsGerados ?? 0} />
                 <KPICard title="Leads Convertidos" value={comercial?.leadsConvertidos ?? 0} color="text-emerald-600" />
                 <KPICard title="Taxa de Conversão" value={`${comercial?.taxaConversaoLeads ?? 0}%`} color="text-indigo-600" />
@@ -384,7 +384,7 @@ export default function RelatoriosPage() {
           ) : (
             <>
               {/* KPIs financeiros */}
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 <Card className="p-4 col-span-2">
                   <div className="flex items-center gap-2 mb-1">
                     <Receipt className="w-4 h-4 text-emerald-500" />
@@ -567,7 +567,7 @@ export default function RelatoriosPage() {
           </div>
 
           {loadingCancelados ? (
-            <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               {[...Array(3)].map((_, i) => <div key={i} className="h-24 bg-muted animate-pulse rounded-xl" />)}
             </div>
           ) : (

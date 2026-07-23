@@ -2,7 +2,7 @@
 
 > Documento vivo — atualizar a cada fase implementada.
 >
-> **Status: Fases 0-1 implementadas** (schema, RBAC, navegação, guarda de acesso, seed estrutural do catálogo, e CRUD completo de linhas/produtos/variantes). Fases 2-4 (motor de orçamento, ordens de serviço, sobras de material) ainda não implementadas — ver plano em `~/.claude/plans/silly-watching-octopus.md` no ambiente de quem construiu isso originalmente, ou a seção [Plano de fases](#plano-de-fases) abaixo.
+> **Status: Fases 0-4 implementadas e publicadas em produção** (schema, RBAC, navegação, guarda de acesso, seed estrutural do catálogo, CRUD de catálogo, motor de orçamento, ordens de serviço, sobras de material). Todas testadas ponta a ponta no navegador antes de publicar. Ver plano original em `~/.claude/plans/silly-watching-octopus.md` no ambiente de quem construiu isso, ou a seção [Plano de fases](#plano-de-fases) abaixo.
 
 ## Visão geral
 
@@ -53,6 +53,13 @@ Ver `prisma/schema.prisma` (seção "ORÇAMENTOS TÉCNICOS") para os campos exat
 
 0. Schema + RBAC + navegação + guarda de acesso + seed estrutural (**feito**).
 1. Catálogo — CRUD de linhas/produtos/variantes (**feito**).
-2. Motor de orçamento — `calc.ts` + formulário com itens repetíveis (`useFieldArray`) + cálculo ao vivo.
-3. Ordens de Serviço — rota de aprovação, lista com progresso e atraso calculado.
-4. Sobras de Material — CRUD simples.
+2. Motor de orçamento — `calc.ts` + `OrcamentoForm.tsx` (lista de itens como estado local, dialog de item com preview ao vivo) + cálculo ao vivo (**feito**).
+3. Ordens de Serviço — rota `aprovar` (transação: orçamento vira APROVADO + cria OS), lista com progresso e atraso calculado em tempo de renderização (**feito**).
+4. Sobras de Material — CRUD simples, sem otimização de corte (**feito**).
+
+## Próximos passos possíveis (fora do escopo original)
+
+- Preencher preços reais do catálogo (o usuário tem acesso administrador ao Alumy pra conferir a tabela de preços real).
+- Mapa de Clientes/geocodificação — adiado a pedido do usuário na Fase 0.
+- Otimização de corte automática em Sobras de Material (o "Conferir otimização" do Alumy) — deliberadamente fora de escopo por complexidade.
+- Integração "sugerir sobra disponível" ao adicionar um item de orçamento — hoje Sobras de Material é independente do motor de orçamento.

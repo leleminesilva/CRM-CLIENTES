@@ -94,7 +94,6 @@ const BREADCRUMBS: Record<string, string> = {
   "/usuarios": "Usuários",
   "/configuracoes": "Configurações",
   "/auditoria": "Auditoria",
-  "/orcamentos-tecnicos": "Orçamentos Técnicos",
 };
 
 export function Topbar() {

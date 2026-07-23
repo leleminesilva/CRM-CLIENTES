@@ -118,40 +118,21 @@ enum StatusOrcamentoCliente {
   NAO_APROVADO
 }
 
-enum ModoCalculoProduto {
-  AREA
-  LINEAR
-  UNIDADE
-}
-
-enum StatusOrcamentoTecnico {
-  RASCUNHO
-  ENVIADO
-  APROVADO
-  REPROVADO
-}
-
-enum StatusOrdemServico {
-  EM_PRODUCAO
-  CONCLUIDO
-  CANCELADO
-}
-
 // ==========================================
 // MODELS
 // ==========================================
 
 model User {
-  id        String    @id @default(cuid())
-  nome      String
-  email     String    @unique
-  senha     String
-  role      Role      @default(COMERCIAL)
-  avatar    String?
-  ativo     Boolean   @default(true)
-  deletedAt DateTime?
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  id           String    @id @default(cuid())
+  nome         String
+  email        String    @unique
+  senha        String
+  role         Role      @default(COMERCIAL)
+  avatar       String?
+  ativo        Boolean   @default(true)
+  deletedAt    DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 
   prefsNotificacao Json?
 
@@ -164,16 +145,13 @@ model User {
   notificacoes  Notificacao[]
   auditLogs     AuditLog[]
 
-  chatMensagensEnviadas  ChatMensagem[]   @relation("ChatMensagensEnviadas")
-  chatMensagensRecebidas ChatMensagem[]   @relation("ChatMensagensRecebidas")
+  chatMensagensEnviadas  ChatMensagem[] @relation("ChatMensagensEnviadas")
+  chatMensagensRecebidas ChatMensagem[] @relation("ChatMensagensRecebidas")
   chatLeitura            ChatLeitura?
-  alertasRecebidos       Alerta[]         @relation("AlertasRecebidos")
-  alertasCriados         Alerta[]         @relation("AlertasCriados")
+  alertasRecebidos       Alerta[]       @relation("AlertasRecebidos")
+  alertasCriados         Alerta[]       @relation("AlertasCriados")
   alertasLeituras        AlertaLeitura[]
   whatsappSessoes        WhatsAppSessao[] @relation("WhatsAppAtendente")
-
-  orcamentosTecnicosResponsavel OrcamentoTecnico[] @relation("OrcamentoTecnicoResponsavel")
-  ordensServicoVendedor         OrdemServico[]     @relation("OrdemServicoVendedor")
 
   @@map("users")
 }
@@ -235,61 +213,60 @@ model Contato {
 }
 
 model Cliente {
-  id                   String                 @id @default(cuid())
-  nome                 String
-  razaoSocial          String?
-  nomeFantasia         String?
-  cpfCnpj              String?
-  telefone             String?
-  whatsapp             String?
-  email                String?
-  cep                  String?
-  logradouro           String?
-  numero               String?
-  complemento          String?
-  tipoResidencia       String?
-  bairro               String?
-  cidade               String?
-  estado               String?
-  segmento             String?
-  porte                Porte?
-  origem               OrigemCliente          @default(OUTROS)
-  responsavelId        String?
-  empresaId            String?
-  contatoId            String?
-  observacoes          String?
+  id            String        @id @default(cuid())
+  nome          String
+  razaoSocial   String?
+  nomeFantasia  String?
+  cpfCnpj       String?
+  telefone      String?
+  whatsapp      String?
+  email         String?
+  cep           String?
+  logradouro    String?
+  numero        String?
+  complemento   String?
+  tipoResidencia String?
+  bairro        String?
+  cidade        String?
+  estado        String?
+  segmento        String?
+  porte           Porte?
+  origem          OrigemCliente          @default(OUTROS)
+  responsavelId   String?
+  empresaId       String?
+  contatoId       String?
+  observacoes     String?
   // Campos do fluxo de atendimento
-  dataInscricao        DateTime?
-  servicoBuscado       String?
-  numeroOrcamento      String?
-  valorOrcamento       Decimal?               @db.Decimal(15, 2)
-  prazoOrcamento       DateTime?
-  dataVenda            DateTime?
-  statusOrcamento      StatusOrcamentoCliente @default(PENDENTE)
-  orcamentoEnviadoEm   DateTime?
-  orcamentoFinalNumero String?
-  orcamentoFinalValor  Decimal?               @db.Decimal(15, 2)
-  orcamentoFinalEm     DateTime?
-  revisadoEm           DateTime?
-  notificacaoMensagem  String?
-  notificacaoEm        DateTime?
-  notificacaoLida      Boolean                @default(false)
-  temperatura          Temperatura            @default(MORNO)
-  motivoExclusao       String?
-  deletedAt            DateTime?
-  createdAt            DateTime               @default(now())
-  updatedAt            DateTime               @updatedAt
+  dataInscricao   DateTime?
+  servicoBuscado  String?
+  numeroOrcamento String?
+  valorOrcamento      Decimal?               @db.Decimal(15, 2)
+  prazoOrcamento      DateTime?
+  dataVenda           DateTime?
+  statusOrcamento     StatusOrcamentoCliente @default(PENDENTE)
+  orcamentoEnviadoEm      DateTime?
+  orcamentoFinalNumero    String?
+  orcamentoFinalValor     Decimal?  @db.Decimal(15, 2)
+  orcamentoFinalEm        DateTime?
+  revisadoEm              DateTime?
+  notificacaoMensagem     String?
+  notificacaoEm           DateTime?
+  notificacaoLida         Boolean   @default(false)
+  temperatura     Temperatura            @default(MORNO)
+  motivoExclusao  String?
+  deletedAt       DateTime?
+  createdAt       DateTime               @default(now())
+  updatedAt       DateTime               @updatedAt
 
-  responsavel        User?              @relation(fields: [responsavelId], references: [id])
-  empresa            Empresa?           @relation(fields: [empresaId], references: [id])
-  contato            Contato?           @relation(fields: [contatoId], references: [id])
-  leads              Lead[]
-  oportunidades      Oportunidade[]
-  tarefas            Tarefa[]
-  atividades         Atividade[]
-  comentarios        Comentario[]
-  anexos             Anexo[]
-  orcamentosTecnicos OrcamentoTecnico[]
+  responsavel   User?         @relation(fields: [responsavelId], references: [id])
+  empresa       Empresa?      @relation(fields: [empresaId], references: [id])
+  contato       Contato?      @relation(fields: [contatoId], references: [id])
+  leads         Lead[]
+  oportunidades Oportunidade[]
+  tarefas       Tarefa[]
+  atividades    Atividade[]
+  comentarios   Comentario[]
+  anexos        Anexo[]
 
   @@map("clientes")
 }
@@ -346,11 +323,11 @@ model Oportunidade {
   createdAt      DateTime           @default(now())
   updatedAt      DateTime           @updatedAt
 
-  responsavel User?        @relation(fields: [responsavelId], references: [id])
-  cliente     Cliente?     @relation(fields: [clienteId], references: [id])
-  empresa     Empresa?     @relation(fields: [empresaId], references: [id])
-  contato     Contato?     @relation(fields: [contatoId], references: [id])
-  lead        Lead?        @relation(fields: [leadId], references: [id])
+  responsavel User?     @relation(fields: [responsavelId], references: [id])
+  cliente     Cliente?  @relation(fields: [clienteId], references: [id])
+  empresa     Empresa?  @relation(fields: [empresaId], references: [id])
+  contato     Contato?  @relation(fields: [contatoId], references: [id])
+  lead        Lead?     @relation(fields: [leadId], references: [id])
   tarefas     Tarefa[]
   atividades  Atividade[]
   comentarios Comentario[]
@@ -504,16 +481,16 @@ model ChatLeitura {
 }
 
 model AuditLog {
-  id           String   @id @default(cuid())
-  userId       String
-  entidade     String
-  entidadeId   String
-  acao         String
+  id          String   @id @default(cuid())
+  userId      String
+  entidade    String
+  entidadeId  String
+  acao        String
   dadosAntigos Json?
-  dadosNovos   Json?
-  ip           String?
-  userAgent    String?
-  createdAt    DateTime @default(now())
+  dadosNovos  Json?
+  ip          String?
+  userAgent   String?
+  createdAt   DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id])
 
@@ -561,24 +538,24 @@ enum WhatsAppMensagemStatus {
 }
 
 model WhatsAppSessao {
-  id                     String               @id @default(cuid())
+  id                     String                @id @default(cuid())
   nome                   String
   numero                 String?
-  provider               WhatsAppProvider     @default(EVOLUTION)
+  provider               WhatsAppProvider      @default(EVOLUTION)
   providerVersion        String?
-  providerSessionId      String               @unique
-  status                 WhatsAppSessaoStatus @default(UNKNOWN)
+  providerSessionId      String                @unique
+  status                 WhatsAppSessaoStatus  @default(UNKNOWN)
   ultimoPing             DateTime?
   ultimaMensagemRecebida DateTime?
   lastError              String?
   lastErrorAt            DateTime?
   atendenteId            String?
   empresaId              String?
-  ativo                  Boolean              @default(true)
-  createdAt              DateTime             @default(now())
-  updatedAt              DateTime             @updatedAt
+  ativo                  Boolean               @default(true)
+  createdAt              DateTime              @default(now())
+  updatedAt              DateTime              @updatedAt
 
-  atendente User?               @relation("WhatsAppAtendente", fields: [atendenteId], references: [id])
+  atendente User? @relation("WhatsAppAtendente", fields: [atendenteId], references: [id])
   conversas WhatsAppConversa[]
   logs      WhatsAppSessaoLog[]
 
@@ -635,15 +612,15 @@ model WhatsAppConversa {
 }
 
 model WhatsAppMensagem {
-  id                String                 @id @default(cuid())
+  id                String                  @id @default(cuid())
   conversaId        String
-  providerMessageId String?                @unique
-  direcao           String // 'entrada' | 'saida'
-  tipo              String                 @default("texto")
+  providerMessageId String?                 @unique
+  direcao           String   // 'entrada' | 'saida'
+  tipo              String   @default("texto")
   conteudo          String
   mediaUrl          String?
-  status            WhatsAppMensagemStatus @default(ENVIANDO)
-  enviadaEm         DateTime               @default(now())
+  status            WhatsAppMensagemStatus  @default(ENVIANDO)
+  enviadaEm         DateTime @default(now())
   entregueEm        DateTime?
   lidaEm            DateTime?
   falhouEm          DateTime?
@@ -692,15 +669,15 @@ enum HandoffReason {
 }
 
 model Alerta {
-  id            String          @id @default(cuid())
-  titulo        String
-  mensagem      String
-  criadoEm      DateTime        @default(now())
-  destinoUserId String?
-  destinoUser   User?           @relation("AlertasRecebidos", fields: [destinoUserId], references: [id], onDelete: Cascade)
-  criadorId     String
-  criador       User            @relation("AlertasCriados", fields: [criadorId], references: [id], onDelete: Cascade)
-  leituras      AlertaLeitura[]
+  id             String          @id @default(cuid())
+  titulo         String
+  mensagem       String
+  criadoEm       DateTime        @default(now())
+  destinoUserId  String?
+  destinoUser    User?           @relation("AlertasRecebidos", fields: [destinoUserId], references: [id], onDelete: Cascade)
+  criadorId      String
+  criador        User            @relation("AlertasCriados", fields: [criadorId], references: [id], onDelete: Cascade)
+  leituras       AlertaLeitura[]
 
   @@map("alertas")
 }
@@ -717,176 +694,3 @@ model AlertaLeitura {
   @@map("alertas_leituras")
 }
 
-// ==========================================
-// ORÇAMENTOS TÉCNICOS — motor de orçamento por vão/vidro, ordens de serviço e
-// sobras de material (segmento serralheria/vidraçaria). Restrito ao cargo
-// DESENVOLVEDOR, ver docs/architecture/orcamentos-tecnicos.md.
-// ==========================================
-
-model LinhaProduto {
-  id        String    @id @default(cuid())
-  nome      String    @unique
-  ordem     Int       @default(0)
-  ativo     Boolean   @default(true)
-  deletedAt DateTime?
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-
-  produtos ProdutoCatalogo[]
-
-  @@map("linhas_produto")
-}
-
-model ProdutoCatalogo {
-  id          String             @id @default(cuid())
-  linhaId     String
-  nome        String
-  modoCalculo ModoCalculoProduto
-  // usado só quando o produto não tem nenhuma VarianteProduto ativa
-  precoBase   Decimal            @default(0) @db.Decimal(15, 2)
-  imagemUrl   String?
-  ordem       Int                @default(0)
-  ativo       Boolean            @default(true)
-  deletedAt   DateTime?
-  createdAt   DateTime           @default(now())
-  updatedAt   DateTime           @updatedAt
-
-  linha     LinhaProduto           @relation(fields: [linhaId], references: [id])
-  variantes VarianteProduto[]
-  itens     ItemOrcamentoTecnico[]
-
-  @@unique([linhaId, nome])
-  @@index([linhaId])
-  @@map("produtos_catalogo")
-}
-
-// Cada linha é um SKU já combinado (ex.: "6mm Temperado Liso"), com preço
-// próprio — não uma faceta somável com outras. Um item escolhe no máximo uma.
-model VarianteProduto {
-  id            String    @id @default(cuid())
-  produtoId     String
-  nome          String
-  // rótulo de agrupamento/exibição opcional (ex. "ESPESSURA", "COR") — não
-  // participa do cálculo, é só pra organizar a UI de seleção.
-  categoria     String?
-  precoUnitario Decimal   @default(0) @db.Decimal(15, 2)
-  ordem         Int       @default(0)
-  ativo         Boolean   @default(true)
-  deletedAt     DateTime?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-
-  produto ProdutoCatalogo        @relation(fields: [produtoId], references: [id])
-  itens   ItemOrcamentoTecnico[]
-
-  @@unique([produtoId, nome])
-  @@index([produtoId])
-  @@map("variantes_produto")
-}
-
-model OrcamentoTecnico {
-  id                 String                 @id @default(cuid())
-  numero             Int                    @unique @default(autoincrement())
-  clienteId          String?
-  responsavelId      String?
-  bairroInstalacao   String?
-  enderecoInstalacao String?
-  observacoes        String?
-  status             StatusOrcamentoTecnico @default(RASCUNHO)
-  descontoPercentual Decimal?               @db.Decimal(5, 2)
-  descontoValor      Decimal?               @db.Decimal(15, 2)
-  // subtotal/valorTotal são denormalizados e recalculados no servidor a cada
-  // mutação de itens — evita somar itens toda vez que a lista é exibida.
-  subtotal           Decimal                @default(0) @db.Decimal(15, 2)
-  valorTotal         Decimal                @default(0) @db.Decimal(15, 2)
-  deletedAt          DateTime?
-  createdAt          DateTime               @default(now())
-  updatedAt          DateTime               @updatedAt
-
-  cliente      Cliente?               @relation(fields: [clienteId], references: [id])
-  responsavel  User?                  @relation("OrcamentoTecnicoResponsavel", fields: [responsavelId], references: [id])
-  itens        ItemOrcamentoTecnico[]
-  ordemServico OrdemServico?
-  sobras       SobraMaterial[]
-
-  @@index([status])
-  @@index([clienteId])
-  @@map("orcamentos_tecnicos")
-}
-
-model ItemOrcamentoTecnico {
-  id                 String   @id @default(cuid())
-  orcamentoId        String
-  produtoId          String
-  varianteId         String?
-  // só os campos relevantes ao modoCalculo do produto são preenchidos
-  larguraMm          Int?
-  alturaMm           Int?
-  comprimentoMm      Int?
-  quantidade         Int      @default(1)
-  ambienteInstalacao String?
-  descricao          String?
-  // preço já aplicado à dimensão (m²/m) ou preço fixo — ANTES de acréscimo e
-  // quantidade. Congelado no momento do cálculo: não é reprecificado depois
-  // se o catálogo mudar (mesma lógica de uma nota já emitida).
-  precoCalculado     Decimal  @db.Decimal(15, 2)
-  acrescimoValor     Decimal  @default(0) @db.Decimal(15, 2)
-  // (precoCalculado * quantidade) + acrescimoValor
-  totalItem          Decimal  @db.Decimal(15, 2)
-  ordem              Int      @default(0)
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
-
-  orcamento     OrcamentoTecnico @relation(fields: [orcamentoId], references: [id], onDelete: Cascade)
-  produto       ProdutoCatalogo  @relation(fields: [produtoId], references: [id])
-  variante      VarianteProduto? @relation(fields: [varianteId], references: [id])
-  sobrasGeradas SobraMaterial[]  @relation("SobraUsadaEmItem")
-
-  @@index([orcamentoId])
-  @@index([produtoId])
-  @@map("itens_orcamento_tecnico")
-}
-
-model OrdemServico {
-  id              String             @id @default(cuid())
-  orcamentoId     String             @unique
-  vendedorId      String?
-  previsaoEntrega DateTime
-  progresso       Int                @default(0)
-  status          StatusOrdemServico @default(EM_PRODUCAO)
-  concluidoEm     DateTime?
-  canceladoEm     DateTime?
-  deletedAt       DateTime?
-  createdAt       DateTime           @default(now())
-  updatedAt       DateTime           @updatedAt
-
-  orcamento OrcamentoTecnico @relation(fields: [orcamentoId], references: [id])
-  vendedor  User?            @relation("OrdemServicoVendedor", fields: [vendedorId], references: [id])
-
-  @@index([status])
-  @@index([previsaoEntrega])
-  @@map("ordens_servico")
-}
-
-// Reaproveitamento manual de sobras de perfil de alumínio ou retalho de
-// vidro. Sem otimização de corte nesta versão — só cadastro e marcação de uso.
-model SobraMaterial {
-  id                String    @id @default(cuid())
-  tipo              String
-  descricao         String?
-  larguraMm         Int?
-  alturaMm          Int?
-  comprimentoMm     Int?
-  origemOrcamentoId String?
-  disponivel        Boolean   @default(true)
-  usadoEmItemId     String?
-  deletedAt         DateTime?
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
-
-  origemOrcamento OrcamentoTecnico?     @relation(fields: [origemOrcamentoId], references: [id])
-  usadoEmItem     ItemOrcamentoTecnico? @relation("SobraUsadaEmItem", fields: [usadoEmItemId], references: [id])
-
-  @@index([disponivel])
-  @@map("sobras_material")
-}

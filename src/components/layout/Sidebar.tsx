@@ -7,7 +7,6 @@ import {
   LayoutDashboard, Users,
   CheckSquare, Calendar, BarChart3, UserCog, Search,
   Settings, ChevronLeft, ChevronRight, Shield, X, MessageCircle, MessageSquare, Bell,
-  Calculator,
 } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { Logo } from "@/components/Logo";
@@ -34,7 +33,6 @@ const navItems: { href: string; label: string; icon: React.ElementType; roles?: 
 ];
 
 const bottomNavItems: { href: string; label: string; icon: React.ElementType; roles?: Role[] }[] = [
-  { href: "/orcamentos-tecnicos", label: "Orçamentos Técnicos", icon: Calculator, roles: ["DESENVOLVEDOR"] },
   { href: "/relatorios",    label: "Relatórios",   icon: BarChart3, roles: ["ADMINISTRADOR", "DESENVOLVEDOR", "GESTOR"] },
   { href: "/usuarios",      label: "Usuários",     icon: UserCog,   roles: ["ADMINISTRADOR", "DESENVOLVEDOR"] },
   { href: "/alerta",        label: "Alerta",       icon: Bell,      roles: ["ADMINISTRADOR", "DESENVOLVEDOR"] },

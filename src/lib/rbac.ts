@@ -47,22 +47,7 @@ type Permission =
   | "configuracoes:view"
   | "configuracoes:update"
   | "whatsapp:manage_sessoes"
-  | "whatsapp:use"
-  | "catalogo:read"
-  | "catalogo:create"
-  | "catalogo:update"
-  | "catalogo:delete"
-  | "orcamentos_tecnicos:read"
-  | "orcamentos_tecnicos:create"
-  | "orcamentos_tecnicos:update"
-  | "orcamentos_tecnicos:delete"
-  | "orcamentos_tecnicos:aprovar"
-  | "ordens_servico:read"
-  | "ordens_servico:update"
-  | "sobras_material:read"
-  | "sobras_material:create"
-  | "sobras_material:update"
-  | "sobras_material:delete";
+  | "whatsapp:use";
 
 // Desenvolvedor tem acesso total, igual Administrador.
 const ADMIN_PERMISSIONS: Permission[] = [
@@ -112,30 +97,7 @@ const PERMISSIONS: Record<Role, Permission[]> = {
   // WhatsApp (gateway self-hosted) fica restrito só a Desenvolvedor por
   // enquanto, deliberadamente à parte de ADMIN_PERMISSIONS — feature nova,
   // ainda não validada em produção. Ver docs/architecture/whatsapp.md.
-  DESENVOLVEDOR: [
-    ...ADMIN_PERMISSIONS,
-    "whatsapp:manage_sessoes",
-    "whatsapp:use",
-    // Orçamentos Técnicos (motor de cálculo por vão/vidro, ordens de serviço,
-    // sobras de material) — módulo novo, deliberadamente à parte de
-    // ADMIN_PERMISSIONS: nem Administrador tem acesso por enquanto.
-    // Ver docs/architecture/orcamentos-tecnicos.md.
-    "catalogo:read",
-    "catalogo:create",
-    "catalogo:update",
-    "catalogo:delete",
-    "orcamentos_tecnicos:read",
-    "orcamentos_tecnicos:create",
-    "orcamentos_tecnicos:update",
-    "orcamentos_tecnicos:delete",
-    "orcamentos_tecnicos:aprovar",
-    "ordens_servico:read",
-    "ordens_servico:update",
-    "sobras_material:read",
-    "sobras_material:create",
-    "sobras_material:update",
-    "sobras_material:delete",
-  ],
+  DESENVOLVEDOR: [...ADMIN_PERMISSIONS, "whatsapp:manage_sessoes", "whatsapp:use"],
   GESTOR: [
     "dashboard:view",
     "dashboard:view_all",

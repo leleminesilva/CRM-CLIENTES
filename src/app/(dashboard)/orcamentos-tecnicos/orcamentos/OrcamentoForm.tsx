@@ -56,6 +56,8 @@ export interface ItemFormValue {
 export interface OrcamentoFormInitial {
   id: string;
   numero: number;
+  status: "RASCUNHO" | "ENVIADO" | "APROVADO" | "REPROVADO";
+  ordemServico: { id: string } | null;
   clienteId: string | null;
   responsavelId: string | null;
   bairroInstalacao: string | null;
@@ -361,6 +363,7 @@ export function OrcamentoForm({ mode, orcamentoId, initialData }: {
     onSuccess: (res) => {
       toast.success(mode === "create" ? "Orçamento criado" : "Orçamento atualizado");
       qc.invalidateQueries({ queryKey: ["orcamentos-tecnicos"] });
+      qc.invalidateQueries({ queryKey: ["orcamento-tecnico", res.data.data.id] });
       router.push(`/orcamentos-tecnicos/orcamentos/${res.data.data.id}`);
     },
     onError: (e: unknown) => {

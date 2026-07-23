@@ -744,6 +744,7 @@ model ProdutoCatalogo {
   modoCalculo ModoCalculoProduto
   // usado só quando o produto não tem nenhuma VarianteProduto ativa
   precoBase   Decimal            @default(0) @db.Decimal(15, 2)
+  imagemUrl   String?
   ordem       Int                @default(0)
   ativo       Boolean            @default(true)
   deletedAt   DateTime?

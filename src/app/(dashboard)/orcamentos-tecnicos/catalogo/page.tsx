@@ -1,11 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
 import { toast } from "sonner";
 import {
-  Plus, Pencil, Trash2, MoreVertical, Layers, Package, Tag,
+  Plus, Pencil, Trash2, MoreVertical, Layers, Package, Tag, Camera,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -53,6 +53,7 @@ interface Produto {
   nome: string;
   modoCalculo: ModoCalculo;
   precoBase: string;
+  imagemUrl: string | null;
   ordem: number;
   ativo: boolean;
   _count: { variantes: number };
@@ -410,6 +411,9 @@ export default function CatalogoPage() {
   const [deleteLinhaTarget, setDeleteLinhaTarget] = useState<Linha | null>(null);
   const [deleteProdutoTarget, setDeleteProdutoTarget] = useState<Produto | null>(null);
   const [variantesProduto, setVariantesProduto] = useState<Produto | null>(null);
+  const [uploadingProdutoId, setUploadingProdutoId] = useState<string | null>(null);
+  const imagemInputRef = useRef<HTMLInputElement>(null);
+  const imagemTargetRef = useRef<string | null>(null);
 
   const { data: linhasData, isLoading: loadingLinhas } = useQuery({
     queryKey: ["linhas-produto"],
@@ -489,6 +493,31 @@ export default function CatalogoPage() {
     },
     onError: () => toast.error("Erro ao remover produto"),
   });
+
+  function handleImagemClick(produtoId: string) {
+    imagemTargetRef.current = produtoId;
+    imagemInputRef.current?.click();
+  }
+
+  async function handleImagemSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    const produtoId = imagemTargetRef.current;
+    if (e.target) e.target.value = "";
+    if (!file || !produtoId) return;
+
+    setUploadingProdutoId(produtoId);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      await axios.post(`/api/orcamentos-tecnicos/produtos-catalogo/${produtoId}/imagem`, fd);
+      qc.invalidateQueries({ queryKey: ["produtos-catalogo", linhaAtualId] });
+      toast.success("Foto atualizada!");
+    } catch {
+      toast.error("Erro ao enviar foto");
+    } finally {
+      setUploadingProdutoId(null);
+    }
+  }
 
   return (
     <div className="space-y-4 h-full flex flex-col">
@@ -594,15 +623,38 @@ export default function CatalogoPage() {
                 <div className="space-y-2">
                   {produtos.map(p => (
                     <div key={p.id} className={cn("flex items-center justify-between gap-3 p-3 rounded-lg border", !p.ativo && "opacity-50")}>
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium truncate">{p.nome}</p>
-                        <div className="flex items-center gap-2 mt-0.5">
-                          <Badge variant="outline" className="text-xs">{MODO_CALCULO_LABELS[p.modoCalculo]}</Badge>
-                          <span className="text-xs text-muted-foreground">
-                            {p._count.variantes > 0
-                              ? `${p._count.variantes} variante(s)`
-                              : `base: ${formatCurrency(Number(p.precoBase))}`}
-                          </span>
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div
+                          className="relative shrink-0 w-11 h-11 rounded-lg bg-muted border overflow-hidden cursor-pointer group"
+                          onClick={() => handleImagemClick(p.id)}
+                          title="Clique para alterar foto"
+                        >
+                          {p.imagemUrl ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={p.imagemUrl} alt={p.nome} className="w-full h-full object-cover" />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center text-muted-foreground/50">
+                              <Package className="w-5 h-5" />
+                            </div>
+                          )}
+                          <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                            {uploadingProdutoId === p.id ? (
+                              <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                            ) : (
+                              <Camera className="w-3.5 h-3.5 text-white" />
+                            )}
+                          </div>
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium truncate">{p.nome}</p>
+                          <div className="flex items-center gap-2 mt-0.5">
+                            <Badge variant="outline" className="text-xs">{MODO_CALCULO_LABELS[p.modoCalculo]}</Badge>
+                            <span className="text-xs text-muted-foreground">
+                              {p._count.variantes > 0
+                                ? `${p._count.variantes} variante(s)`
+                                : `base: ${formatCurrency(Number(p.precoBase))}`}
+                            </span>
+                          </div>
                         </div>
                       </div>
                       <div className="flex items-center gap-1 shrink-0">
@@ -628,6 +680,14 @@ export default function CatalogoPage() {
           )}
         </Card>
       </div>
+
+      <input
+        ref={imagemInputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={handleImagemSelect}
+      />
 
       <VariantesManagerDialog
         produto={variantesProduto}

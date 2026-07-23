@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
 import { toast } from "sonner";
-import { Plus, Pencil, Trash2, FileText } from "lucide-react";
+import { Plus, Pencil, Trash2, FileText, Package } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -29,7 +29,7 @@ import {
 } from "@/lib/orcamentosTecnicos/calc";
 
 interface LinhaOption { id: string; nome: string; }
-interface ProdutoOption { id: string; linhaId: string; nome: string; modoCalculo: ModoCalculo; precoBase: string; }
+interface ProdutoOption { id: string; linhaId: string; nome: string; modoCalculo: ModoCalculo; precoBase: string; imagemUrl: string | null; }
 interface VarianteOption { id: string; produtoId: string; nome: string; categoria: string | null; precoUnitario: string; }
 interface ClienteOption { id: string; nome: string; }
 interface UsuarioOption { id: string; nome: string; }
@@ -220,13 +220,32 @@ function ItemDialog({
           {linhaId && (
             <div className="space-y-1.5">
               <Label>Produto *</Label>
-              <Select value={produtoId ?? undefined} onValueChange={v => { setProdutoId(v); setVarianteId(null); }}>
-                <SelectTrigger><SelectValue placeholder="Selecione o produto" /></SelectTrigger>
-                <SelectContent>
-                  {produtos.filter(p => p.ativo).map(p => <SelectItem key={p.id} value={p.id}>{p.nome}</SelectItem>)}
-                </SelectContent>
-              </Select>
-              {produtos.length === 0 && <p className="text-xs text-muted-foreground">Nenhum produto cadastrado nessa linha ainda.</p>}
+              {produtos.length === 0 ? (
+                <p className="text-xs text-muted-foreground">Nenhum produto cadastrado nessa linha ainda.</p>
+              ) : (
+                <div className="grid grid-cols-3 gap-2">
+                  {produtos.filter(p => p.ativo).map(p => (
+                    <button
+                      key={p.id} type="button"
+                      onClick={() => { setProdutoId(p.id); setVarianteId(null); }}
+                      className={cn(
+                        "flex flex-col items-center gap-1.5 p-2 rounded-lg border text-center transition-colors",
+                        produtoId === p.id ? "border-primary bg-primary/10" : "hover:bg-muted"
+                      )}
+                    >
+                      <div className="w-14 h-14 rounded-md bg-muted overflow-hidden flex items-center justify-center shrink-0">
+                        {p.imagemUrl ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={p.imagemUrl} alt={p.nome} className="w-full h-full object-cover" />
+                        ) : (
+                          <Package className="w-6 h-6 text-muted-foreground/40" />
+                        )}
+                      </div>
+                      <span className="text-xs leading-tight line-clamp-2">{p.nome}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 

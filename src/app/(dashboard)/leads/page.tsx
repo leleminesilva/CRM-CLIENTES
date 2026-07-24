@@ -421,15 +421,17 @@ export default function LeadsKanbanPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Kanban Board */}
-      <div className="overflow-x-auto pb-4">
+      {/* Kanban Board — altura travada e scroll independente por coluna, pra
+          barra de rolagem horizontal ficar sempre visível logo abaixo dos
+          cabeçalhos, em vez de só depois de rolar a coluna mais cheia. */}
+      <div className="overflow-x-auto overflow-y-hidden pb-4">
         <DndContext
           sensors={sensors}
           collisionDetection={closestCenter}
           onDragStart={handleDragStart}
           onDragEnd={handleDragEnd}
         >
-          <div className="flex gap-4 min-w-max">
+          <div className="flex gap-4 min-w-max h-[calc(100vh-260px)] min-h-[400px]">
             {ESTAGIOS.map((estagio) => {
               const estagioLeads = getLeadsForEstagio(estagio);
               const estagioValor = estagioLeads.reduce((s, l) => s + Number(l.valorEstimado || 0), 0);
@@ -437,11 +439,11 @@ export default function LeadsKanbanPage() {
               return (
                 <div
                   key={estagio}
-                  className={`w-72 flex flex-col rounded-xl border-2 ${ESTAGIO_COLORS[estagio]} min-h-[200px]`}
+                  className={`w-72 flex flex-col rounded-xl border-2 ${ESTAGIO_COLORS[estagio]}`}
                   data-estagio={estagio}
                 >
                   {/* Column Header */}
-                  <div className="p-3 border-b border-inherit">
+                  <div className="p-3 border-b border-inherit shrink-0">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <div className={`w-2 h-2 rounded-full ${ESTAGIO_HEADER_COLORS[estagio]}`} />
@@ -458,9 +460,9 @@ export default function LeadsKanbanPage() {
                     )}
                   </div>
 
-                  {/* Cards */}
+                  {/* Cards — rola por dentro, não estica a coluna inteira */}
                   <div
-                    className="flex-1 p-2 space-y-2 min-h-[100px]"
+                    className="flex-1 min-h-0 overflow-y-auto p-2 space-y-2"
                     id={estagio}
                     data-estagio={estagio}
                   >
@@ -475,7 +477,7 @@ export default function LeadsKanbanPage() {
                   </div>
 
                   {/* Add Button */}
-                  <div className="p-2 border-t border-inherit">
+                  <div className="p-2 border-t border-inherit shrink-0">
                     <NovoLeadDialog
                       estagio={estagio}
                       onSuccess={() => qc.invalidateQueries({ queryKey: ["leads-kanban"] })}

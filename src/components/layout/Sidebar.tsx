@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 import {
   LayoutDashboard, Users,
   CheckSquare, Calendar, BarChart3, UserCog, Search,
-  Settings, ChevronLeft, ChevronRight, Shield, X, MessageCircle, MessageSquare, Bell,
+  Settings, ChevronLeft, ChevronRight, Shield, X, MessageCircle, MessageSquare, Bell, Kanban,
 } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { Logo } from "@/components/Logo";
@@ -25,10 +25,11 @@ type Role = "ADMINISTRADOR" | "DESENVOLVEDOR" | "GESTOR" | "COMERCIAL" | "OPERAC
 const navItems: { href: string; label: string; icon: React.ElementType; roles?: Role[] }[] = [
   { href: "/",           label: "Dashboard",  icon: LayoutDashboard },
   { href: "/clientes",   label: "Clientes",   icon: Users },
+  { href: "/leads",      label: "Leads",      icon: Kanban },
   { href: "/tarefas",    label: "Tarefas",    icon: CheckSquare },
   { href: "/agenda",     label: "Agenda",     icon: Calendar },
   { href: "/chat",       label: "Chat",       icon: MessageSquare },
-  { href: "/whatsapp",   label: "WhatsApp",   icon: MessageCircle, roles: ["DESENVOLVEDOR"] },
+  { href: "/whatsapp",   label: "WhatsApp",   icon: MessageCircle },
   { href: "/pesquisa",   label: "Pesquisa",   icon: Search },
 ];
 

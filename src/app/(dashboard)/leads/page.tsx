@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
+import { useRouter } from "next/navigation";
 
 function parseBRL(raw: string): number {
   const s = raw.trim();
@@ -91,10 +92,12 @@ function TemperaturaIcon({ temperatura }: { temperatura: string }) {
 }
 
 function KanbanCard({ lead, overlay }: { lead: Lead; overlay?: boolean }) {
+  const router = useRouter();
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: lead.id,
     data: { estagio: lead.estagio },
   });
+  const pointerDownPos = useRef<{ x: number; y: number } | null>(null);
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -102,15 +105,29 @@ function KanbanCard({ lead, overlay }: { lead: Lead; overlay?: boolean }) {
     opacity: isDragging && !overlay ? 0.4 : 1,
   };
 
+  function handlePointerDownCapture(e: React.PointerEvent) {
+    pointerDownPos.current = { x: e.clientX, y: e.clientY };
+  }
+
+  function handleClick(e: React.MouseEvent) {
+    if (overlay || !lead.clienteId) return;
+    const start = pointerDownPos.current;
+    // Distingue clique de arrasto: só navega se o ponteiro não se moveu (arrasto real move o card).
+    if (start && (Math.abs(e.clientX - start.x) > 5 || Math.abs(e.clientY - start.y) > 5)) return;
+    router.push(`/clientes/${lead.clienteId}`);
+  }
+
   return (
     <div
       ref={setNodeRef}
       style={style}
       {...attributes}
       {...listeners}
+      onPointerDownCapture={handlePointerDownCapture}
+      onClick={handleClick}
       className={`bg-card border rounded-lg p-3 cursor-grab active:cursor-grabbing shadow-sm hover:shadow-md transition-shadow ${
         overlay ? "shadow-lg rotate-1" : ""
-      }`}
+      } ${lead.clienteId && !overlay ? "hover:border-indigo-400 dark:hover:border-indigo-600" : ""}`}
     >
       <div className="flex items-start justify-between gap-2">
         <p className="font-medium text-sm leading-tight">{lead.titulo}</p>

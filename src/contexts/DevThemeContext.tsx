@@ -5,10 +5,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import { DEV_THEMES, DEFAULT_DEV_THEME, type DevThemeId, type DevTheme } from "@/lib/devThemes";
 
 interface DevThemeContextType {
-  isDev: boolean;
-  // isDev = tem o cargo Desenvolvedor. isThemed = isDev E escolheu um layout
-  // diferente de "Padrão" — é essa a flag que os componentes devem checar
-  // antes de aplicar qualquer estilo do tema.
+  // isThemed = usuário escolheu um layout diferente de "Padrão" — é essa a
+  // flag que os componentes devem checar antes de aplicar qualquer estilo do tema.
   isThemed: boolean;
   themeId: DevThemeId;
   theme: DevTheme;
@@ -16,7 +14,6 @@ interface DevThemeContextType {
 }
 
 const DevThemeContext = createContext<DevThemeContextType>({
-  isDev: false,
   isThemed: false,
   themeId: DEFAULT_DEV_THEME,
   theme: DEV_THEMES[DEFAULT_DEV_THEME],
@@ -25,10 +22,9 @@ const DevThemeContext = createContext<DevThemeContextType>({
 
 export function DevThemeProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
-  const isDev = user?.role === "DESENVOLVEDOR";
   const [themeId, setThemeIdState] = useState<DevThemeId>(DEFAULT_DEV_THEME);
 
-  // Cada Desenvolvedor guarda a própria escolha de layout, localmente.
+  // Cada usuário guarda a própria escolha de layout, localmente.
   useEffect(() => {
     if (!user?.id) return;
     const saved = localStorage.getItem(`devTheme_${user.id}`);
@@ -40,10 +36,10 @@ export function DevThemeProvider({ children }: { children: React.ReactNode }) {
     if (user?.id) localStorage.setItem(`devTheme_${user.id}`, id);
   }
 
-  const isThemed = isDev && themeId !== "padrao";
+  const isThemed = themeId !== "padrao";
 
   return (
-    <DevThemeContext.Provider value={{ isDev, isThemed, themeId, theme: DEV_THEMES[themeId], setThemeId }}>
+    <DevThemeContext.Provider value={{ isThemed, themeId, theme: DEV_THEMES[themeId], setThemeId }}>
       {children}
     </DevThemeContext.Provider>
   );

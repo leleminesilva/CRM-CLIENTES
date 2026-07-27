@@ -18,9 +18,9 @@ export default function DashboardLayout({
         <DevThemeRoot className={`contents ${DEV_FONT_VARIABLES}`}>
           <div className="flex h-svh overflow-hidden bg-background">
             <Sidebar />
-            <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+            <div className="flex-1 flex flex-col min-w-0 min-h-0 overflow-hidden">
               <Topbar />
-              <main className="flex-1 overflow-y-auto overflow-x-hidden p-4 md:p-6 scrollbar-thin overscroll-contain">
+              <main className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden p-4 md:p-6 scrollbar-thin overscroll-contain">
                 {children}
               </main>
             </div>

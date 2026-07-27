@@ -290,7 +290,7 @@ export function Sidebar() {
       {/* ── Desktop sidebar ── */}
       <aside
         className={cn(
-          "relative hidden lg:flex flex-col border-r transition-all duration-300 ease-in-out",
+          "relative hidden lg:flex flex-col h-svh shrink-0 border-r transition-all duration-300 ease-in-out",
           !activeTheme && "bg-sidebar text-sidebar-foreground border-sidebar-border",
           collapsed ? "w-16" : "w-64"
         )}

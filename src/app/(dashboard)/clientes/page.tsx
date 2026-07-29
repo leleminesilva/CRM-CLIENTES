@@ -22,6 +22,7 @@ import {
   ArrowUp,
   ArrowDown,
   ArrowUpDown,
+  SlidersHorizontal,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -43,6 +44,14 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { Card } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
@@ -89,6 +98,7 @@ export default function ClientesPage() {
   const [estagio, setEstagio] = useState(() => ss?.getItem("cf_estagio") ?? "");
   const [dataInicio, setDataInicio] = useState(() => ss?.getItem("cf_dataInicio") ?? "");
   const [dataFim, setDataFim] = useState(() => ss?.getItem("cf_dataFim") ?? "");
+  const [filtersOpen, setFiltersOpen] = useState(false);
   // 0 = padrão (updatedAt desc), 1 = inclusão asc, 2 = inclusão desc
   const [sortMode, setSortMode] = useState(0);
   // 0 = desativado, 1 = etapa asc (pipeline), 2 = etapa desc
@@ -135,6 +145,7 @@ export default function ClientesPage() {
   const isAdmin = user?.role === "ADMINISTRADOR" || user?.role === "DESENVOLVEDOR";
 
   const hasActiveFilters = !!(responsavelId || temperatura || servico || estagio || dataInicio || dataFim);
+  const activeFilterCount = [responsavelId, temperatura, servico, estagio, dataInicio || dataFim].filter(Boolean).length;
 
   function clearFilters() {
     setSearch("");
@@ -239,6 +250,93 @@ export default function ClientesPage() {
     : clientesOrdenados;
   const totalPages = clientSortActive ? Math.max(1, Math.ceil(total / PAGE_SIZE)) : (data?.totalPages || 1);
 
+  function renderFilterFields(layout: "inline" | "stacked") {
+    const stacked = layout === "stacked";
+    return (
+      <>
+        <Select value={temperatura || "all"} onValueChange={(v) => { setTemperatura(v === "all" ? "" : v); setPage(1); }}>
+          <SelectTrigger className={stacked ? "w-full" : "w-[140px] shrink-0"}>
+            <SelectValue placeholder="Temperatura" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Temperatura</SelectItem>
+            <SelectItem value="QUENTE">🔥 Quente</SelectItem>
+            <SelectItem value="MORNO">🌡️ Morno</SelectItem>
+            <SelectItem value="FRIO">❄️ Frio</SelectItem>
+          </SelectContent>
+        </Select>
+
+        <Select value={servico || "all"} onValueChange={(v) => { setServico(v === "all" ? "" : v); setPage(1); }}>
+          <SelectTrigger className={stacked ? "w-full" : "w-[170px] shrink-0"}>
+            <SelectValue placeholder="Tipo de serviço" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Tipo de serviço</SelectItem>
+            {SERVICOS.map((s) => (
+              <SelectItem key={s} value={s}>{s}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        {isAdmin && (
+          <Select value={responsavelId || "all"} onValueChange={(v) => { setResponsavelId(v === "all" ? "" : v); setPage(1); }}>
+            <SelectTrigger className={stacked ? "w-full" : "w-[160px] shrink-0"}>
+              <SelectValue placeholder="Funcionário" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Funcionário</SelectItem>
+              {(vendedoresData ?? []).map((u) => (
+                <SelectItem key={u.id} value={u.id}>{u.nome}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
+
+        <Select value={estagio || "all"} onValueChange={(v) => { setEstagio(v === "all" ? "" : v); setPage(1); }}>
+          <SelectTrigger className={stacked ? "w-full" : "w-[180px] shrink-0"}>
+            <SelectValue placeholder="Etapa" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Etapa</SelectItem>
+            {Object.entries(ETAPA_CONFIG).map(([key, cfg]) => (
+              <SelectItem key={key} value={key}>{cfg.label}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        <div className={stacked ? "space-y-1.5" : "flex items-center gap-1.5 shrink-0"}>
+          <Label className={stacked ? "text-xs text-muted-foreground" : "sr-only"}>
+            Data de cadastro
+          </Label>
+          <div className={cn("flex items-center gap-1.5", stacked && "w-full")}>
+            <CalendarDays className="w-4 h-4 text-muted-foreground shrink-0" />
+            <input
+              type="date"
+              value={dataInicio}
+              onChange={(e) => { setDataInicio(e.target.value); setPage(1); }}
+              className={cn(
+                "h-9 rounded-md border border-input bg-background px-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring",
+                stacked ? "flex-1 min-w-0" : "w-[135px]"
+              )}
+              title="Data de início"
+            />
+            <span className="text-muted-foreground text-sm shrink-0">até</span>
+            <input
+              type="date"
+              value={dataFim}
+              onChange={(e) => { setDataFim(e.target.value); setPage(1); }}
+              className={cn(
+                "h-9 rounded-md border border-input bg-background px-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring",
+                stacked ? "flex-1 min-w-0" : "w-[135px]"
+              )}
+              title="Data de fim"
+            />
+          </div>
+        </div>
+      </>
+    );
+  }
+
   const ActionMenu = ({ c }: { c: Cliente }) => (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -279,91 +377,54 @@ export default function ClientesPage() {
 
       {/* Filtros */}
       <div className="space-y-2">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input
-            placeholder="Buscar cliente..."
-            value={search}
-            onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-            className="pl-9"
-          />
-        </div>
-        <div className="flex items-center gap-2 flex-wrap">
-          {/* Temperatura */}
-          <Select value={temperatura || "all"} onValueChange={(v) => { setTemperatura(v === "all" ? "" : v); setPage(1); }}>
-            <SelectTrigger className="w-[140px] shrink-0">
-              <SelectValue placeholder="Temperatura" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Temperatura</SelectItem>
-              <SelectItem value="QUENTE">🔥 Quente</SelectItem>
-              <SelectItem value="MORNO">🌡️ Morno</SelectItem>
-              <SelectItem value="FRIO">❄️ Frio</SelectItem>
-            </SelectContent>
-          </Select>
-
-          {/* Tipo de serviço */}
-          <Select value={servico || "all"} onValueChange={(v) => { setServico(v === "all" ? "" : v); setPage(1); }}>
-            <SelectTrigger className="w-[170px] shrink-0">
-              <SelectValue placeholder="Tipo de serviço" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Tipo de serviço</SelectItem>
-              {SERVICOS.map((s) => (
-                <SelectItem key={s} value={s}>{s}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          {/* Funcionário — apenas admin */}
-          {isAdmin && (
-            <Select value={responsavelId || "all"} onValueChange={(v) => { setResponsavelId(v === "all" ? "" : v); setPage(1); }}>
-              <SelectTrigger className="w-[160px] shrink-0">
-                <SelectValue placeholder="Funcionário" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Funcionário</SelectItem>
-                {(vendedoresData ?? []).map((u) => (
-                  <SelectItem key={u.id} value={u.id}>{u.nome}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
-
-          {/* Etapa */}
-          <Select value={estagio || "all"} onValueChange={(v) => { setEstagio(v === "all" ? "" : v); setPage(1); }}>
-            <SelectTrigger className="w-[180px] shrink-0">
-              <SelectValue placeholder="Etapa" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Etapa</SelectItem>
-              {Object.entries(ETAPA_CONFIG).map(([key, cfg]) => (
-                <SelectItem key={key} value={key}>{cfg.label}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          {/* Data de cadastro */}
-          <div className="flex items-center gap-1.5 shrink-0">
-            <CalendarDays className="w-4 h-4 text-muted-foreground shrink-0" />
-            <input
-              type="date"
-              value={dataInicio}
-              onChange={(e) => { setDataInicio(e.target.value); setPage(1); }}
-              className="h-9 rounded-md border border-input bg-background px-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring w-[135px]"
-              title="Data de início"
-            />
-            <span className="text-muted-foreground text-sm">até</span>
-            <input
-              type="date"
-              value={dataFim}
-              onChange={(e) => { setDataFim(e.target.value); setPage(1); }}
-              className="h-9 rounded-md border border-input bg-background px-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring w-[135px]"
-              title="Data de fim"
+        <div className="flex items-center gap-2">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input
+              placeholder="Buscar cliente..."
+              value={search}
+              onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+              className="pl-9"
             />
           </div>
 
-          {/* Limpar filtros */}
+          {/* Botão Filtrar — só mobile, filtros vão num modal empilhado */}
+          <Dialog open={filtersOpen} onOpenChange={setFiltersOpen}>
+            <DialogTrigger asChild>
+              <Button variant="outline" size="icon" className="relative shrink-0 md:hidden">
+                <SlidersHorizontal className="w-4 h-4" />
+                {activeFilterCount > 0 && (
+                  <span className="absolute -top-1.5 -right-1.5 flex items-center justify-center w-4 h-4 rounded-full bg-indigo-600 text-[10px] font-bold text-white">
+                    {activeFilterCount}
+                  </span>
+                )}
+                <span className="sr-only">Filtrar</span>
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-sm max-h-[85vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>Filtros</DialogTitle>
+              </DialogHeader>
+              <div className="flex flex-col gap-3">
+                {renderFilterFields("stacked")}
+              </div>
+              <DialogFooter className="flex-row gap-2">
+                {hasActiveFilters && (
+                  <Button variant="outline" onClick={() => { clearFilters(); setFiltersOpen(false); }} className="flex-1">
+                    Limpar
+                  </Button>
+                )}
+                <Button onClick={() => setFiltersOpen(false)} className="flex-1 bg-indigo-600 hover:bg-indigo-700">
+                  Aplicar
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </div>
+
+        {/* Filtros inline — só desktop */}
+        <div className="hidden md:flex items-center gap-2 flex-wrap">
+          {renderFilterFields("inline")}
           {hasActiveFilters && (
             <Button variant="ghost" size="sm" onClick={clearFilters} className="text-muted-foreground hover:text-foreground shrink-0">
               <X className="w-3.5 h-3.5 mr-1" />Limpar filtros
@@ -390,19 +451,26 @@ export default function ClientesPage() {
                     {c.nome.slice(0, 2).toUpperCase()}
                   </AvatarFallback>
                 </Avatar>
-                <div className="min-w-0">
+                <div className="min-w-0 flex-1">
                   <p className="font-semibold text-sm truncate">{c.nome}</p>
                   {c.empresa && <p className="text-xs text-muted-foreground truncate">{c.empresa.nomeFantasia || c.empresa.razaoSocial}</p>}
-                  <div className="flex items-center gap-2 mt-1 flex-wrap">
-                    {c.telefone && <span className="text-xs text-muted-foreground">{c.telefone}</span>}
+                  {c.telefone && <p className="text-xs text-muted-foreground mt-0.5">{c.telefone}</p>}
+
+                  <div className="flex items-center gap-1.5 mt-2 flex-wrap">
                     <Badge variant="secondary" className="text-xs">{ORIGEM_LABELS[c.origem] || c.origem}</Badge>
                     {(() => {
                       const cfg = c.temperatura ? TEMP_CONFIG[c.temperatura] : null;
-                      return cfg ? <span className={`text-xs font-medium ${cfg.color}`}>{cfg.icon} {cfg.label}</span> : null;
+                      return cfg ? (
+                        <span className={`inline-flex items-center gap-1 text-xs font-medium ${cfg.color}`}>
+                          <span>{cfg.icon}</span>{cfg.label}
+                        </span>
+                      ) : null;
                     })()}
-                    <span className="text-xs text-muted-foreground">
-                      📅 {new Date(c.createdAt).toLocaleDateString("pt-BR")}
-                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-1 mt-1.5 text-[11px] text-muted-foreground">
+                    <CalendarDays className="w-3 h-3 shrink-0" />
+                    <span>Cadastrado em {new Date(c.createdAt).toLocaleDateString("pt-BR")}</span>
                   </div>
                 </div>
               </Link>

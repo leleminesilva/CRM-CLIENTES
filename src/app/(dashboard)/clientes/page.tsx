@@ -466,7 +466,28 @@ export default function ClientesPage() {
                         </span>
                       ) : null;
                     })()}
+                    {(() => {
+                      const estagio = (c as unknown as { leads?: { estagio: string }[] }).leads?.[0]?.estagio;
+                      const cfg = estagio ? ETAPA_CONFIG[estagio] : null;
+                      return cfg ? (
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${cfg.color}`}>
+                          {cfg.label}
+                        </span>
+                      ) : null;
+                    })()}
                   </div>
+
+                  {c.responsavel && (
+                    <div className="flex items-center gap-1.5 mt-1.5">
+                      <Avatar className="w-4 h-4">
+                        {c.responsavel.avatar && <AvatarImage src={c.responsavel.avatar} alt={c.responsavel.nome} />}
+                        <AvatarFallback className="text-[9px] bg-violet-100 text-violet-600">
+                          {c.responsavel.nome.slice(0, 2).toUpperCase()}
+                        </AvatarFallback>
+                      </Avatar>
+                      <span className="text-xs text-muted-foreground">{c.responsavel.nome}</span>
+                    </div>
+                  )}
 
                   <div className="flex items-center gap-1 mt-1.5 text-[11px] text-muted-foreground">
                     <CalendarDays className="w-3 h-3 shrink-0" />

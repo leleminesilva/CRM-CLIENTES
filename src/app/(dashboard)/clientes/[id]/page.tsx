@@ -702,6 +702,8 @@ export default function ClienteDetalhePage() {
   const [notifDialog, setNotifDialog] = useState(false);
   const [notifMensagem, setNotifMensagem] = useState("");
   const [notifPopupAberto, setNotifPopupAberto] = useState(false);
+  const [notifResposta, setNotifResposta] = useState("");
+  const [cardResposta, setCardResposta] = useState("");
 
   const notifMutation = useMutation({
     mutationFn: (mensagem: string) => axios.post(`/api/clientes/${id}/notificar`, { mensagem }),
@@ -717,6 +719,16 @@ export default function ClienteDetalhePage() {
   const marcarLidaMutation = useMutation({
     mutationFn: () => axios.patch(`/api/clientes/${id}/notificar`),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["cliente", id] }),
+  });
+
+  // Responder à notificação — usado tanto no popup quanto no card fixo
+  const responderMutation = useMutation({
+    mutationFn: (resposta: string) => axios.patch(`/api/clientes/${id}/notificar`, { resposta }),
+    onSuccess: () => {
+      toast.success("Resposta enviada!");
+      qc.invalidateQueries({ queryKey: ["cliente", id] });
+    },
+    onError: () => toast.error("Erro ao enviar resposta"),
   });
 
   // Nova Venda — registra uma venda adicional pro mesmo cliente, sem
@@ -769,6 +781,7 @@ export default function ClienteDetalhePage() {
 
   function fecharPopup() {
     setNotifPopupAberto(false);
+    setNotifResposta("");
     marcarLidaMutation.mutate();
   }
 
@@ -809,12 +822,33 @@ export default function ClienteDetalhePage() {
                 {cliente.notificacaoMensagem}
               </p>
             </div>
-            <button
-              onClick={fecharPopup}
-              className="w-full py-2.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-white text-sm font-semibold transition-colors"
-            >
-              Entendido
-            </button>
+            <Textarea
+              placeholder="Responder a esta notificação (opcional)..."
+              value={notifResposta}
+              onChange={(e) => setNotifResposta(e.target.value)}
+              rows={2}
+            />
+            <div className="flex gap-3">
+              <button
+                onClick={fecharPopup}
+                className="flex-1 py-2.5 rounded-lg border border-border text-center text-sm font-semibold hover:bg-muted transition-colors"
+              >
+                Entendido
+              </button>
+              <button
+                onClick={() => {
+                  const texto = notifResposta.trim();
+                  if (!texto) return;
+                  responderMutation.mutate(texto, {
+                    onSuccess: () => { setNotifResposta(""); setNotifPopupAberto(false); },
+                  });
+                }}
+                disabled={!notifResposta.trim() || responderMutation.isPending}
+                className="flex-1 py-2.5 rounded-lg bg-amber-500 hover:bg-amber-600 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-semibold transition-colors"
+              >
+                Enviar resposta
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -1061,6 +1095,39 @@ export default function ClienteDetalhePage() {
               Enviada em {new Date(cliente.notificacaoEm).toLocaleString("pt-BR")}
             </p>
           )}
+
+          {cliente.notificacaoResposta ? (
+            <div className="mt-3 pt-3 border-t border-amber-500/20">
+              <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide mb-1">Resposta</p>
+              <p className="text-sm leading-relaxed whitespace-pre-wrap">{cliente.notificacaoResposta}</p>
+              {cliente.notificacaoRespondidaEm && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  Respondida em {new Date(cliente.notificacaoRespondidaEm).toLocaleString("pt-BR")}
+                </p>
+              )}
+            </div>
+          ) : cliente.responsavelId === user?.id ? (
+            <div className="mt-3 pt-3 border-t border-amber-500/20 space-y-2">
+              <Textarea
+                placeholder="Responder a esta notificação..."
+                value={cardResposta}
+                onChange={(e) => setCardResposta(e.target.value)}
+                rows={2}
+              />
+              <Button
+                size="sm"
+                className="bg-amber-500 hover:bg-amber-600 text-white"
+                disabled={!cardResposta.trim() || responderMutation.isPending}
+                onClick={() => {
+                  const texto = cardResposta.trim();
+                  if (!texto) return;
+                  responderMutation.mutate(texto, { onSuccess: () => setCardResposta("") });
+                }}
+              >
+                Responder
+              </Button>
+            </div>
+          ) : null}
         </Card>
       )}
 

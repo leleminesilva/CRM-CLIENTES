@@ -253,6 +253,8 @@ model Cliente {
   notificacaoMensagem     String?
   notificacaoEm           DateTime?
   notificacaoLida         Boolean   @default(false)
+  notificacaoResposta     String?
+  notificacaoRespondidaEm DateTime?
   temperatura     Temperatura            @default(MORNO)
   motivoExclusao  String?
   deletedAt       DateTime?

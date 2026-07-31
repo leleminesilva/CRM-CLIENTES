@@ -148,6 +148,8 @@ export interface Cliente {
   notificacaoMensagem?: string | null;
   notificacaoEm?: string | null;
   notificacaoLida?: boolean;
+  notificacaoResposta?: string | null;
+  notificacaoRespondidaEm?: string | null;
   temperatura: Temperatura;
   createdAt: string;
   updatedAt: string;

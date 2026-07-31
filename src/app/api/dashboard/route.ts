@@ -58,6 +58,13 @@ export async function GET(request: NextRequest) {
         ? Prisma.empty
         : Prisma.sql`AND l."responsavelId" = ${payload.userId}`;
 
+    // Filtro SQL para queries de vendas fechadas (tabela com alias "v")
+    const vendasUserFilterSql = vendedorId
+      ? Prisma.sql`AND v."responsavelId" = ${vendedorId}`
+      : canViewAllUsers
+        ? Prisma.empty
+        : Prisma.sql`AND v."responsavelId" = ${payload.userId}`;
+
     const [
       totalClientes,
       leadsAtivos,
@@ -98,19 +105,17 @@ export async function GET(request: NextRequest) {
         _count: { _all: true },
       }),
 
-      // Origem das vendas fechadas no período (só leads FECHADO_GANHO, pelo dataFechamento —
-      // mesmo critério usado em "Vendas Fechadas"/"Receita Fechada" nesse dashboard)
-      prisma.lead.groupBy({
-        by: ["origem"],
-        where: {
-          deletedAt: null,
-          estagio: "FECHADO_GANHO",
-          dataFechamento: { gte: de, lte: ate },
-          OR: [{ clienteId: null }, { cliente: { deletedAt: null } }],
-          ...userFilter,
-        },
-        _count: { _all: true },
-      }),
+      // Origem das vendas fechadas no período — mesmo critério (tabela vendas)
+      // usado em "Vendas Fechadas"/"Receita Fechada" nesse dashboard
+      prisma.$queryRaw<Array<{ origem: string; count: number }>>(Prisma.sql`
+        SELECT c.origem::text AS origem, COUNT(*)::int AS count
+        FROM vendas v
+        LEFT JOIN clientes c ON v."clienteId" = c.id AND c."deletedAt" IS NULL
+        WHERE v."deletedAt" IS NULL
+          AND v.data >= ${de} AND v.data <= ${ate}
+          ${vendasUserFilterSql}
+        GROUP BY c.origem
+      `),
 
       // Leads ganhos no período (para kpis.leadsGanhos)
       prisma.lead.count({
@@ -138,19 +143,17 @@ export async function GET(request: NextRequest) {
         _sum: { valorOrcamento: true },
       }),
 
-      // Receita fechada no período — via leads fechados com dataFechamento no range
+      // Receita fechada no período — via vendas confirmadas com data no range
       prisma.$queryRaw<Array<{ count: number; valor: number }>>(Prisma.sql`
         SELECT
           COUNT(*)::int AS count,
-          COALESCE(SUM(COALESCE(c."valorOrcamento", l."valorEstimado")), 0)::float AS valor
-        FROM leads l
-        LEFT JOIN clientes c ON l."clienteId" = c.id AND c."deletedAt" IS NULL
-        WHERE l."deletedAt" IS NULL
-          AND l.estagio = 'FECHADO_GANHO'::"EstagioLead"
-          AND l."dataFechamento" >= ${de}
-          AND l."dataFechamento" <= ${ate}
-          AND (l."clienteId" IS NULL OR c.id IS NOT NULL)
-          ${leadsUserFilterSql}
+          COALESCE(SUM(v.valor), 0)::float AS valor
+        FROM vendas v
+        LEFT JOIN clientes c ON v."clienteId" = c.id AND c."deletedAt" IS NULL
+        WHERE v."deletedAt" IS NULL
+          AND v.data >= ${de}
+          AND v.data <= ${ate}
+          ${vendasUserFilterSql}
       `),
 
       // Total de leads criados no período (para taxa de conversão)
@@ -220,22 +223,20 @@ export async function GET(request: NextRequest) {
     const canceladosValor = canceladosValorRow?.valor ?? 0;
     const taxaConversao   = leadsTotal > 0 ? (leadsConvertidos / leadsTotal) * 100 : 0;
 
-    // Performance por vendedor — usa COALESCE(c.valorOrcamento, l.valorEstimado)
+    // Performance por vendedor — soma direta do valor de cada venda confirmada
     const vendasPorVendedorRaw = await prisma.$queryRaw<Array<{ responsavelId: string; total: number; valor: number }>>(
       Prisma.sql`
         SELECT
-          l."responsavelId",
+          v."responsavelId",
           COUNT(*)::int AS total,
-          COALESCE(SUM(COALESCE(c."valorOrcamento", l."valorEstimado")), 0)::float AS valor
-        FROM leads l
-        LEFT JOIN clientes c ON l."clienteId" = c.id AND c."deletedAt" IS NULL
-        WHERE l."deletedAt" IS NULL
-          AND l.estagio = 'FECHADO_GANHO'::"EstagioLead"
-          AND l."dataFechamento" >= ${de}
-          AND l."dataFechamento" <= ${ate}
-          AND (l."clienteId" IS NULL OR c.id IS NOT NULL)
-          ${leadsUserFilterSql}
-        GROUP BY l."responsavelId"
+          COALESCE(SUM(v.valor), 0)::float AS valor
+        FROM vendas v
+        LEFT JOIN clientes c ON v."clienteId" = c.id AND c."deletedAt" IS NULL
+        WHERE v."deletedAt" IS NULL
+          AND v.data >= ${de}
+          AND v.data <= ${ate}
+          ${vendasUserFilterSql}
+        GROUP BY v."responsavelId"
         ORDER BY valor DESC
         LIMIT 5
       `
@@ -279,19 +280,17 @@ export async function GET(request: NextRequest) {
     const vendasMesRaw = await prisma.$queryRaw<Array<{ dia: string; total: number; valor: number }>>(
       Prisma.sql`
         SELECT
-          TO_CHAR(l."dataFechamento", 'DD/MM') AS dia,
-          DATE(l."dataFechamento") AS data_ord,
+          TO_CHAR(v.data, 'DD/MM') AS dia,
+          DATE(v.data) AS data_ord,
           COUNT(*)::int AS total,
-          COALESCE(SUM(COALESCE(c."valorOrcamento", l."valorEstimado")), 0)::float AS valor
-        FROM leads l
-        LEFT JOIN clientes c ON l."clienteId" = c.id AND c."deletedAt" IS NULL
-        WHERE l."deletedAt" IS NULL
-          AND l.estagio = 'FECHADO_GANHO'::"EstagioLead"
-          AND l."dataFechamento" >= ${de}
-          AND l."dataFechamento" <= ${ate}
-          AND (l."clienteId" IS NULL OR c.id IS NOT NULL)
-          ${leadsUserFilterSql}
-        GROUP BY TO_CHAR(l."dataFechamento", 'DD/MM'), DATE(l."dataFechamento")
+          COALESCE(SUM(v.valor), 0)::float AS valor
+        FROM vendas v
+        LEFT JOIN clientes c ON v."clienteId" = c.id AND c."deletedAt" IS NULL
+        WHERE v."deletedAt" IS NULL
+          AND v.data >= ${de}
+          AND v.data <= ${ate}
+          ${vendasUserFilterSql}
+        GROUP BY TO_CHAR(v.data, 'DD/MM'), DATE(v.data)
         ORDER BY data_ord
       `
     );
@@ -303,19 +302,17 @@ export async function GET(request: NextRequest) {
       vendasMesPorVendedor = await prisma.$queryRaw<Array<{ dia: string; data_ord: Date; responsavelId: string; valor: number }>>(
         Prisma.sql`
           SELECT
-            TO_CHAR(l."dataFechamento", 'DD/MM') AS dia,
-            DATE(l."dataFechamento") AS data_ord,
-            l."responsavelId",
-            COALESCE(SUM(COALESCE(c."valorOrcamento", l."valorEstimado")), 0)::float AS valor
-          FROM leads l
-          LEFT JOIN clientes c ON l."clienteId" = c.id AND c."deletedAt" IS NULL
-          WHERE l."deletedAt" IS NULL
-            AND l.estagio = 'FECHADO_GANHO'::"EstagioLead"
-            AND l."dataFechamento" >= ${de}
-            AND l."dataFechamento" <= ${ate}
-            AND l."responsavelId" IN (${Prisma.join(vendedorIds)})
-            AND (l."clienteId" IS NULL OR c.id IS NOT NULL)
-          GROUP BY TO_CHAR(l."dataFechamento", 'DD/MM'), DATE(l."dataFechamento"), l."responsavelId"
+            TO_CHAR(v.data, 'DD/MM') AS dia,
+            DATE(v.data) AS data_ord,
+            v."responsavelId",
+            COALESCE(SUM(v.valor), 0)::float AS valor
+          FROM vendas v
+          LEFT JOIN clientes c ON v."clienteId" = c.id AND c."deletedAt" IS NULL
+          WHERE v."deletedAt" IS NULL
+            AND v.data >= ${de}
+            AND v.data <= ${ate}
+            AND v."responsavelId" IN (${Prisma.join(vendedorIds)})
+          GROUP BY TO_CHAR(v.data, 'DD/MM'), DATE(v.data), v."responsavelId"
           ORDER BY data_ord
         `
       );
@@ -351,7 +348,7 @@ export async function GET(request: NextRequest) {
         // linha aqui bata com a cor da barra dele em "Performance por Vendedor"
         vendedorNomes:     vendasPorVendedor.map((v) => v.vendedor),
         leadsPorOrigem:    leadsPorOrigem.map((l) => ({ origem: l.origem, total: l._count._all })),
-        vendasPorOrigem:   vendasPorOrigem.map((l) => ({ origem: l.origem, total: l._count._all })),
+        vendasPorOrigem:   vendasPorOrigem.map((v) => ({ origem: v.origem, total: Number(v.count) })),
         vendasPorVendedor,
         servicosMaisSolicitados,
       },

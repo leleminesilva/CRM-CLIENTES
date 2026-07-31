@@ -151,6 +151,19 @@ export interface Cliente {
   temperatura: Temperatura;
   createdAt: string;
   updatedAt: string;
+  vendas?: Venda[];
+}
+
+export interface Venda {
+  id: string;
+  clienteId: string;
+  leadId?: string | null;
+  responsavelId?: string | null;
+  numeroOrcamento: string;
+  valor: number;
+  data: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface Lead {

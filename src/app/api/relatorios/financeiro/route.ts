@@ -18,17 +18,15 @@ export async function GET(request: NextRequest) {
     ate.setHours(23, 59, 59, 999);
 
     const [receitaFechada, receitaPrevista, receitaPorMes, funil, topClientes] = await Promise.all([
-      // Receita fechada no período via leads FECHADO_GANHO
+      // Receita fechada no período via vendas confirmadas
       prisma.$queryRaw<Array<{ total: number; receita: number }>>(
         Prisma.sql`
           SELECT COUNT(*)::int AS total,
-            COALESCE(SUM(COALESCE(c."valorOrcamento", l."valorEstimado")), 0)::float AS receita
-          FROM leads l
-          LEFT JOIN clientes c ON l."clienteId" = c.id AND c."deletedAt" IS NULL
-          WHERE l."deletedAt" IS NULL
-            AND l.estagio = 'FECHADO_GANHO'::"EstagioLead"
-            AND l."dataFechamento" >= ${de}
-            AND l."dataFechamento" <= ${ate}
+            COALESCE(SUM(v.valor), 0)::float AS receita
+          FROM vendas v
+          WHERE v."deletedAt" IS NULL
+            AND v.data >= ${de}
+            AND v.data <= ${ate}
         `
       ),
 
@@ -46,17 +44,15 @@ export async function GET(request: NextRequest) {
       prisma.$queryRaw<Array<{ mes: string; total: number; receita: number }>>(
         Prisma.sql`
           SELECT
-            TO_CHAR(l."dataFechamento", 'MM/YYYY') AS mes,
-            DATE_TRUNC('month', l."dataFechamento") AS mes_ord,
+            TO_CHAR(v.data, 'MM/YYYY') AS mes,
+            DATE_TRUNC('month', v.data) AS mes_ord,
             COUNT(*)::int AS total,
-            COALESCE(SUM(COALESCE(c."valorOrcamento", l."valorEstimado")), 0)::float AS receita
-          FROM leads l
-          LEFT JOIN clientes c ON l."clienteId" = c.id AND c."deletedAt" IS NULL
-          WHERE l."deletedAt" IS NULL
-            AND l.estagio = 'FECHADO_GANHO'::"EstagioLead"
-            AND l."dataFechamento" >= ${de}
-            AND l."dataFechamento" <= ${ate}
-          GROUP BY TO_CHAR(l."dataFechamento", 'MM/YYYY'), DATE_TRUNC('month', l."dataFechamento")
+            COALESCE(SUM(v.valor), 0)::float AS receita
+          FROM vendas v
+          WHERE v."deletedAt" IS NULL
+            AND v.data >= ${de}
+            AND v.data <= ${ate}
+          GROUP BY TO_CHAR(v.data, 'MM/YYYY'), DATE_TRUNC('month', v.data)
           ORDER BY mes_ord
         `
       ),

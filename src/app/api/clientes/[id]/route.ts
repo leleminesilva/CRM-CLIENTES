@@ -113,6 +113,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
         anexos: { where: { deletedAt: null }, orderBy: { createdAt: "desc" } },
         leads: { where: { deletedAt: null }, orderBy: { createdAt: "desc" }, take: 5 },
         oportunidades: { where: { deletedAt: null }, orderBy: { createdAt: "desc" }, take: 5 },
+        vendas: { where: { deletedAt: null }, orderBy: { data: "desc" } },
         tarefas: { where: { deletedAt: null }, orderBy: { dataVencimento: "asc" }, take: 5 },
       },
     });

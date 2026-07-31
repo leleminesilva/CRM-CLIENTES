@@ -44,13 +44,11 @@ export async function GET(request: NextRequest) {
       prisma.$queryRaw<Array<{ total: number; receita: number }>>(
         Prisma.sql`
           SELECT COUNT(*)::int AS total,
-            COALESCE(SUM(COALESCE(c."valorOrcamento", l."valorEstimado")), 0)::float AS receita
-          FROM leads l
-          LEFT JOIN clientes c ON l."clienteId" = c.id AND c."deletedAt" IS NULL
-          WHERE l."deletedAt" IS NULL
-            AND l.estagio = 'FECHADO_GANHO'::"EstagioLead"
-            AND l."dataFechamento" >= ${de}
-            AND l."dataFechamento" <= ${ate}
+            COALESCE(SUM(v.valor), 0)::float AS receita
+          FROM vendas v
+          WHERE v."deletedAt" IS NULL
+            AND v.data >= ${de}
+            AND v.data <= ${ate}
         `
       ),
     ]);

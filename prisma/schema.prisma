@@ -139,6 +139,7 @@ model User {
   clientes      Cliente[]
   leads         Lead[]
   oportunidades Oportunidade[]
+  vendas        Venda[]
   tarefas       Tarefa[]
   atividades    Atividade[]
   comentarios   Comentario[]
@@ -263,6 +264,7 @@ model Cliente {
   contato       Contato?      @relation(fields: [contatoId], references: [id])
   leads         Lead[]
   oportunidades Oportunidade[]
+  vendas        Venda[]
   tarefas       Tarefa[]
   atividades    Atividade[]
   comentarios   Comentario[]
@@ -296,12 +298,32 @@ model Lead {
   empresa       Empresa?       @relation(fields: [empresaId], references: [id])
   contato       Contato?       @relation(fields: [contatoId], references: [id])
   oportunidades Oportunidade[]
+  venda         Venda?
   tarefas       Tarefa[]
   atividades    Atividade[]
   comentarios   Comentario[]
   anexos        Anexo[]
 
   @@map("leads")
+}
+
+model Venda {
+  id              String    @id @default(cuid())
+  clienteId       String
+  leadId          String?   @unique
+  responsavelId   String?
+  numeroOrcamento String
+  valor           Decimal   @db.Decimal(15, 2)
+  data            DateTime
+  deletedAt       DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  cliente     Cliente @relation(fields: [clienteId], references: [id])
+  lead        Lead?   @relation(fields: [leadId], references: [id])
+  responsavel User?   @relation(fields: [responsavelId], references: [id])
+
+  @@map("vendas")
 }
 
 model Oportunidade {

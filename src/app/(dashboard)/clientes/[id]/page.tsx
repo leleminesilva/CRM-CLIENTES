@@ -100,16 +100,21 @@ function PipelineTracker({
   const MOTIVOS_CANCELAMENTO = ["Prazo", "Preço", "Distância", "Não Realizamos", "Outros"];
 
   const mutation = useMutation({
-    mutationFn: async ({ novoEstagio, motivoPerda, dataFechamento, proximoContato, clientePatch }: {
+    mutationFn: async ({ novoEstagio, motivoPerda, dataFechamento, proximoContato, clientePatch, venda }: {
       novoEstagio: EstagioLead;
       motivoPerda?: string;
       dataFechamento?: string;
       proximoContato?: string;
       clientePatch?: Record<string, unknown>;
+      venda?: { numeroOrcamento: string; valor: number; data: string };
     }) => {
-      await (leadId
-        ? axios.patch(`/api/leads/${leadId}/mover`, { estagio: novoEstagio, motivoPerda, dataFechamento, proximoContato })
-        : axios.post("/api/leads", { titulo: clienteNome, estagio: novoEstagio, origem: "OUTROS", clienteId }));
+      let resolvedLeadId = leadId;
+      if (leadId) {
+        await axios.patch(`/api/leads/${leadId}/mover`, { estagio: novoEstagio, motivoPerda, dataFechamento, proximoContato });
+      } else {
+        const res = await axios.post("/api/leads", { titulo: clienteNome, estagio: novoEstagio, origem: "OUTROS", clienteId });
+        resolvedLeadId = res.data?.data?.id ?? null;
+      }
 
       const statusMap: Partial<Record<EstagioLead, string>> = {
         FECHADO_GANHO:   "APROVADO",
@@ -117,6 +122,10 @@ function PipelineTracker({
       };
       const novoStatus = statusMap[novoEstagio] ?? "PENDENTE";
       await axios.patch(`/api/clientes/${clienteId}`, { statusOrcamento: novoStatus, ...clientePatch });
+
+      if (venda) {
+        await axios.post(`/api/clientes/${clienteId}/vendas`, { ...venda, leadId: resolvedLeadId });
+      }
     },
     onSuccess: () => { toast.success("Etapa atualizada!"); onUpdate(); },
     onError: () => toast.error("Erro ao atualizar etapa"),
@@ -453,6 +462,7 @@ function PipelineTracker({
                   novoEstagio: "FECHADO_GANHO",
                   dataFechamento: confData,
                   clientePatch: { numeroOrcamento: confNumero, valorOrcamento: parseBRL(confValor), dataVenda: confData },
+                  venda: { numeroOrcamento: confNumero, valor: parseBRL(confValor), data: confData },
                 });
                 setConfDialog(false);
               }}
@@ -700,6 +710,38 @@ export default function ClienteDetalhePage() {
   const marcarLidaMutation = useMutation({
     mutationFn: () => axios.patch(`/api/clientes/${id}/notificar`),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["cliente", id] }),
+  });
+
+  // Nova Venda — registra uma venda adicional pro mesmo cliente, sem
+  // precisar recriar um pipeline inteiro (Entrar em Contato → ... → Confirmado)
+  // pra um negócio que já aconteceu.
+  const [novaVendaDialog, setNovaVendaDialog] = useState(false);
+  const [nvNumero, setNvNumero] = useState("");
+  const [nvValor, setNvValor] = useState("");
+  const [nvData, setNvData] = useState(() => new Date().toISOString().slice(0, 10));
+
+  const novaVendaMutation = useMutation({
+    mutationFn: () => axios.post(`/api/clientes/${id}/vendas`, {
+      numeroOrcamento: nvNumero,
+      valor: parseBRL(nvValor),
+      data: nvData,
+    }),
+    onSuccess: () => {
+      toast.success("Venda registrada!");
+      setNovaVendaDialog(false);
+      setNvNumero(""); setNvValor(""); setNvData(new Date().toISOString().slice(0, 10));
+      qc.invalidateQueries({ queryKey: ["cliente", id] });
+    },
+    onError: () => toast.error("Erro ao registrar venda"),
+  });
+
+  const removerVendaMutation = useMutation({
+    mutationFn: (vendaId: string) => axios.delete(`/api/vendas/${vendaId}`),
+    onSuccess: () => {
+      toast.success("Venda removida");
+      qc.invalidateQueries({ queryKey: ["cliente", id] });
+    },
+    onError: () => toast.error("Erro ao remover venda"),
   });
 
   // Abre o popup assim que os dados carregam e há notificação não lida para o usuário atual
@@ -1049,6 +1091,59 @@ export default function ClienteDetalhePage() {
         </DialogContent>
       </Dialog>
 
+      {/* Nova Venda — registra outra venda pro mesmo cliente */}
+      <Dialog open={novaVendaDialog} onOpenChange={(o) => { if (!o) setNovaVendaDialog(false); }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-emerald-500">
+              <ThumbsUp className="w-4 h-4" /> Nova Venda
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-1.5">
+              <p className="text-sm font-medium">Número do Orçamento <span className="text-red-500">*</span></p>
+              <input
+                value={nvNumero}
+                onChange={(e) => setNvNumero(e.target.value)}
+                placeholder="Ex: 11241"
+                className={`w-full h-9 rounded-md border px-3 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring ${!nvNumero ? "border-red-400" : "border-input"}`}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <p className="text-sm font-medium">Valor (R$) <span className="text-red-500">*</span></p>
+              <input
+                type="text"
+                inputMode="decimal"
+                value={nvValor}
+                onChange={(e) => setNvValor(e.target.value)}
+                placeholder="Ex: 4.562,98"
+                className={`w-full h-9 rounded-md border px-3 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring ${!nvValor || isNaN(parseBRL(nvValor)) ? "border-red-400" : "border-input"}`}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <p className="text-sm font-medium">Data da Venda <span className="text-red-500">*</span></p>
+              <input
+                type="date"
+                value={nvData}
+                max={new Date().toISOString().slice(0, 10)}
+                onChange={(e) => setNvData(e.target.value)}
+                className={`w-full h-9 rounded-md border px-3 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring ${!nvData ? "border-red-400" : "border-input"}`}
+              />
+            </div>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setNovaVendaDialog(false)}>Voltar</Button>
+            <Button
+              className="bg-emerald-600 hover:bg-emerald-700"
+              disabled={!nvNumero || !nvValor || isNaN(parseBRL(nvValor)) || !nvData || novaVendaMutation.isPending}
+              onClick={() => novaVendaMutation.mutate()}
+            >
+              {novaVendaMutation.isPending ? "Salvando..." : "Registrar venda"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Tabs */}
       <Tabs defaultValue={isAdmin ? "historico" : "leads"}>
         <TabsList>
@@ -1061,6 +1156,10 @@ export default function ClienteDetalhePage() {
           <TabsTrigger value="leads">
             <TrendingUp className="w-4 h-4 mr-2" />
             Leads ({(cliente.leads || []).length})
+          </TabsTrigger>
+          <TabsTrigger value="vendas">
+            <ThumbsUp className="w-4 h-4 mr-2" />
+            Vendas ({(cliente.vendas || []).length})
           </TabsTrigger>
           <TabsTrigger value="tarefas">
             <CheckSquare className="w-4 h-4 mr-2" />
@@ -1110,6 +1209,41 @@ export default function ClienteDetalhePage() {
                         <ExternalLink className="w-3.5 h-3.5" />
                       </Button>
                     </Link>
+                  </div>
+                </Card>
+              ))
+            )}
+          </div>
+        </TabsContent>
+
+        <TabsContent value="vendas" className="mt-4">
+          <div className="space-y-2">
+            <div className="flex justify-end">
+              <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700" onClick={() => setNovaVendaDialog(true)}>
+                <ThumbsUp className="w-3.5 h-3.5 mr-2" />
+                Nova Venda
+              </Button>
+            </div>
+            {(cliente.vendas || []).length === 0 ? (
+              <p className="text-muted-foreground text-sm">Nenhuma venda registrada</p>
+            ) : (
+              (cliente.vendas || []).map(v => (
+                <Card key={v.id} className="p-3 flex items-center justify-between">
+                  <div>
+                    <p className="font-medium text-sm">Orçamento {v.numeroOrcamento}</p>
+                    <p className="text-xs text-muted-foreground">{new Date(v.data).toLocaleDateString("pt-BR")}</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm font-semibold text-emerald-600">{formatCurrency(v.valor)}</p>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                      disabled={removerVendaMutation.isPending}
+                      onClick={() => removerVendaMutation.mutate(v.id)}
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </Button>
                   </div>
                 </Card>
               ))

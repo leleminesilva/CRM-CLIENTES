@@ -108,6 +108,13 @@ function PipelineTracker({
       clientePatch?: Record<string, unknown>;
       venda?: { numeroOrcamento: string; valor: number; data: string };
     }) => {
+      // Captura ANTES de mover o lead: se o cliente já estava Confirmado e o
+      // vendedor clica em "Confirmado" de novo pra registrar outra venda, o
+      // lead já tem uma Venda vinculada (Venda.leadId é único) — nesse caso a
+      // nova venda entra sem leadId, como uma venda adicional, em vez de
+      // colidir com a constraint e falhar silenciosamente.
+      const jaEstavaFechado = estagio === "FECHADO_GANHO";
+
       let resolvedLeadId = leadId;
       if (leadId) {
         await axios.patch(`/api/leads/${leadId}/mover`, { estagio: novoEstagio, motivoPerda, dataFechamento, proximoContato });
@@ -124,7 +131,7 @@ function PipelineTracker({
       await axios.patch(`/api/clientes/${clienteId}`, { statusOrcamento: novoStatus, ...clientePatch });
 
       if (venda) {
-        await axios.post(`/api/clientes/${clienteId}/vendas`, { ...venda, leadId: resolvedLeadId });
+        await axios.post(`/api/clientes/${clienteId}/vendas`, { ...venda, leadId: jaEstavaFechado ? null : resolvedLeadId });
       }
     },
     onSuccess: () => { toast.success("Etapa atualizada!"); onUpdate(); },

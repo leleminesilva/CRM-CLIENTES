@@ -10,6 +10,9 @@ export const vendaSchema = z.object({
 export type VendaInput = z.infer<typeof vendaSchema>;
 
 export const vendaPosVendaSchema = z.object({
+  numeroOrcamento: z.string().min(1).optional(),
+  valor: z.coerce.number().positive().optional(),
+  data: z.string().min(1).optional(), // YYYY-MM-DD
   statusPosVenda: z.enum(["AGUARDANDO_VIDRO", "VIDRO_CHEGOU", "AGENDADO", "CONCLUIDO"]).optional(),
   ordemKanban: z.number().optional(),
   vidroChegou: z.boolean().optional(),

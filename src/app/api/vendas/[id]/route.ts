@@ -30,6 +30,9 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     const data = vendaPosVendaSchema.parse(body);
 
     const updateData: Record<string, unknown> = {};
+    if (data.numeroOrcamento !== undefined) updateData.numeroOrcamento = data.numeroOrcamento;
+    if (data.valor !== undefined) updateData.valor = data.valor;
+    if (data.data !== undefined) updateData.data = new Date(`${data.data}T12:00:00`);
     if (data.statusPosVenda !== undefined) updateData.statusPosVenda = data.statusPosVenda;
     if (data.ordemKanban !== undefined) updateData.ordemKanban = data.ordemKanban;
     if (data.dataAgendamento !== undefined) {
@@ -50,6 +53,23 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
 
     const venda = await prisma.venda.update({ where: { id: params.id }, data: updateData });
 
+    const houveEdicaoDeValores =
+      (data.numeroOrcamento !== undefined && data.numeroOrcamento !== old.numeroOrcamento) ||
+      (data.valor !== undefined && data.valor !== Number(old.valor)) ||
+      (data.data !== undefined && data.data !== old.data.toISOString().slice(0, 10));
+
+    if (houveEdicaoDeValores) {
+      await prisma.atividade.create({
+        data: {
+          tipo: "EDICAO",
+          descricao: `Venda editada: orçamento ${old.numeroOrcamento} (R$ ${Number(old.valor).toFixed(2)}) → orçamento ${venda.numeroOrcamento} (R$ ${Number(venda.valor).toFixed(2)})`,
+          userId: payload.userId,
+          clienteId: old.clienteId,
+          metadata: { vendaId: old.id, de: { numeroOrcamento: old.numeroOrcamento, valor: old.valor.toString(), data: old.data }, para: { numeroOrcamento: venda.numeroOrcamento, valor: venda.valor.toString(), data: venda.data } },
+        },
+      });
+    }
+
     if (data.statusPosVenda && data.statusPosVenda !== old.statusPosVenda) {
       await prisma.atividade.create({
         data: {
@@ -67,7 +87,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
       entidade: "Venda",
       entidadeId: params.id,
       acao: "UPDATE",
-      dadosAntigos: { statusPosVenda: old.statusPosVenda, vidroChegouEm: old.vidroChegouEm, dataAgendamento: old.dataAgendamento },
+      dadosAntigos: { numeroOrcamento: old.numeroOrcamento, valor: old.valor.toString(), data: old.data, statusPosVenda: old.statusPosVenda, vidroChegouEm: old.vidroChegouEm, dataAgendamento: old.dataAgendamento },
       dadosNovos: updateData,
     });
 

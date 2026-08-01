@@ -66,6 +66,17 @@ const ETAPA_HEADER_COLORS: Record<StatusPosVenda, string> = {
   CONCLUIDO:        "bg-emerald-500",
 };
 
+// Interpreta valores em formato brasileiro (4.562,98) ou americano (4562.98)
+function parseBRL(raw: string): number {
+  const s = raw.trim();
+  if (!s) return 0;
+  const hasDot   = s.includes(".");
+  const hasComma = s.includes(",");
+  if (hasDot && hasComma) return parseFloat(s.replace(/\./g, "").replace(",", "."));
+  if (hasComma)           return parseFloat(s.replace(",", "."));
+  return parseFloat(s);
+}
+
 function enderecoResumo(cliente: Venda["cliente"]): string | null {
   if (!cliente) return null;
   const partes = [cliente.bairro, cliente.cidade].filter(Boolean);
@@ -165,6 +176,9 @@ function DetalheDialog({ venda, onClose }: { venda: Venda | null; onClose: () =>
   const qc = useQueryClient();
   const router = useRouter();
   const [status, setStatus] = useState<StatusPosVenda>("AGUARDANDO_VIDRO");
+  const [numeroOrcamento, setNumeroOrcamento] = useState("");
+  const [valorStr, setValorStr] = useState("");
+  const [dataVenda, setDataVenda] = useState("");
   const [vidroChegou, setVidroChegou] = useState(false);
   const [vidroChegouEm, setVidroChegouEm] = useState("");
   const [dataAgendamento, setDataAgendamento] = useState("");
@@ -174,6 +188,9 @@ function DetalheDialog({ venda, onClose }: { venda: Venda | null; onClose: () =>
   useEffect(() => {
     if (!venda) return;
     setStatus(venda.statusPosVenda);
+    setNumeroOrcamento(venda.numeroOrcamento);
+    setValorStr(String(venda.valor).replace(".", ","));
+    setDataVenda(venda.data.slice(0, 10));
     setVidroChegou(!!venda.vidroChegouEm);
     setVidroChegouEm(venda.vidroChegouEm ? venda.vidroChegouEm.slice(0, 10) : "");
     setDataAgendamento(venda.dataAgendamento ? venda.dataAgendamento.slice(0, 10) : "");
@@ -181,9 +198,14 @@ function DetalheDialog({ venda, onClose }: { venda: Venda | null; onClose: () =>
     setObservacoes(venda.observacoesPosVenda ?? "");
   }, [venda]);
 
+  const valorInvalido = !valorStr.trim() || isNaN(parseBRL(valorStr)) || parseBRL(valorStr) <= 0;
+
   const mutation = useMutation({
     mutationFn: () =>
       axios.patch(`/api/vendas/${venda!.id}`, {
+        numeroOrcamento: numeroOrcamento.trim(),
+        valor: parseBRL(valorStr),
+        data: dataVenda,
         statusPosVenda: status,
         vidroChegou,
         vidroChegouEm: vidroChegou ? (vidroChegouEm || new Date().toISOString().slice(0, 10)) : null,
@@ -226,18 +248,35 @@ function DetalheDialog({ venda, onClose }: { venda: Venda | null; onClose: () =>
         </DialogHeader>
 
         <div className="space-y-4 pt-1">
-          <div className="bg-muted/50 rounded-lg p-3 space-y-1.5 text-sm">
-            <div className="flex items-center justify-between">
-              <span className="text-muted-foreground">Orçamento</span>
-              <span className="font-medium">{venda.numeroOrcamento}</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-muted-foreground">Valor</span>
-              <span className="font-semibold text-emerald-600">{formatCurrency(venda.valor)}</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-muted-foreground">Data da venda</span>
-              <span>{formatDate(venda.data)}</span>
+          <div className="bg-muted/50 rounded-lg p-3 space-y-3 text-sm">
+            <div className="grid grid-cols-3 gap-2">
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground">Nº Orçamento</Label>
+                <input
+                  value={numeroOrcamento}
+                  onChange={(e) => setNumeroOrcamento(e.target.value)}
+                  className={`w-full h-9 rounded-md border px-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring ${!numeroOrcamento.trim() ? "border-red-400" : "border-input"}`}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground">Valor (R$)</Label>
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  value={valorStr}
+                  onChange={(e) => setValorStr(e.target.value)}
+                  className={`w-full h-9 rounded-md border px-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring ${valorInvalido ? "border-red-400" : "border-input"}`}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground">Data da venda</Label>
+                <input
+                  type="date"
+                  value={dataVenda}
+                  onChange={(e) => setDataVenda(e.target.value)}
+                  className={`w-full h-9 rounded-md border px-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring ${!dataVenda ? "border-red-400" : "border-input"}`}
+                />
+              </div>
             </div>
             {endereco && (
               <div className="flex items-start justify-between gap-2 pt-1 border-t mt-1.5">
@@ -324,7 +363,7 @@ function DetalheDialog({ venda, onClose }: { venda: Venda | null; onClose: () =>
           <Button variant="outline" onClick={onClose}>Cancelar</Button>
           <Button
             className="bg-indigo-600 hover:bg-indigo-700"
-            disabled={mutation.isPending}
+            disabled={mutation.isPending || !numeroOrcamento.trim() || valorInvalido || !dataVenda}
             onClick={() => mutation.mutate()}
           >
             {mutation.isPending ? "Salvando..." : "Salvar"}

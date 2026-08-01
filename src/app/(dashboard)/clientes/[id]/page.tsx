@@ -428,6 +428,11 @@ function PipelineTracker({
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-2">
+            {estagio === "FECHADO_GANHO" && (
+              <p className="text-xs text-amber-500 bg-amber-500/10 border border-amber-500/30 rounded-lg px-3 py-2">
+                Isso registra uma <strong>nova venda</strong> pra esse cliente. Pra corrigir número/valor/data de uma venda que já existe, use o ✏️ na aba &quot;Vendas&quot; mais abaixo.
+              </p>
+            )}
             <div className="space-y-1.5">
               <p className="text-sm font-medium">Número do Orçamento <span className="text-red-500">*</span></p>
               <input
@@ -761,6 +766,34 @@ export default function ClienteDetalhePage() {
       qc.invalidateQueries({ queryKey: ["cliente", id] });
     },
     onError: () => toast.error("Erro ao remover venda"),
+  });
+
+  // Editar Venda — corrige número/valor/data de uma venda já registrada, sem
+  // criar uma nova (diferente do fluxo "Confirmado"/"Nova Venda", que sempre adiciona).
+  const [editVendaId, setEditVendaId] = useState<string | null>(null);
+  const [evNumero, setEvNumero] = useState("");
+  const [evValor, setEvValor] = useState("");
+  const [evData, setEvData] = useState("");
+
+  function abrirEdicaoVenda(v: { id: string; numeroOrcamento: string; valor: number; data: string }) {
+    setEditVendaId(v.id);
+    setEvNumero(v.numeroOrcamento);
+    setEvValor(String(v.valor).replace(".", ","));
+    setEvData(new Date(v.data).toISOString().slice(0, 10));
+  }
+
+  const editarVendaMutation = useMutation({
+    mutationFn: () => axios.patch(`/api/vendas/${editVendaId}`, {
+      numeroOrcamento: evNumero,
+      valor: parseBRL(evValor),
+      data: evData,
+    }),
+    onSuccess: () => {
+      toast.success("Venda atualizada!");
+      setEditVendaId(null);
+      qc.invalidateQueries({ queryKey: ["cliente", id] });
+    },
+    onError: () => toast.error("Erro ao atualizar venda"),
   });
 
   // Abre o popup assim que os dados carregam e há notificação não lida para o usuário atual
@@ -1218,6 +1251,56 @@ export default function ClienteDetalhePage() {
         </DialogContent>
       </Dialog>
 
+      {/* Editar Venda — corrige uma venda já registrada (não cria outra) */}
+      <Dialog open={!!editVendaId} onOpenChange={(o) => { if (!o) setEditVendaId(null); }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Pencil className="w-4 h-4" /> Editar Venda
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-1.5">
+              <p className="text-sm font-medium">Número do Orçamento <span className="text-red-500">*</span></p>
+              <input
+                value={evNumero}
+                onChange={(e) => setEvNumero(e.target.value)}
+                className={`w-full h-9 rounded-md border px-3 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring ${!evNumero ? "border-red-400" : "border-input"}`}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <p className="text-sm font-medium">Valor (R$) <span className="text-red-500">*</span></p>
+              <input
+                type="text"
+                inputMode="decimal"
+                value={evValor}
+                onChange={(e) => setEvValor(e.target.value)}
+                className={`w-full h-9 rounded-md border px-3 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring ${!evValor || isNaN(parseBRL(evValor)) ? "border-red-400" : "border-input"}`}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <p className="text-sm font-medium">Data da Venda <span className="text-red-500">*</span></p>
+              <input
+                type="date"
+                value={evData}
+                max={new Date().toISOString().slice(0, 10)}
+                onChange={(e) => setEvData(e.target.value)}
+                className={`w-full h-9 rounded-md border px-3 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring ${!evData ? "border-red-400" : "border-input"}`}
+              />
+            </div>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setEditVendaId(null)}>Voltar</Button>
+            <Button
+              disabled={!evNumero || !evValor || isNaN(parseBRL(evValor)) || !evData || editarVendaMutation.isPending}
+              onClick={() => editarVendaMutation.mutate()}
+            >
+              {editarVendaMutation.isPending ? "Salvando..." : "Salvar alterações"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Tabs */}
       <Tabs defaultValue={isAdmin ? "historico" : "leads"}>
         <TabsList>
@@ -1309,6 +1392,14 @@ export default function ClienteDetalhePage() {
                   </div>
                   <div className="flex items-center gap-2">
                     <p className="text-sm font-semibold text-emerald-600">{formatCurrency(v.valor)}</p>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                      onClick={() => abrirEdicaoVenda(v)}
+                    >
+                      <Pencil className="w-3.5 h-3.5" />
+                    </Button>
                     <Button
                       variant="ghost"
                       size="icon"

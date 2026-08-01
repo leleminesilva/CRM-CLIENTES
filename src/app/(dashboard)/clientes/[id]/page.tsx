@@ -1102,6 +1102,38 @@ export default function ClienteDetalhePage() {
         />
       </div>
 
+      {/* Todas as Vendas — só aparece quando há mais de uma, pra deixar visível
+          de cara (sem precisar abrir a aba Vendas) que existe mais de um
+          registro pra esse cliente. */}
+      {(cliente.vendas || []).length > 1 && (
+        <Card className="p-4">
+          <p className="text-xs text-muted-foreground mb-3 font-medium uppercase tracking-wide flex items-center gap-1.5">
+            <ThumbsUp className="w-3.5 h-3.5" /> Vendas ({cliente.vendas!.length})
+          </p>
+          <div className="space-y-2">
+            {cliente.vendas!.map((v) => (
+              <div key={v.id} className="flex items-center justify-between text-sm bg-muted/40 rounded-lg px-3 py-2">
+                <div>
+                  <p className="font-medium">Orçamento {v.numeroOrcamento}</p>
+                  <p className="text-xs text-muted-foreground">{new Date(v.data).toLocaleDateString("pt-BR")}</p>
+                </div>
+                <div className="flex items-center gap-1">
+                  <p className="font-semibold text-emerald-600">{formatCurrency(v.valor)}</p>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                    onClick={() => abrirEdicaoVenda(v)}
+                  >
+                    <Pencil className="w-3.5 h-3.5" />
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
+
       <ObservacoesCard
         clienteId={id}
         observacoes={cliente.observacoes as string | null}

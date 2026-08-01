@@ -23,11 +23,12 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import {
   Package, PackageCheck, CalendarClock, CheckCircle2,
-  MapPin, MessageCircle, Phone, ExternalLink, User2, FileText,
+  MapPin, MessageCircle, Phone, ExternalLink, User2, FileText, Search, X,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -39,6 +40,7 @@ import {
 } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { formatCurrency, formatDate, STATUS_POS_VENDA_LABELS } from "@/lib/utils/formatters";
+import { useAuth } from "@/contexts/AuthContext";
 import type { StatusPosVenda, Venda } from "@/types";
 
 const ETAPAS: StatusPosVenda[] = ["AGUARDANDO_VIDRO", "VIDRO_CHEGOU", "AGENDADO", "CONCLUIDO"];
@@ -335,8 +337,13 @@ function DetalheDialog({ venda, onClose }: { venda: Venda | null; onClose: () =>
 
 export default function ConfirmadosPage() {
   const qc = useQueryClient();
+  const { user } = useAuth();
+  const canViewAll = user?.role === "ADMINISTRADOR" || user?.role === "DESENVOLVEDOR" || user?.role === "GESTOR";
   const [activeId, setActiveId] = useState<string | null>(null);
   const [detalheVenda, setDetalheVenda] = useState<Venda | null>(null);
+  const [search, setSearch] = useState("");
+  const [mes, setMes] = useState("");
+  const [vendedorId, setVendedorId] = useState("");
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
@@ -351,6 +358,15 @@ export default function ConfirmadosPage() {
     refetchInterval: 30000,
   });
 
+  const { data: vendedoresData } = useQuery({
+    queryKey: ["usuarios-ativos"],
+    queryFn: async () => {
+      const { data } = await axios.get("/api/usuarios/ativos");
+      return data.data as Array<{ id: string; nome: string }>;
+    },
+    enabled: canViewAll,
+  });
+
   const moveMutation = useMutation({
     mutationFn: ({ id, statusPosVenda }: { id: string; statusPosVenda: StatusPosVenda }) =>
       axios.patch(`/api/vendas/${id}`, { statusPosVenda }),
@@ -358,8 +374,21 @@ export default function ConfirmadosPage() {
     onError: () => toast.error("Erro ao mover pedido"),
   });
 
-  const vendas = data || [];
+  const vendasTodas = data || [];
+  const vendas = vendasTodas.filter((v) => {
+    if (search && !(v.cliente?.nome ?? "").toLowerCase().includes(search.trim().toLowerCase())) return false;
+    if (mes && v.data.slice(0, 7) !== mes) return false;
+    if (vendedorId && v.responsavelId !== vendedorId) return false;
+    return true;
+  });
   const activeVenda = vendas.find((v) => v.id === activeId);
+
+  const hasActiveFilters = !!(search || mes || vendedorId);
+  function clearFilters() {
+    setSearch("");
+    setMes("");
+    setVendedorId("");
+  }
 
   const getVendasForEtapa = (etapa: StatusPosVenda) => vendas.filter((v) => v.statusPosVenda === etapa);
 
@@ -390,9 +419,54 @@ export default function ConfirmadosPage() {
         <div>
           <h2 className="text-2xl font-bold">Confirmado</h2>
           <p className="text-muted-foreground">
-            {totalVendas} pedidos confirmados · {formatCurrency(valorTotal)} · pós-venda, vidro e agendamento
+            {totalVendas} pedido{totalVendas === 1 ? "" : "s"} confirmado{totalVendas === 1 ? "" : "s"}
+            {hasActiveFilters && vendasTodas.length !== totalVendas ? ` de ${vendasTodas.length}` : ""}
+            {" · "}{formatCurrency(valorTotal)} · pós-venda, vidro e agendamento
           </p>
         </div>
+      </div>
+
+      <div className="flex items-center gap-2 flex-wrap">
+        <div className="relative w-[220px] shrink-0">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <Input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Buscar cliente..."
+            className="pl-8"
+          />
+        </div>
+
+        <div className="flex items-center gap-1.5 shrink-0">
+          <CalendarClock className="w-4 h-4 text-muted-foreground shrink-0" />
+          <input
+            type="month"
+            value={mes}
+            onChange={(e) => setMes(e.target.value)}
+            title="Mês da venda"
+            className="h-9 rounded-md border border-input bg-background px-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring w-[150px]"
+          />
+        </div>
+
+        {canViewAll && (
+          <Select value={vendedorId || "all"} onValueChange={(v) => setVendedorId(v === "all" ? "" : v)}>
+            <SelectTrigger className="w-[170px] shrink-0">
+              <SelectValue placeholder="Vendedor" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Vendedor</SelectItem>
+              {(vendedoresData ?? []).map((u) => (
+                <SelectItem key={u.id} value={u.id}>{u.nome}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
+
+        {hasActiveFilters && (
+          <Button variant="ghost" size="sm" onClick={clearFilters} className="text-muted-foreground">
+            <X className="w-3.5 h-3.5 mr-1" /> Limpar filtros
+          </Button>
+        )}
       </div>
 
       <DetalheDialog venda={detalheVenda} onClose={() => setDetalheVenda(null)} />

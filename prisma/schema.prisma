@@ -118,6 +118,13 @@ enum StatusOrcamentoCliente {
   NAO_APROVADO
 }
 
+enum StatusPosVenda {
+  AGUARDANDO_VIDRO
+  VIDRO_CHEGOU
+  AGENDADO
+  CONCLUIDO
+}
+
 // ==========================================
 // MODELS
 // ==========================================
@@ -320,6 +327,14 @@ model Venda {
   deletedAt       DateTime?
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
+
+  // Acompanhamento pós-venda (aba "Confirmado")
+  statusPosVenda      StatusPosVenda @default(AGUARDANDO_VIDRO)
+  ordemKanban         Int            @default(0)
+  vidroChegouEm       DateTime?
+  dataAgendamento     DateTime?
+  horarioAgendamento  String?
+  observacoesPosVenda String?
 
   cliente     Cliente @relation(fields: [clienteId], references: [id])
   lead        Lead?   @relation(fields: [leadId], references: [id])

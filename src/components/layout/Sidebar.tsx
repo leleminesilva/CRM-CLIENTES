@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 import {
   LayoutDashboard, Users,
   CheckSquare, Calendar, BarChart3, UserCog, Search,
-  Settings, ChevronLeft, ChevronRight, Shield, X, MessageCircle, MessageSquare, Bell, Kanban,
+  Settings, ChevronLeft, ChevronRight, Shield, X, MessageCircle, MessageSquare, Bell, Kanban, PackageCheck,
 } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { Logo } from "@/components/Logo";
@@ -26,6 +26,7 @@ const navItems: { href: string; label: string; icon: React.ElementType; roles?: 
   { href: "/",           label: "Dashboard",  icon: LayoutDashboard },
   { href: "/clientes",   label: "Clientes",   icon: Users },
   { href: "/leads",      label: "Leads",      icon: Kanban },
+  { href: "/confirmados", label: "Confirmado", icon: PackageCheck },
   { href: "/tarefas",    label: "Tarefas",    icon: CheckSquare },
   { href: "/agenda",     label: "Agenda",     icon: Calendar },
   { href: "/chat",       label: "Chat",       icon: MessageSquare },

@@ -121,6 +121,13 @@ export const ESTAGIO_LABELS: Record<string, string> = {
   REENGAJAR: "Entrar em Contato Novamente",
 };
 
+export const STATUS_POS_VENDA_LABELS: Record<string, string> = {
+  AGUARDANDO_VIDRO: "Aguardando Vidro",
+  VIDRO_CHEGOU: "Vidro Chegou",
+  AGENDADO: "Agendado",
+  CONCLUIDO: "Concluído",
+};
+
 export const STATUS_OPO_LABELS: Record<string, string> = {
   ABERTA: "Aberta",
   GANHA: "Ganha",

@@ -21,6 +21,7 @@ export type EstagioLead =
   | "REENGAJAR";
 export type Temperatura = "QUENTE" | "MORNO" | "FRIO";
 export type StatusOrcamentoCliente = "PENDENTE" | "APROVADO" | "NAO_APROVADO";
+export type StatusPosVenda = "AGUARDANDO_VIDRO" | "VIDRO_CHEGOU" | "AGENDADO" | "CONCLUIDO";
 export type StatusOportunidade = "ABERTA" | "GANHA" | "PERDIDA" | "SUSPENSA";
 export type TipoTarefa =
   | "REUNIAO"
@@ -166,6 +167,15 @@ export interface Venda {
   data: string;
   createdAt: string;
   updatedAt: string;
+  // Acompanhamento pós-venda
+  statusPosVenda: StatusPosVenda;
+  ordemKanban: number;
+  vidroChegouEm?: string | null;
+  dataAgendamento?: string | null;
+  horarioAgendamento?: string | null;
+  observacoesPosVenda?: string | null;
+  cliente?: Cliente | null;
+  responsavel?: User | null;
 }
 
 export interface Lead {

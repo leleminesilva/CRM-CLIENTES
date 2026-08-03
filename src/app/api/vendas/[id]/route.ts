@@ -8,6 +8,34 @@ import { STATUS_POS_VENDA_LABELS } from "@/lib/utils/formatters";
 
 export const dynamic = "force-dynamic";
 
+// O card "Orçamento" do cliente e o valor estimado do Lead são cópias
+// (denormalizadas) do valor da venda mais recente — atualizadas pelo dialog
+// "Confirmar venda". Editar ou remover uma Venda por aqui não passa por
+// aquele fluxo, então sem isso o cliente ficava mostrando o valor de uma
+// venda antiga/já apagada. Refaz a cópia a partir da venda não-deletada mais
+// recente sempre que uma Venda muda de valor ou é removida.
+async function sincronizarResumoCliente(clienteId: string) {
+  const ultimaVenda = await prisma.venda.findFirst({
+    where: { clienteId, deletedAt: null },
+    orderBy: { data: "desc" },
+  });
+  if (!ultimaVenda) return;
+
+  await prisma.cliente.update({
+    where: { id: clienteId },
+    data: {
+      numeroOrcamento: ultimaVenda.numeroOrcamento,
+      valorOrcamento: ultimaVenda.valor,
+      dataVenda: ultimaVenda.data,
+    },
+  });
+
+  const lead = await prisma.lead.findFirst({ where: { clienteId, deletedAt: null } });
+  if (lead) {
+    await prisma.lead.update({ where: { id: lead.id }, data: { valorEstimado: ultimaVenda.valor } });
+  }
+}
+
 // Acompanhamento pós-venda: mover no Kanban (statusPosVenda/ordemKanban) e/ou
 // editar vidro chegou, agendamento e observações — usado pela aba "Confirmado".
 export async function PATCH(request: NextRequest, { params }: { params: { id: string } }) {
@@ -68,6 +96,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
           metadata: { vendaId: old.id, de: { numeroOrcamento: old.numeroOrcamento, valor: old.valor.toString(), data: old.data }, para: { numeroOrcamento: venda.numeroOrcamento, valor: venda.valor.toString(), data: venda.data } },
         },
       });
+      await sincronizarResumoCliente(old.clienteId);
     }
 
     if (data.statusPosVenda && data.statusPosVenda !== old.statusPosVenda) {
@@ -115,6 +144,7 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
     if (!venda) return NextResponse.json({ error: "Venda não encontrada" }, { status: 404 });
 
     await prisma.venda.update({ where: { id: params.id }, data: { deletedAt: new Date() } });
+    await sincronizarResumoCliente(venda.clienteId);
 
     await createAuditLog({
       userId: payload.userId,

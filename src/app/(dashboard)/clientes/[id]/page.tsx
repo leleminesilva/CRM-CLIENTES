@@ -763,6 +763,7 @@ export default function ClienteDetalhePage() {
     mutationFn: (vendaId: string) => axios.delete(`/api/vendas/${vendaId}`),
     onSuccess: () => {
       toast.success("Venda removida");
+      setEditVendaId(null);
       qc.invalidateQueries({ queryKey: ["cliente", id] });
     },
     onError: () => toast.error("Erro ao remover venda"),
@@ -1127,6 +1128,15 @@ export default function ClienteDetalhePage() {
                   >
                     <Pencil className="w-3.5 h-3.5" />
                   </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                    disabled={removerVendaMutation.isPending}
+                    onClick={() => removerVendaMutation.mutate(v.id)}
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </Button>
                 </div>
               </div>
             ))}
@@ -1322,6 +1332,15 @@ export default function ClienteDetalhePage() {
             </div>
           </div>
           <DialogFooter className="gap-2">
+            <Button
+              variant="destructive"
+              className="mr-auto"
+              disabled={removerVendaMutation.isPending}
+              onClick={() => editVendaId && removerVendaMutation.mutate(editVendaId)}
+            >
+              <Trash2 className="w-3.5 h-3.5 mr-1.5" />
+              {removerVendaMutation.isPending ? "Removendo..." : "Remover"}
+            </Button>
             <Button variant="outline" onClick={() => setEditVendaId(null)}>Voltar</Button>
             <Button
               disabled={!evNumero || !evValor || isNaN(parseBRL(evValor)) || !evData || editarVendaMutation.isPending}

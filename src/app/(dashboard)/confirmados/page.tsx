@@ -23,7 +23,7 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import {
   Package, PackageCheck, CalendarClock, CheckCircle2,
-  MapPin, MessageCircle, Phone, ExternalLink, User2, FileText, Search, X,
+  MapPin, MessageCircle, Phone, ExternalLink, User2, FileText, Search, X, Trash2,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -221,6 +221,16 @@ function DetalheDialog({ venda, onClose }: { venda: Venda | null; onClose: () =>
     onError: () => toast.error("Erro ao atualizar pedido"),
   });
 
+  const removerMutation = useMutation({
+    mutationFn: () => axios.delete(`/api/vendas/${venda!.id}`),
+    onSuccess: () => {
+      toast.success("Pedido removido");
+      qc.invalidateQueries({ queryKey: ["vendas-kanban"] });
+      onClose();
+    },
+    onError: () => toast.error("Erro ao remover pedido"),
+  });
+
   if (!venda) return null;
   const cliente = venda.cliente;
   const enderecoLinha1 = cliente ? [cliente.logradouro, cliente.numero].filter(Boolean).join(", ") : "";
@@ -360,6 +370,15 @@ function DetalheDialog({ venda, onClose }: { venda: Venda | null; onClose: () =>
         </div>
 
         <DialogFooter className="gap-2 pt-1">
+          <Button
+            variant="destructive"
+            className="mr-auto"
+            disabled={removerMutation.isPending}
+            onClick={() => removerMutation.mutate()}
+          >
+            <Trash2 className="w-3.5 h-3.5 mr-1.5" />
+            {removerMutation.isPending ? "Removendo..." : "Remover"}
+          </Button>
           <Button variant="outline" onClick={onClose}>Cancelar</Button>
           <Button
             className="bg-indigo-600 hover:bg-indigo-700"

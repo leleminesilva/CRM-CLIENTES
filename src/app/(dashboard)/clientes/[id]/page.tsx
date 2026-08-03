@@ -1103,10 +1103,9 @@ export default function ClienteDetalhePage() {
         />
       </div>
 
-      {/* Todas as Vendas — só aparece quando há mais de uma, pra deixar visível
-          de cara (sem precisar abrir a aba Vendas) que existe mais de um
-          registro pra esse cliente. */}
-      {(cliente.vendas || []).length > 1 && (
+      {/* Todas as Vendas — visível de cara na tela principal (sem precisar
+          abrir a aba Vendas), com atalho pra editar/remover cada uma. */}
+      {(cliente.vendas || []).length > 0 && (
         <Card className="p-4">
           <p className="text-xs text-muted-foreground mb-3 font-medium uppercase tracking-wide flex items-center gap-1.5">
             <ThumbsUp className="w-3.5 h-3.5" /> Vendas ({cliente.vendas!.length})

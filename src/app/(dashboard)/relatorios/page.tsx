@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import axios from "axios";
-import { TrendingUp, Users, DollarSign, Download, Receipt, XCircle, ExternalLink } from "lucide-react";
+import { TrendingUp, Users, DollarSign, Download, Receipt, XCircle, ExternalLink, Trash2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -68,6 +68,14 @@ export default function RelatoriosPage() {
     },
   });
 
+  const { data: deletados, isLoading: loadingDeletados } = useQuery({
+    queryKey: ["relatorio-clientes-deletados", de, ate],
+    queryFn: async () => {
+      const { data } = await axios.get(`/api/relatorios/clientes-deletados?de=${de}&ate=${ate}`);
+      return data.data;
+    },
+  });
+
   const TEMP_LABELS: Record<string, string> = { QUENTE: "🔥 Quente", MORNO: "🌡️ Morno", FRIO: "❄️ Frio" };
 
   function exportarCSV(tipo: string) {
@@ -77,6 +85,12 @@ export default function RelatoriosPage() {
         `"${r.clienteNome}","${r.responsavel}","${r.servico}","${TEMP_LABELS[String(r.temperatura)] || String(r.temperatura)}","${r.dataFechamento ? new Date(String(r.dataFechamento)).toLocaleDateString("pt-BR") : ""}","${r.motivoPerda || ""}",${r.valor}`
       );
       baixarCSV([header, ...rows].join("\n"), `relatorio-cancelados-${de}`);
+    } else if (tipo === "deletados" && deletados) {
+      const header = "Cliente,Responsável,Serviço,Temperatura,Data Exclusão,Motivo,Valor";
+      const rows = (deletados.lista as Array<Record<string, unknown>>).map((r) =>
+        `"${r.nome}","${r.responsavel}","${r.servico}","${TEMP_LABELS[String(r.temperatura)] || String(r.temperatura)}","${r.deletedAt ? new Date(String(r.deletedAt)).toLocaleDateString("pt-BR") : ""}","${r.motivoExclusao || ""}",${r.valor}`
+      );
+      baixarCSV([header, ...rows].join("\n"), `relatorio-clientes-deletados-${de}`);
     } else if (tipo === "equipe" && equipe) {
       const header = "Vendedor,Cargo,Leads Gerados,Vendas Fechadas,Tarefas Concluídas,Receita,Ticket Médio";
       const rows = equipe.map((r: Record<string, unknown>) =>
@@ -124,6 +138,9 @@ export default function RelatoriosPage() {
   const canceladosLista: Array<{ id: string; clienteId?: string; clienteNome: string; responsavel: string; servico: string; temperatura: string; dataFechamento: string; motivoPerda?: string; valor: number }> = cancelados?.lista || [];
   const canceladosPorMotivo: Array<{ motivo: string; total: number }> = cancelados?.porMotivo || [];
   const canceladosPorResponsavel: Array<{ nome: string; total: number; valor: number }> = cancelados?.porResponsavel || [];
+  const deletadosLista: Array<{ id: string; nome: string; responsavel: string; servico: string; temperatura: string; deletedAt: string; motivoExclusao?: string; valor: number }> = deletados?.lista || [];
+  const deletadosPorMotivo: Array<{ motivo: string; total: number }> = deletados?.porMotivo || [];
+  const deletadosPorResponsavel: Array<{ nome: string; total: number; valor: number }> = deletados?.porResponsavel || [];
 
   const funnelOrdem = ["NOVO_LEAD", "CONTATO_INICIAL", "QUALIFICACAO", "PROPOSTA_ENVIADA", "NEGOCIACAO", "FECHADO_GANHO"];
 
@@ -164,6 +181,9 @@ export default function RelatoriosPage() {
           </TabsTrigger>
           <TabsTrigger value="cancelados">
             <XCircle className="w-4 h-4 mr-2" />Cancelados
+          </TabsTrigger>
+          <TabsTrigger value="deletados">
+            <Trash2 className="w-4 h-4 mr-2" />Clientes Deletados
           </TabsTrigger>
         </TabsList>
 
@@ -730,6 +750,171 @@ export default function RelatoriosPage() {
                 <Card className="p-12 text-center text-muted-foreground">
                   <XCircle className="w-8 h-8 mx-auto mb-3 opacity-40" />
                   <p>Nenhum cancelamento encontrado no período</p>
+                </Card>
+              )}
+            </>
+          )}
+        </TabsContent>
+
+        {/* ── CLIENTES DELETADOS ── */}
+        <TabsContent value="deletados" className="space-y-6 mt-4">
+          <div className="flex justify-end">
+            <Button variant="outline" size="sm" onClick={() => exportarCSV("deletados")}>
+              <Download className="w-4 h-4 mr-2" />Exportar CSV
+            </Button>
+          </div>
+
+          {loadingDeletados ? (
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              {[...Array(3)].map((_, i) => <div key={i} className="h-24 bg-muted animate-pulse rounded-xl" />)}
+            </div>
+          ) : (
+            <>
+              {/* KPIs */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <KPICard
+                  title="Total Deletados"
+                  value={deletados?.total ?? 0}
+                  color="text-red-500"
+                  sub="no período selecionado"
+                />
+                <KPICard
+                  title="Valor Total Perdido"
+                  value={formatCurrency(deletados?.valorPerdido ?? 0)}
+                  color="text-red-500"
+                  sub="soma dos orçamentos dos clientes deletados"
+                />
+                <KPICard
+                  title="Ticket Médio Perdido"
+                  value={formatCurrency(deletados?.ticketMedio ?? 0)}
+                  sub="por exclusão"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Gráfico por motivo */}
+                <Card>
+                  <CardHeader><CardTitle className="text-sm">Exclusões por Motivo</CardTitle></CardHeader>
+                  <CardContent>
+                    {deletadosPorMotivo.length > 0 ? (
+                      <ResponsiveContainer width="100%" height={220}>
+                        <BarChart data={deletadosPorMotivo} layout="vertical" margin={{ left: 0, right: 16 }}>
+                          <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                          <XAxis type="number" tick={{ fontSize: 11 }} allowDecimals={false} />
+                          <YAxis dataKey="motivo" type="category" width={130} tick={{ fontSize: 11 }} />
+                          <Tooltip formatter={(v: number) => [v, "Exclusões"]} />
+                          <Bar dataKey="total" fill="#ef4444" radius={[0, 4, 4, 0]}>
+                            {deletadosPorMotivo.map((_, i) => (
+                              <Cell key={i} fill={COLORS[i % COLORS.length]} />
+                            ))}
+                          </Bar>
+                        </BarChart>
+                      </ResponsiveContainer>
+                    ) : (
+                      <div className="flex items-center justify-center h-40 text-muted-foreground text-sm">
+                        Nenhuma exclusão no período
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+
+                {/* Por responsável */}
+                <Card>
+                  <CardHeader><CardTitle className="text-sm">Exclusões por Responsável</CardTitle></CardHeader>
+                  <CardContent>
+                    {deletadosPorResponsavel.length > 0 ? (
+                      <div className="space-y-3">
+                        {deletadosPorResponsavel.map((r, i) => {
+                          const max = Math.max(...deletadosPorResponsavel.map((x) => x.total));
+                          const pct = max > 0 ? (r.total / max) * 100 : 0;
+                          return (
+                            <div key={r.nome} className="space-y-1">
+                              <div className="flex justify-between text-sm">
+                                <span className="font-medium">{r.nome}</span>
+                                <span className="text-muted-foreground text-xs">
+                                  {r.total} exclus. · {formatCurrency(r.valor)}
+                                </span>
+                              </div>
+                              <div className="h-6 bg-muted rounded-lg overflow-hidden">
+                                <div
+                                  className="h-full rounded-lg transition-all"
+                                  style={{ width: `${Math.max(pct, 4)}%`, backgroundColor: COLORS[i % COLORS.length] }}
+                                />
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-center h-40 text-muted-foreground text-sm">
+                        Nenhuma exclusão no período
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Tabela detalhada */}
+              {deletadosLista.length > 0 ? (
+                <Card>
+                  <CardHeader><CardTitle className="text-sm">Lista de Clientes Deletados</CardTitle></CardHeader>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b bg-muted/50">
+                          <th className="text-left p-3 font-medium">Cliente</th>
+                          <th className="text-left p-3 font-medium">Responsável</th>
+                          <th className="text-left p-3 font-medium">Serviço</th>
+                          <th className="text-left p-3 font-medium">Temp.</th>
+                          <th className="text-left p-3 font-medium">Data Exclusão</th>
+                          <th className="text-left p-3 font-medium">Motivo</th>
+                          <th className="text-right p-3 font-medium">Valor</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {deletadosLista.map((c) => (
+                          <tr key={c.id} className="border-b hover:bg-muted/30">
+                            <td className="p-3 font-medium">{c.nome}</td>
+                            <td className="p-3 text-muted-foreground">{c.responsavel}</td>
+                            <td className="p-3 max-w-[160px]">
+                              <div className="flex flex-wrap gap-1">
+                                {c.servico !== "—"
+                                  ? c.servico.split(",").map((s) => s.trim()).filter(Boolean).map((s) => (
+                                      <span key={s} className="inline-flex px-1.5 py-0.5 rounded text-xs bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">{s}</span>
+                                    ))
+                                  : <span className="text-muted-foreground">—</span>}
+                              </div>
+                            </td>
+                            <td className="p-3 text-sm">{TEMP_LABELS[c.temperatura] ?? "—"}</td>
+                            <td className="p-3 text-muted-foreground whitespace-nowrap">
+                              {c.deletedAt ? new Date(c.deletedAt).toLocaleDateString("pt-BR") : "—"}
+                            </td>
+                            <td className="p-3 max-w-[200px]">
+                              {c.motivoExclusao ? (
+                                <span>{c.motivoExclusao}</span>
+                              ) : <span className="text-muted-foreground text-xs">Não informado</span>}
+                            </td>
+                            <td className="p-3 text-right font-semibold">
+                              {c.valor > 0 ? formatCurrency(c.valor) : <span className="text-muted-foreground">—</span>}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                      <tfoot>
+                        <tr className="border-t bg-muted/30">
+                          <td className="p-3 font-semibold" colSpan={6}>Total</td>
+                          <td className="p-3 text-right font-semibold text-red-500">
+                            {formatCurrency(deletadosLista.reduce((s, c) => s + c.valor, 0))}
+                          </td>
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </div>
+                </Card>
+              ) : (
+                <Card className="p-12 text-center text-muted-foreground">
+                  <Trash2 className="w-8 h-8 mx-auto mb-3 opacity-40" />
+                  <p>Nenhum cliente deletado encontrado no período</p>
                 </Card>
               )}
             </>

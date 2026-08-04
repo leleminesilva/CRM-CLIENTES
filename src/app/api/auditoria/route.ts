@@ -15,12 +15,14 @@ export async function GET(request: NextRequest) {
     const page = parseInt(searchParams.get("page") || "1");
     const limit = parseInt(searchParams.get("limit") || "20");
     const entidade = searchParams.get("entidade") || undefined;
+    const acao = searchParams.get("acao") || undefined;
     const userId = searchParams.get("userId") || undefined;
     const de = searchParams.get("de") || undefined;
     const ate = searchParams.get("ate") || undefined;
 
     const where: Record<string, unknown> = {};
     if (entidade) where.entidade = entidade;
+    if (acao) where.acao = acao;
     if (userId) where.userId = userId;
     if (de || ate) {
       where.createdAt = {};

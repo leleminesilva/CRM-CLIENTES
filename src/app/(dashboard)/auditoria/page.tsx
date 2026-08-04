@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { formatDateTime } from "@/lib/utils/formatters";
 import type { AuditLog } from "@/types";
 
@@ -24,14 +25,16 @@ export default function AuditoriaPage() {
   const [de, setDe] = useState("");
   const [ate, setAte] = useState("");
   const [entidade, setEntidade] = useState("");
+  const [acao, setAcao] = useState("");
 
   const { data, isLoading } = useQuery({
-    queryKey: ["auditoria", page, de, ate, entidade],
+    queryKey: ["auditoria", page, de, ate, entidade, acao],
     queryFn: async () => {
       const params = new URLSearchParams({ page: String(page), limit: "20" });
       if (de) params.set("de", de);
       if (ate) params.set("ate", ate);
       if (entidade) params.set("entidade", entidade);
+      if (acao) params.set("acao", acao);
       const { data } = await axios.get(`/api/auditoria?${params}`);
       return data;
     },
@@ -56,6 +59,20 @@ export default function AuditoriaPage() {
           <div className="space-y-1.5">
             <Label>Entidade</Label>
             <Input value={entidade} onChange={e => setEntidade(e.target.value)} placeholder="Ex: Cliente, Lead" className="w-40" />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Ação</Label>
+            <Select value={acao || "TODAS"} onValueChange={(v) => setAcao(v === "TODAS" ? "" : v)}>
+              <SelectTrigger className="w-40">
+                <SelectValue placeholder="Todas" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="TODAS">Todas</SelectItem>
+                <SelectItem value="CREATE">Criação</SelectItem>
+                <SelectItem value="UPDATE">Edição</SelectItem>
+                <SelectItem value="DELETE">Exclusão</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
           <div className="space-y-1.5">
             <Label>Data inicial</Label>

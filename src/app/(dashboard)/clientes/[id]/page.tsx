@@ -673,6 +673,7 @@ export default function ClienteDetalhePage() {
   const qc = useQueryClient();
   const { user } = useAuth();
   const isAdmin = user?.role === "ADMINISTRADOR" || user?.role === "DESENVOLVEDOR";
+  const podeNotificar = isAdmin || user?.role === "GESTOR";
 
   // Dialog de exclusão do cliente
   const [deleteDialog, setDeleteDialog] = useState(false);
@@ -901,7 +902,7 @@ export default function ClienteDetalhePage() {
           {cliente.nomeFantasia && <p className="text-muted-foreground">{cliente.nomeFantasia}</p>}
         </div>
         <div className="flex gap-2 shrink-0 flex-wrap justify-end">
-          {isAdmin && cliente.responsavelId && (
+          {podeNotificar && cliente.responsavelId && (
             <Button
               size="sm"
               className="bg-amber-500 hover:bg-amber-600 text-white"

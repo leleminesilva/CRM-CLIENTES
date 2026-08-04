@@ -1,14 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
 import prisma from "@/lib/prisma";
+import { canViewAll } from "@/lib/rbac";
 
 export const dynamic = "force-dynamic";
 
-// Enviar notificação ao responsável
+// Enviar notificação ao responsável (só quem gerencia a equipe pode notificar)
 export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
   try {
     const payload = await getCurrentUser(request);
     if (!payload) return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
+    if (!canViewAll(payload.role)) {
+      return NextResponse.json({ error: "Sem permissão para notificar" }, { status: 403 });
+    }
 
     const { mensagem } = await request.json();
     if (!mensagem?.trim()) return NextResponse.json({ error: "Mensagem obrigatória" }, { status: 400 });

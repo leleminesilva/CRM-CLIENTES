@@ -86,9 +86,9 @@ export default function RelatoriosPage() {
       );
       baixarCSV([header, ...rows].join("\n"), `relatorio-cancelados-${de}`);
     } else if (tipo === "deletados" && deletados) {
-      const header = "Cliente,Responsável,Serviço,Temperatura,Data Exclusão,Motivo,Valor";
+      const header = "Cliente,Responsável,Excluído por,Serviço,Temperatura,Data Exclusão,Motivo,Valor";
       const rows = (deletados.lista as Array<Record<string, unknown>>).map((r) =>
-        `"${r.nome}","${r.responsavel}","${r.servico}","${TEMP_LABELS[String(r.temperatura)] || String(r.temperatura)}","${r.deletedAt ? new Date(String(r.deletedAt)).toLocaleDateString("pt-BR") : ""}","${r.motivoExclusao || ""}",${r.valor}`
+        `"${r.nome}","${r.responsavel}","${r.excluidoPor}","${r.servico}","${TEMP_LABELS[String(r.temperatura)] || String(r.temperatura)}","${r.deletedAt ? new Date(String(r.deletedAt)).toLocaleDateString("pt-BR") : ""}","${r.motivoExclusao || ""}",${r.valor}`
       );
       baixarCSV([header, ...rows].join("\n"), `relatorio-clientes-deletados-${de}`);
     } else if (tipo === "equipe" && equipe) {
@@ -138,9 +138,7 @@ export default function RelatoriosPage() {
   const canceladosLista: Array<{ id: string; clienteId?: string; clienteNome: string; responsavel: string; servico: string; temperatura: string; dataFechamento: string; motivoPerda?: string; valor: number }> = cancelados?.lista || [];
   const canceladosPorMotivo: Array<{ motivo: string; total: number }> = cancelados?.porMotivo || [];
   const canceladosPorResponsavel: Array<{ nome: string; total: number; valor: number }> = cancelados?.porResponsavel || [];
-  const deletadosLista: Array<{ id: string; nome: string; responsavel: string; servico: string; temperatura: string; deletedAt: string; motivoExclusao?: string; valor: number }> = deletados?.lista || [];
-  const deletadosPorMotivo: Array<{ motivo: string; total: number }> = deletados?.porMotivo || [];
-  const deletadosPorResponsavel: Array<{ nome: string; total: number; valor: number }> = deletados?.porResponsavel || [];
+  const deletadosLista: Array<{ id: string; nome: string; responsavel: string; excluidoPor: string; servico: string; temperatura: string; deletedAt: string; motivoExclusao?: string; valor: number }> = deletados?.lista || [];
 
   const funnelOrdem = ["NOVO_LEAD", "CONTATO_INICIAL", "QUALIFICACAO", "PROPOSTA_ENVIADA", "NEGOCIACAO", "FECHADO_GANHO"];
 
@@ -791,69 +789,6 @@ export default function RelatoriosPage() {
                 />
               </div>
 
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Gráfico por motivo */}
-                <Card>
-                  <CardHeader><CardTitle className="text-sm">Exclusões por Motivo</CardTitle></CardHeader>
-                  <CardContent>
-                    {deletadosPorMotivo.length > 0 ? (
-                      <ResponsiveContainer width="100%" height={220}>
-                        <BarChart data={deletadosPorMotivo} layout="vertical" margin={{ left: 0, right: 16 }}>
-                          <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                          <XAxis type="number" tick={{ fontSize: 11 }} allowDecimals={false} />
-                          <YAxis dataKey="motivo" type="category" width={130} tick={{ fontSize: 11 }} />
-                          <Tooltip formatter={(v: number) => [v, "Exclusões"]} />
-                          <Bar dataKey="total" fill="#ef4444" radius={[0, 4, 4, 0]}>
-                            {deletadosPorMotivo.map((_, i) => (
-                              <Cell key={i} fill={COLORS[i % COLORS.length]} />
-                            ))}
-                          </Bar>
-                        </BarChart>
-                      </ResponsiveContainer>
-                    ) : (
-                      <div className="flex items-center justify-center h-40 text-muted-foreground text-sm">
-                        Nenhuma exclusão no período
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-
-                {/* Por responsável */}
-                <Card>
-                  <CardHeader><CardTitle className="text-sm">Exclusões por Responsável</CardTitle></CardHeader>
-                  <CardContent>
-                    {deletadosPorResponsavel.length > 0 ? (
-                      <div className="space-y-3">
-                        {deletadosPorResponsavel.map((r, i) => {
-                          const max = Math.max(...deletadosPorResponsavel.map((x) => x.total));
-                          const pct = max > 0 ? (r.total / max) * 100 : 0;
-                          return (
-                            <div key={r.nome} className="space-y-1">
-                              <div className="flex justify-between text-sm">
-                                <span className="font-medium">{r.nome}</span>
-                                <span className="text-muted-foreground text-xs">
-                                  {r.total} exclus. · {formatCurrency(r.valor)}
-                                </span>
-                              </div>
-                              <div className="h-6 bg-muted rounded-lg overflow-hidden">
-                                <div
-                                  className="h-full rounded-lg transition-all"
-                                  style={{ width: `${Math.max(pct, 4)}%`, backgroundColor: COLORS[i % COLORS.length] }}
-                                />
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    ) : (
-                      <div className="flex items-center justify-center h-40 text-muted-foreground text-sm">
-                        Nenhuma exclusão no período
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              </div>
-
               {/* Tabela detalhada */}
               {deletadosLista.length > 0 ? (
                 <Card>
@@ -864,6 +799,7 @@ export default function RelatoriosPage() {
                         <tr className="border-b bg-muted/50">
                           <th className="text-left p-3 font-medium">Cliente</th>
                           <th className="text-left p-3 font-medium">Responsável</th>
+                          <th className="text-left p-3 font-medium">Excluído por</th>
                           <th className="text-left p-3 font-medium">Serviço</th>
                           <th className="text-left p-3 font-medium">Temp.</th>
                           <th className="text-left p-3 font-medium">Data Exclusão</th>
@@ -876,6 +812,7 @@ export default function RelatoriosPage() {
                           <tr key={c.id} className="border-b hover:bg-muted/30">
                             <td className="p-3 font-medium">{c.nome}</td>
                             <td className="p-3 text-muted-foreground">{c.responsavel}</td>
+                            <td className="p-3 text-muted-foreground">{c.excluidoPor}</td>
                             <td className="p-3 max-w-[160px]">
                               <div className="flex flex-wrap gap-1">
                                 {c.servico !== "—"
@@ -902,7 +839,7 @@ export default function RelatoriosPage() {
                       </tbody>
                       <tfoot>
                         <tr className="border-t bg-muted/30">
-                          <td className="p-3 font-semibold" colSpan={6}>Total</td>
+                          <td className="p-3 font-semibold" colSpan={7}>Total</td>
                           <td className="p-3 text-right font-semibold text-red-500">
                             {formatCurrency(deletadosLista.reduce((s, c) => s + c.valor, 0))}
                           </td>

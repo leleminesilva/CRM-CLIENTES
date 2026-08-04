@@ -28,21 +28,19 @@ export async function GET(request: NextRequest) {
 
     const totalValorPerdido = deletados.reduce((acc, c) => acc + Number(c.valorOrcamento ?? 0), 0);
 
-    // Agrupamento por categoria do motivo (parte antes do " — ")
-    const porMotivoMap: Record<string, number> = {};
-    for (const c of deletados) {
-      const cat = c.motivoExclusao ? c.motivoExclusao.split(" — ")[0].trim() : "Sem motivo informado";
-      porMotivoMap[cat] = (porMotivoMap[cat] || 0) + 1;
-    }
-
-    // Agrupamento por responsável
-    const porResponsavelMap: Record<string, { nome: string; total: number; valor: number }> = {};
-    for (const c of deletados) {
-      const id = c.responsavelId || "sem-resp";
-      const nome = c.responsavel?.nome || "Sem responsável";
-      if (!porResponsavelMap[id]) porResponsavelMap[id] = { nome, total: 0, valor: 0 };
-      porResponsavelMap[id].total += 1;
-      porResponsavelMap[id].valor += Number(c.valorOrcamento ?? 0);
+    // Quem de fato executou a exclusão (nem sempre é o responsável do cliente)
+    const auditLogs = await prisma.auditLog.findMany({
+      where: {
+        entidade: "Cliente",
+        acao: "DELETE",
+        entidadeId: { in: deletados.map((c) => c.id) },
+      },
+      select: { entidadeId: true, createdAt: true, user: { select: { nome: true } } },
+      orderBy: { createdAt: "desc" },
+    });
+    const excluidoPorMap: Record<string, string> = {};
+    for (const log of auditLogs) {
+      if (!excluidoPorMap[log.entidadeId]) excluidoPorMap[log.entidadeId] = log.user?.nome || "—";
     }
 
     return NextResponse.json({
@@ -54,16 +52,13 @@ export async function GET(request: NextRequest) {
           id: c.id,
           nome: c.nome,
           responsavel: c.responsavel?.nome || "—",
+          excluidoPor: excluidoPorMap[c.id] || "—",
           servico: c.servicoBuscado || "—",
           temperatura: c.temperatura,
           deletedAt: c.deletedAt,
           motivoExclusao: c.motivoExclusao ?? null,
           valor: Number(c.valorOrcamento ?? 0),
         })),
-        porMotivo: Object.entries(porMotivoMap)
-          .map(([motivo, total]) => ({ motivo, total }))
-          .sort((a, b) => b.total - a.total),
-        porResponsavel: Object.values(porResponsavelMap).sort((a, b) => b.total - a.total),
       },
     });
   } catch (err) {

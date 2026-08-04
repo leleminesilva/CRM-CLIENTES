@@ -2,7 +2,7 @@
 
 > Documento vivo — atualizar a cada fase implementada (ver plano de fases no final).
 >
-> **Status: Fases 0–4 implementadas** (fundação, ciclo de vida da sessão + Realtime, mensageria + mídia, segurança/escopo). Só falta a **Fase 5** (provisionar a VPS/Docker/Evolution de verdade) pra sair do papel. Resumo rápido de cada fase concluída está na seção [Plano de fases](#plano-de-fases-referência) no final; destaques da mais recente (Fase 4): `conversas`/`enviar` — que desde o início só exigiam estar logado, sem checagem nenhuma — agora exigem `whatsapp:use` e checam posse por atendente, testado de ponta a ponta com dois usuários reais confirmando isolamento correto; auditoria de credenciais confirmada (`EVOLUTION_API_KEY` nunca sai de `evolution.ts`, `supabaseAdmin` nunca é importado em código client-side).
+> **Status: Fases 0–4 implementadas** (fundação, ciclo de vida da sessão + Realtime, mensageria + mídia, segurança/escopo). Só falta a **Fase 5** (provisionar a VPS/Docker/Evolution de verdade) pra sair do papel — roteiro passo a passo em [`docs/deploy/whatsapp-vps-setup.md`](../deploy/whatsapp-vps-setup.md). Resumo rápido de cada fase concluída está na seção [Plano de fases](#plano-de-fases-referência) no final; destaques da mais recente (Fase 4): `conversas`/`enviar` — que desde o início só exigiam estar logado, sem checagem nenhuma — agora exigem `whatsapp:use` e checam posse por atendente, testado de ponta a ponta com dois usuários reais confirmando isolamento correto; auditoria de credenciais confirmada (`EVOLUTION_API_KEY` nunca sai de `evolution.ts`, `supabaseAdmin` nunca é importado em código client-side).
 >
 > Duas rodadas de revisão arquitetural antes da implementação trouxeram uma lista maior de refinamentos (ConnectionManager separado, DI registry, circuit breaker, storage adapter plugável, métricas, reestrutura DDD em `src/modules/`, entre outros) — deliberadamente **não** incorporados: nesta escala (um provider, um punhado de sessões, zero tráfego em produção ainda), o custo de manter essas camadas supera o benefício. Ver [Fora de escopo (arquitetura)](#fora-de-escopo-arquitetura) pra lista completa com o motivo de cada corte.
 
@@ -407,6 +407,6 @@ Ver plano completo em `/Users/leandromedeiros/.claude/plans/zippy-riding-clover.
 - **Fase 2** ✅ — ciclo de vida da sessão (rotas `qrcode`/`desconectar`/`reiniciar`/`logs`), broadcast via Supabase Realtime (`src/lib/whatsapp/realtime.ts`), UI de gerenciamento (QR ao vivo, health badge, ações, histórico de auditoria).
 - **Fase 3** ✅ — handlers do pipeline de eventos substituindo lógica inline, mídia (bucket privado + URLs assinadas), `send.ts`/`/enviar` com anexo, UI de composer com anexo, Realtime na conversa aberta.
 - **Fase 4** ✅ — escopo por atendente em `conversas`/`enviar` (antes sem checagem nenhuma), auditoria de credenciais.
-- **Fase 5** — provisionamento real da VPS/Docker/Evolution.
+- **Fase 5** — provisionamento real da VPS/Docker/Evolution. Roteiro passo a passo pronto em [`docs/deploy/whatsapp-vps-setup.md`](../deploy/whatsapp-vps-setup.md) — falta só executar.
 
 Cada fase deve atualizar este documento com o que de fato foi implementado (e, se algo mudou em relação ao planejado aqui, registrar o motivo na seção de Decisões arquiteturais).

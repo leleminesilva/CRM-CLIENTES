@@ -1,8 +1,9 @@
 "use client";
 
-import React, { createContext, useContext, useEffect, useState } from "react";
+import React, { createContext, useContext, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import axios from "axios";
+import { toast } from "sonner";
 import type { AuthUser } from "@/types";
 
 interface AuthContextType {
@@ -19,10 +20,37 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
+  const sessaoExpiradaTratada = useRef(false);
 
   useEffect(() => {
     refreshUser();
   }, []);
+
+  // Sessão expirada/token inválido acontece a qualquer momento (ex: token
+  // vencido em uso prolongado) e antes disso ficava só um "Erro ao
+  // atualizar X" genérico do formulário, sem indicar que era preciso logar
+  // de novo. Intercepta globalmente e manda pro login com uma mensagem clara.
+  useEffect(() => {
+    const id = axios.interceptors.response.use(
+      (response) => response,
+      (error) => {
+        const url: string = error?.config?.url || "";
+        if (
+          axios.isAxiosError(error) &&
+          error.response?.status === 401 &&
+          !url.startsWith("/api/auth/") &&
+          !sessaoExpiradaTratada.current
+        ) {
+          sessaoExpiradaTratada.current = true;
+          setUser(null);
+          toast.error("Sessão expirada. Faça login novamente.");
+          router.push("/login");
+        }
+        return Promise.reject(error);
+      }
+    );
+    return () => axios.interceptors.response.eject(id);
+  }, [router]);
 
   async function refreshUser() {
     try {
@@ -37,6 +65,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   async function login(email: string, senha: string) {
     const { data } = await axios.post("/api/auth/login", { email, senha });
+    sessaoExpiradaTratada.current = false;
     setUser(data.data);
     router.push("/");
   }

@@ -1,10 +1,16 @@
 import type { Role } from "@/types";
 
 // Módulo WhatsApp em standby: Fase 5 (VPS/Evolution real) ainda não
-// provisionada e a migração de schema mais recente (whatsapp_conversas)
-// ficou inconsistente em produção — pausado até resolver, sem mexer em dados.
-// Reverter: virar pra `false`. Ver docs/architecture/whatsapp.md.
-export const WHATSAPP_STANDBY = true;
+// provisionada — pausado até a instância existir. (O drift de schema que
+// também motivou o standby já foi reconciliado: `prisma migrate diff` contra
+// produção e local dá vazio.)
+//
+// Destravado só onde NEXT_PUBLIC_WHATSAPP_STANDBY estiver explicitamente em
+// "false"; a ausência da env mantém o standby LIGADO (seguro por padrão), então
+// produção continua congelada até setarmos a env na Vercel. É NEXT_PUBLIC_
+// porque a página client (src/app/(dashboard)/whatsapp/page.tsx) também lê
+// essa flag — e "o módulo está no ar?" não é segredo. Ver docs/architecture/whatsapp.md.
+export const WHATSAPP_STANDBY = process.env.NEXT_PUBLIC_WHATSAPP_STANDBY !== "false";
 
 type Permission =
   | "dashboard:view"

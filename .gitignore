@@ -30,6 +30,10 @@ prisma/.env
 # Vercel
 .vercel
 
+# Assistentes de código (config local, não versionar)
+.claude/
+.codex/
+
 # TypeScript
 *.tsbuildinfo
 next-env.d.ts

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
 import { hasPermission, isAdmin } from "@/lib/rbac";
 import prisma from "@/lib/prisma";
+import type { Prisma } from "@prisma/client";
 
 export const dynamic = "force-dynamic";
 
@@ -14,6 +15,18 @@ export async function GET(request: NextRequest) {
 
   const { searchParams } = new URL(request.url);
   const sessaoId = searchParams.get("sessaoId");
+  const filtro = searchParams.get("filtro"); // minhas | nao_atribuidas | pendentes | resolvidas
+
+  const filtroWhere: Prisma.WhatsAppConversaWhereInput =
+    filtro === "minhas"
+      ? { responsavelId: payload.userId }
+      : filtro === "nao_atribuidas"
+        ? { responsavelId: null }
+        : filtro === "pendentes"
+          ? { status: "PENDENTE" }
+          : filtro === "resolvidas"
+            ? { status: "RESOLVIDA" }
+            : {};
 
   // Escopo por atendente: quem não pode ver tudo só enxerga conversas de
   // sessões atribuídas a ele. Um sessaoId de sessão alheia degrada pra
@@ -23,6 +36,7 @@ export async function GET(request: NextRequest) {
     where: {
       ...(sessaoId ? { sessaoId } : {}),
       ...(isAdmin(payload.role) ? {} : { sessao: { atendenteId: payload.userId } }),
+      ...filtroWhere,
     },
     orderBy: { ultimaMsgEm: "desc" },
     include: {
@@ -31,6 +45,7 @@ export async function GET(request: NextRequest) {
         take: 1,
       },
       agentEstado: { select: { estado: true } },
+      responsavel: { select: { id: true, nome: true } },
     },
   });
 

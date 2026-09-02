@@ -159,7 +159,8 @@ model User {
   alertasRecebidos       Alerta[]       @relation("AlertasRecebidos")
   alertasCriados         Alerta[]       @relation("AlertasCriados")
   alertasLeituras        AlertaLeitura[]
-  whatsappSessoes        WhatsAppSessao[] @relation("WhatsAppAtendente")
+  whatsappSessoes        WhatsAppSessao[]    @relation("WhatsAppAtendente")
+  whatsappConversas      WhatsAppConversa[]  @relation("WhatsAppResponsavel")
 
   @@map("users")
 }
@@ -576,6 +577,21 @@ enum WhatsAppMensagemStatus {
   FALHOU
 }
 
+enum WhatsAppConversaStatus {
+  ABERTA
+  PENDENTE
+  RESOLVIDA
+}
+
+enum WhatsAppConversaEtapa {
+  NOVA
+  EM_ATENDIMENTO
+  AGUARDANDO_CLIENTE
+  ORCAMENTO_ENVIADO
+  FECHADO
+  SEM_RETORNO
+}
+
 model WhatsAppSessao {
   id                     String                @id @default(cuid())
   nome                   String
@@ -626,15 +642,18 @@ model WhatsAppWebhookEvent {
 }
 
 model WhatsAppConversa {
-  id           String    @id @default(cuid())
-  sessaoId     String
-  contatoPhone String
-  contatoNome  String?
-  clienteId    String?
-  ultimaMsgEm  DateTime?
-  naoLidas     Int       @default(0)
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  id            String                 @id @default(cuid())
+  sessaoId      String
+  contatoPhone  String
+  contatoNome   String?
+  clienteId     String?
+  status        WhatsAppConversaStatus @default(ABERTA)
+  etapa         WhatsAppConversaEtapa  @default(NOVA)
+  responsavelId String?
+  ultimaMsgEm   DateTime?
+  naoLidas      Int                    @default(0)
+  createdAt     DateTime               @default(now())
+  updatedAt     DateTime               @updatedAt
 
   // Restrict (não Cascade): excluir uma sessão nunca pode apagar histórico de
   // conversas junto — é por isso que essa arquitetura existe. "Excluir sessão"
@@ -642,11 +661,13 @@ model WhatsAppConversa {
   // restrição nunca deveria ser acionada em uso normal; existe como rede de
   // segurança contra um DELETE direto acidental na tabela de sessões.
   sessao      WhatsAppSessao       @relation(fields: [sessaoId], references: [id], onDelete: Restrict)
+  responsavel User?                @relation("WhatsAppResponsavel", fields: [responsavelId], references: [id])
   mensagens   WhatsAppMensagem[]
   agentEstado WhatsAppAgentEstado?
 
   @@unique([sessaoId, contatoPhone])
   @@index([sessaoId])
+  @@index([responsavelId])
   @@map("whatsapp_conversas")
 }
 

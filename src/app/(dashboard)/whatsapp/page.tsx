@@ -58,6 +58,9 @@ interface ClienteVinculado {
   whatsapp?: string | null;
 }
 
+type ConversaStatus = "ABERTA" | "PENDENTE" | "RESOLVIDA";
+type FiltroFila = "todas" | "minhas" | "nao_atribuidas" | "pendentes" | "resolvidas";
+
 interface Conversa {
   id: string;
   sessaoId: string;
@@ -68,7 +71,28 @@ interface Conversa {
   mensagens?: Mensagem[];
   agentEstado?: { estado: string } | null;
   cliente?: ClienteVinculado | null;
+  status?: ConversaStatus;
+  responsavelId?: string | null;
+  responsavel?: { id: string; nome: string } | null;
 }
+
+const STATUS_LABEL: Record<ConversaStatus, string> = {
+  ABERTA: "Aberta",
+  PENDENTE: "Pendente",
+  RESOLVIDA: "Resolvida",
+};
+const STATUS_COR: Record<ConversaStatus, string> = {
+  ABERTA: "text-blue-500",
+  PENDENTE: "text-amber-500",
+  RESOLVIDA: "text-green-500",
+};
+const FILTROS_FILA: { id: FiltroFila; label: string }[] = [
+  { id: "todas", label: "Todas" },
+  { id: "minhas", label: "Minhas" },
+  { id: "nao_atribuidas", label: "Não atribuídas" },
+  { id: "pendentes", label: "Pendentes" },
+  { id: "resolvidas", label: "Resolvidas" },
+];
 
 const BOT_ATIVO_ESTADOS = ["TRIAGEM", "COLETANDO", "AGUARDANDO_CONFIRMACAO"];
 
@@ -303,6 +327,8 @@ function ListaConversas({
   onSelect,
   search,
   onSearchChange,
+  filtro,
+  onFiltroChange,
 }: {
   conversas: Conversa[];
   sessao: Sessao | undefined;
@@ -310,6 +336,8 @@ function ListaConversas({
   onSelect: (c: Conversa) => void;
   search: string;
   onSearchChange: (v: string) => void;
+  filtro: FiltroFila;
+  onFiltroChange: (f: FiltroFila) => void;
 }) {
   const filtered = conversas.filter((c) => {
     const q = search.toLowerCase();
@@ -330,7 +358,7 @@ function ListaConversas({
         </div>
       </div>
 
-      <div className="p-2 border-b border-border bg-[#f0f2f5] dark:bg-[#202c33]">
+      <div className="p-2 border-b border-border bg-[#f0f2f5] dark:bg-[#202c33] space-y-2">
         <div className="relative">
           <Search className="absolute left-3 top-2.5 w-4 h-4 text-muted-foreground" />
           <Input
@@ -339,6 +367,22 @@ function ListaConversas({
             value={search}
             onChange={(e) => onSearchChange(e.target.value)}
           />
+        </div>
+        <div className="flex gap-1 overflow-x-auto -mx-1 px-1" style={{ scrollbarWidth: "none" }}>
+          {FILTROS_FILA.map((f) => (
+            <button
+              key={f.id}
+              onClick={() => onFiltroChange(f.id)}
+              className={cn(
+                "shrink-0 text-xs font-medium px-2.5 py-1 rounded-full transition-colors",
+                filtro === f.id
+                  ? "bg-green-600 text-white"
+                  : "bg-white/70 dark:bg-white/5 text-muted-foreground hover:text-foreground"
+              )}
+            >
+              {f.label}
+            </button>
+          ))}
         </div>
       </div>
 
@@ -687,9 +731,12 @@ function AreaChat({
 function PainelContexto({ conversa }: { conversa: Conversa }) {
   const router = useRouter();
   const queryClient = useQueryClient();
+  const { user } = useAuth();
   const [busca, setBusca] = useState("");
   const [vinculando, setVinculando] = useState(false);
+  const [atribuindo, setAtribuindo] = useState(false);
   const cliente = conversa.cliente ?? null;
+  const status: ConversaStatus = conversa.status ?? "ABERTA";
 
   const { data: resultados = [] } = useQuery({
     queryKey: ["clientes-busca-wa", busca],
@@ -698,6 +745,15 @@ function PainelContexto({ conversa }: { conversa: Conversa }) {
       return (data.clientes ?? data ?? []) as ClienteVinculado[];
     },
     enabled: vinculando && busca.trim().length >= 2,
+  });
+
+  const { data: usuarios = [] } = useQuery({
+    queryKey: ["usuarios-ativos-wa"],
+    queryFn: async () => {
+      const { data } = await axios.get("/api/usuarios/ativos");
+      return (data.data ?? []) as { id: string; nome: string }[];
+    },
+    enabled: atribuindo,
   });
 
   const vincular = useMutation({
@@ -712,6 +768,19 @@ function PainelContexto({ conversa }: { conversa: Conversa }) {
     onError: () => toast.error("Erro ao vincular"),
   });
 
+  const patch = useMutation({
+    mutationFn: (body: Record<string, unknown>) =>
+      axios.patch(`/api/whatsapp/conversas/${conversa.id}`, body),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["wa-conversas"] });
+      setAtribuindo(false);
+    },
+    onError: (e: unknown) => {
+      const msg = (e as { response?: { data?: { error?: string } } })?.response?.data?.error;
+      toast.error(msg ?? "Erro ao atualizar conversa");
+    },
+  });
+
   return (
     <aside className="hidden xl:flex flex-col w-72 border-l border-border bg-background shrink-0 overflow-y-auto">
       <div className="p-4 text-center border-b border-border">
@@ -720,6 +789,64 @@ function PainelContexto({ conversa }: { conversa: Conversa }) {
         </div>
         <p className="font-semibold text-sm">{conversa.contatoNome ?? formatPhone(conversa.contatoPhone)}</p>
         <p className="text-xs text-muted-foreground">{formatPhone(conversa.contatoPhone)}</p>
+      </div>
+
+      <div className="p-4 space-y-3 border-b border-border">
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Conversa</p>
+
+        <div className="flex rounded-lg border border-border p-0.5">
+          {(["ABERTA", "PENDENTE", "RESOLVIDA"] as ConversaStatus[]).map((s) => (
+            <button
+              key={s}
+              onClick={() => status !== s && patch.mutate({ status: s })}
+              disabled={patch.isPending}
+              className={cn(
+                "flex-1 text-[11px] font-semibold py-1 rounded-md transition-colors flex items-center justify-center gap-1",
+                status === s ? cn("bg-muted", STATUS_COR[s]) : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              <span className="w-1.5 h-1.5 rounded-full bg-current" />
+              {STATUS_LABEL[s]}
+            </button>
+          ))}
+        </div>
+
+        <div className="text-xs">
+          <span className="text-muted-foreground">Responsável: </span>
+          <span className="font-medium">{conversa.responsavel?.nome ?? "ninguém"}</span>
+        </div>
+        {!atribuindo ? (
+          <div className="flex gap-2">
+            {conversa.responsavelId !== user?.id && (
+              <Button size="sm" className="h-7 text-xs flex-1 bg-green-600 hover:bg-green-700 text-white" onClick={() => patch.mutate({ responsavelId: user?.id })} disabled={patch.isPending}>
+                Assumir
+              </Button>
+            )}
+            <Button size="sm" variant="outline" className="h-7 text-xs flex-1" onClick={() => setAtribuindo(true)}>
+              Atribuir a…
+            </Button>
+            {conversa.responsavelId && (
+              <Button size="sm" variant="ghost" className="h-7 text-xs text-muted-foreground" onClick={() => patch.mutate({ responsavelId: null })} disabled={patch.isPending}>
+                Tirar
+              </Button>
+            )}
+          </div>
+        ) : (
+          <div className="rounded-lg border border-border p-2 space-y-1 max-h-48 overflow-y-auto">
+            {usuarios.map((u) => (
+              <button
+                key={u.id}
+                onClick={() => patch.mutate({ responsavelId: u.id })}
+                className="w-full text-left px-2 py-1.5 rounded-md hover:bg-accent text-xs"
+              >
+                {u.nome}
+              </button>
+            ))}
+            <Button size="sm" variant="ghost" className="h-6 text-xs w-full text-muted-foreground" onClick={() => setAtribuindo(false)}>
+              Cancelar
+            </Button>
+          </div>
+        )}
       </div>
 
       <div className="p-4 space-y-3">
@@ -1028,6 +1155,7 @@ function WhatsAppContent() {
   const [modalAberto, setModalAberto] = useState(false);
   const [aba, setAba] = useState<"conversas" | "canais">("conversas");
   const [escopo, setEscopo] = useState<"todas" | "minhas">("todas");
+  const [filtro, setFiltro] = useState<FiltroFila>("todas");
   const queryClient = useQueryClient();
 
   const { data: sessoes = [] } = useQuery({
@@ -1042,10 +1170,12 @@ function WhatsAppContent() {
   const podeAdicionar = podeVerTodas || sessoes.length === 0;
 
   const { data: conversas = [] } = useQuery({
-    queryKey: ["wa-conversas", sessaoId],
+    queryKey: ["wa-conversas", sessaoId, filtro],
     queryFn: async () => {
-      const params = sessaoId ? `?sessaoId=${sessaoId}` : "";
-      const { data } = await axios.get(`/api/whatsapp/conversas${params}`);
+      const qs = new URLSearchParams();
+      if (sessaoId) qs.set("sessaoId", sessaoId);
+      if (filtro !== "todas") qs.set("filtro", filtro);
+      const { data } = await axios.get(`/api/whatsapp/conversas?${qs.toString()}`);
       return data as Conversa[];
     },
     enabled: !!sessaoId,
@@ -1188,6 +1318,8 @@ function WhatsAppContent() {
                 onSelect={(c) => setConversa(c)}
                 search={searchConversa}
                 onSearchChange={setSearchConversa}
+                filtro={filtro}
+                onFiltroChange={setFiltro}
               />
             </div>
 

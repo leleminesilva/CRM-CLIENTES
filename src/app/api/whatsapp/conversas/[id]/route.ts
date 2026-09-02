@@ -4,8 +4,65 @@ import { hasPermission, isAdmin } from "@/lib/rbac";
 import prisma from "@/lib/prisma";
 import { signedUrlMedia } from "@/lib/whatsapp/media";
 import { waLogger } from "@/lib/whatsapp/logger";
+import { emit } from "@/lib/whatsapp/events";
+import type { WhatsAppConversaStatus, WhatsAppConversaEtapa } from "@prisma/client";
 
 export const dynamic = "force-dynamic";
+
+const STATUS_VALIDOS = ["ABERTA", "PENDENTE", "RESOLVIDA"];
+const ETAPA_VALIDA = ["NOVA", "EM_ATENDIMENTO", "AGUARDANDO_CLIENTE", "ORCAMENTO_ENVIADO", "FECHADO", "SEM_RETORNO"];
+
+// Atualiza metadados da conversa: status, etapa do quadro, responsável.
+export async function PATCH(request: NextRequest, { params }: { params: { id: string } }) {
+  const payload = await getCurrentUser(request);
+  if (!payload) return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
+  if (!hasPermission(payload.role, "whatsapp:use")) {
+    return NextResponse.json({ error: "Sem permissão" }, { status: 403 });
+  }
+
+  const alvo = await prisma.whatsAppConversa.findUnique({
+    where: { id: params.id },
+    include: { sessao: { select: { atendenteId: true } } },
+  });
+  if (!alvo) return NextResponse.json({ error: "Conversa não encontrada" }, { status: 404 });
+  if (!isAdmin(payload.role) && alvo.sessao.atendenteId !== payload.userId) {
+    return NextResponse.json({ error: "Você não tem acesso a esta conversa" }, { status: 403 });
+  }
+
+  const body = await request.json().catch(() => ({}));
+  const data: {
+    status?: WhatsAppConversaStatus;
+    etapa?: WhatsAppConversaEtapa;
+    responsavelId?: string | null;
+  } = {};
+
+  if (typeof body.status === "string" && STATUS_VALIDOS.includes(body.status)) {
+    data.status = body.status as WhatsAppConversaStatus;
+  }
+  if (typeof body.etapa === "string" && ETAPA_VALIDA.includes(body.etapa)) {
+    data.etapa = body.etapa as WhatsAppConversaEtapa;
+  }
+  if ("responsavelId" in body) {
+    if (body.responsavelId === null) {
+      data.responsavelId = null;
+    } else if (typeof body.responsavelId === "string") {
+      const existe = await prisma.user.findFirst({
+        where: { id: body.responsavelId, ativo: true, deletedAt: null },
+        select: { id: true },
+      });
+      if (!existe) return NextResponse.json({ error: "Responsável inválido" }, { status: 400 });
+      data.responsavelId = body.responsavelId;
+    }
+  }
+
+  if (Object.keys(data).length === 0) {
+    return NextResponse.json({ error: "Nada para atualizar" }, { status: 400 });
+  }
+
+  const conversa = await prisma.whatsAppConversa.update({ where: { id: params.id }, data });
+  await emit("ConversationUpdated", { conversaId: params.id }, params.id);
+  return NextResponse.json(conversa);
+}
 
 export async function GET(
   request: NextRequest,

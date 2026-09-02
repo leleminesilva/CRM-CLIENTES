@@ -721,12 +721,9 @@ function AreaChat({
   const grupo = !!conversa.isGrupo;
   const tituloContato = conversa.contatoNome ?? (grupo ? "Grupo do WhatsApp" : formatPhone(conversa.contatoPhone));
 
-  // Janela de resposta livre do WhatsApp: 24 h após a última mensagem do
-  // cliente. Depois disso só modelo aprovado (regra da Meta).
+  // Última mensagem recebida — só pra situar o atendente. (A "janela de 24 h"
+  // da API oficial da Meta não se aplica aqui: o gateway é WhatsApp Web.)
   const ultimaEntrada = [...mensagens].reverse().find((m) => m.direcao === "entrada");
-  const janelaRestanteMs = ultimaEntrada
-    ? 24 * 3600 * 1000 - (Date.now() - new Date(ultimaEntrada.enviadaEm).getTime())
-    : null;
 
   // Agrupa mensagens por data
   const groups: { date: string; msgs: Mensagem[] }[] = [];
@@ -961,11 +958,8 @@ function AreaChat({
           <p className="flex items-center gap-1.5 mt-2 px-0.5 text-[11px] text-muted-foreground">
             <Clock className="w-3 h-3 shrink-0" />
             Respondendo pelo canal <b className="text-foreground font-semibold">{sessaoNome}</b>
-            {janelaRestanteMs != null && janelaRestanteMs > 0 && (
-              <span>· janela de resposta fecha em <span className="tabular-nums">{formatDuracao(janelaRestanteMs)}</span></span>
-            )}
-            {janelaRestanteMs != null && janelaRestanteMs <= 0 && (
-              <span className="text-amber-600 dark:text-amber-500">· janela de 24 h expirada — só modelo aprovado</span>
+            {ultimaEntrada && (
+              <span>· cliente escreveu por último {formatTime(ultimaEntrada.enviadaEm)}</span>
             )}
           </p>
         )}

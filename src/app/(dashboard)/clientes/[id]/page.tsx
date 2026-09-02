@@ -693,6 +693,20 @@ export default function ClienteDetalhePage() {
     },
   });
 
+  const { data: conversasWa = [] } = useQuery({
+    queryKey: ["cliente-conversas-wa", id],
+    queryFn: async () => {
+      const { data } = await axios.get(`/api/whatsapp/conversas/por-cliente?clienteId=${id}`);
+      return data as Array<{
+        id: string; contatoPhone: string; contatoNome: string | null;
+        status: string; naoLidas: number; ultimaMsgEm: string | null; tags: string[];
+        sessao: { nome: string }; responsavel: { nome: string } | null;
+        mensagens: Array<{ conteudo: string; direcao: string }>;
+      }>;
+    },
+    enabled: !!id,
+  });
+
   const deleteMutation = useMutation({
     mutationFn: (motivo: string) => axios.delete(`/api/clientes/${id}`, { data: { motivo } }),
     onSuccess: () => { toast.success("Cliente removido"); router.push("/clientes"); },
@@ -1377,6 +1391,12 @@ export default function ClienteDetalhePage() {
             <MessageSquare className="w-4 h-4 mr-2" />
             Comentários ({(cliente.comentarios || []).length})
           </TabsTrigger>
+          {conversasWa.length > 0 && (
+            <TabsTrigger value="whatsapp">
+              <MessageCircle className="w-4 h-4 mr-2" />
+              WhatsApp ({conversasWa.length})
+            </TabsTrigger>
+          )}
         </TabsList>
 
         {isAdmin && (
@@ -1509,6 +1529,49 @@ export default function ClienteDetalhePage() {
             )}
           </div>
         </TabsContent>
+
+        {conversasWa.length > 0 && (
+          <TabsContent value="whatsapp" className="mt-4">
+            <div className="space-y-3">
+              {conversasWa.map((cv) => {
+                const ultima = cv.mensagens[0];
+                return (
+                  <Card key={cv.id} className="p-3 flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-medium truncate">{cv.contatoNome || cv.contatoPhone}</p>
+                        <Badge variant="secondary" className="text-[10px]">{cv.sessao.nome}</Badge>
+                        {cv.status && cv.status !== "ABERTA" && (
+                          <Badge variant="outline" className="text-[10px]">{cv.status.toLowerCase()}</Badge>
+                        )}
+                        {cv.naoLidas > 0 && (
+                          <Badge className="bg-green-600 text-white text-[10px] h-4 px-1.5">{cv.naoLidas}</Badge>
+                        )}
+                      </div>
+                      {ultima && (
+                        <p className="text-xs text-muted-foreground truncate mt-0.5">
+                          {ultima.direcao === "saida" ? "Você: " : ""}{ultima.conteudo}
+                        </p>
+                      )}
+                      {cv.responsavel && (
+                        <p className="text-[11px] text-muted-foreground mt-0.5">Responsável: {cv.responsavel.nome}</p>
+                      )}
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="shrink-0"
+                      onClick={() => router.push(`/whatsapp?phone=${cv.contatoPhone}`)}
+                    >
+                      <MessageCircle className="w-4 h-4 mr-1.5" />
+                      Abrir
+                    </Button>
+                  </Card>
+                );
+              })}
+            </div>
+          </TabsContent>
+        )}
       </Tabs>
     </div>
   );

@@ -183,13 +183,8 @@ const PERMISSIONS: Record<Role, Permission[]> = {
 };
 
 export function hasPermission(role: Role, permission: Permission): boolean {
-  if (permission === "whatsapp:use" || permission === "whatsapp:manage_sessoes") {
-    if (WHATSAPP_STANDBY) return false;
-    // Por enquanto o módulo WhatsApp é liberado só para o Desenvolvedor —
-    // Administrador e demais cargos não veem a sidebar nem acessam as rotas.
-    // Para reabrir a todos, remova este check (o mapa PERMISSIONS abaixo já
-    // concede a permissão aos outros cargos).
-    if (role !== "DESENVOLVEDOR") return false;
+  if (WHATSAPP_STANDBY && (permission === "whatsapp:use" || permission === "whatsapp:manage_sessoes")) {
+    return false;
   }
   return PERMISSIONS[role]?.includes(permission) ?? false;
 }

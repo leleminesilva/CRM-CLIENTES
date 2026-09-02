@@ -16,7 +16,7 @@ import {
   MessageCircle, Plus, Trash2, Phone, Send,
   Loader2, Settings, ChevronLeft, Check, CheckCheck,
   Search, Smartphone, RefreshCw, PowerOff, ChevronDown, ChevronUp, History,
-  Paperclip, FileText, X as XIcon, Download, UserRound, ExternalLink,
+  Paperclip, FileText, X as XIcon, Download, UserRound, ExternalLink, Sparkles,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -104,6 +104,15 @@ const FILTROS_FILA: { id: FiltroFila; label: string }[] = [
 type EtapaQuadro =
   | "NOVA" | "EM_ATENDIMENTO" | "AGUARDANDO_CLIENTE"
   | "ORCAMENTO_ENVIADO" | "FECHADO" | "SEM_RETORNO";
+
+const RESPOSTAS_RAPIDAS = [
+  "Bom dia! Como posso ajudar?",
+  "Pode me passar as medidas (largura × altura)?",
+  "Qual o tipo de vidro? (temperado, comum, laminado…)",
+  "Você é de qual cidade?",
+  "Vou confirmar o valor com a equipe e já te retorno 👍",
+  "Consegue me mandar uma foto do local?",
+];
 
 const ETAPAS_QUADRO: { id: EtapaQuadro; label: string; cor: string }[] = [
   { id: "NOVA",               label: "Novas",              cor: "bg-slate-400" },
@@ -553,6 +562,18 @@ function AreaChat({
     },
   });
 
+  const sugerir = useMutation({
+    mutationFn: async () => {
+      const { data } = await axios.post(`/api/whatsapp/conversas/${conversa!.id}/sugerir`);
+      return data as { sugestao: string };
+    },
+    onSuccess: (d) => setTexto(d.sugestao),
+    onError: (e: unknown) => {
+      const msg = (e as { response?: { data?: { error?: string } } })?.response?.data?.error;
+      toast.error(msg ?? "Não foi possível gerar a sugestão");
+    },
+  });
+
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [data?.mensagens]);
@@ -701,6 +722,25 @@ function AreaChat({
             </button>
           </div>
         )}
+        <div className="flex items-center gap-1.5 mb-2 overflow-x-auto" style={{ scrollbarWidth: "none" }}>
+          <button
+            onClick={() => sugerir.mutate()}
+            disabled={sugerir.isPending || mensagens.length === 0}
+            className="shrink-0 flex items-center gap-1.5 text-xs font-semibold rounded-full border border-blue-500/40 text-blue-600 dark:text-blue-400 px-2.5 py-1 hover:bg-blue-500/10 disabled:opacity-50"
+          >
+            {sugerir.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
+            Sugerir resposta
+          </button>
+          {RESPOSTAS_RAPIDAS.map((r) => (
+            <button
+              key={r}
+              onClick={() => setTexto((t) => (t.trim() ? `${t} ${r}` : r))}
+              className="shrink-0 text-xs font-medium rounded-full bg-white/70 dark:bg-white/5 text-muted-foreground hover:text-foreground px-2.5 py-1"
+            >
+              {r.length > 32 ? r.slice(0, 30) + "…" : r}
+            </button>
+          ))}
+        </div>
         <div className="flex items-end gap-2">
           <input
             ref={fileInputRef}

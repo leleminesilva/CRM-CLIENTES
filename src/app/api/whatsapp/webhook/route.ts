@@ -86,10 +86,11 @@ export async function POST(request: NextRequest) {
 
       // evento.type === "message"
       const msg = evento.data;
+      const fromMe = !!msg.fromMe;
       // Ignora eventos de grupo/sistema sem conteúdo útil (reações, protocol
       // messages, distribuição de chave, etc.) — eles poluem a conversa com
       // balões vazios, ainda mais em grupo.
-      if (msg.tipo === "texto" && !(msg.conteudo ?? "").trim() && !msg.media?.base64) continue;
+      if (msg.tipo === "texto" && !(msg.conteudo ?? "").trim() && !msg.media) continue;
       // Grupo mantém o id do grupo como "telefone" (não passa pelo ajuste do
       // 9º dígito, que só vale pra celular BR).
       const fromPhone = msg.isGrupo ? normalizePhone(msg.fromPhone) : normalizeWhatsAppPhone(msg.fromPhone);
@@ -103,6 +104,18 @@ export async function POST(request: NextRequest) {
         : null;
       if (!sessao) continue;
 
+      // fromMe = mensagem enviada pelo próprio número. Se já existe uma
+      // mensagem com esse providerMessageId, foi o CRM que enviou (já
+      // persistida no envio) — descarta o eco. Se não existe, foi enviada
+      // pelo celular do WhatsApp; a gravamos como "saida" pra aparecer aqui.
+      if (fromMe) {
+        const jaExiste = await prisma.whatsAppMensagem.findUnique({
+          where: { providerMessageId: msg.providerMessageId },
+          select: { id: true },
+        });
+        if (jaExiste) continue;
+      }
+
       const conversa = await prisma.whatsAppConversa.upsert({
         where: { sessaoId_contatoPhone: { sessaoId: sessao.id, contatoPhone: fromPhone } },
         create: {
@@ -111,7 +124,7 @@ export async function POST(request: NextRequest) {
           contatoNome: msg.contatoNome,
           isGrupo: msg.isGrupo ?? false,
           ultimaMsgEm: msg.timestamp,
-          naoLidas: 1,
+          naoLidas: fromMe ? 0 : 1,
         },
         update: {
           // Em grupo, msg.contatoNome só vem preenchido quando o gateway
@@ -119,47 +132,85 @@ export async function POST(request: NextRequest) {
           contatoNome: msg.contatoNome ?? undefined,
           isGrupo: msg.isGrupo ? true : undefined,
           ultimaMsgEm: msg.timestamp,
-          naoLidas: { increment: 1 },
+          // Respondeu pelo celular → zera não lidas; mensagem recebida → +1.
+          naoLidas: fromMe ? 0 : { increment: 1 },
         },
       });
+
+      // Nome do grupo: se ainda não tem, tenta puxar o assunto do gateway.
+      if (msg.isGrupo && !conversa.contatoNome && provider.infoGrupo) {
+        try {
+          const info = await provider.infoGrupo(instanceName!, `${fromPhone}@g.us`);
+          if (info?.subject) {
+            await prisma.whatsAppConversa.update({
+              where: { id: conversa.id },
+              data: { contatoNome: info.subject },
+            });
+          }
+        } catch (err) {
+          waLogger.error("falha ao buscar nome do grupo", { erro: err, conversationId: conversa.id });
+        }
+      }
 
       await prisma.whatsAppSessao.update({
         where: { id: sessao.id },
         data: { ultimaMensagemRecebida: msg.timestamp },
       });
 
-      // Mídia recebida (se o gateway entregou o conteúdo — ver comentário em
-      // extrairConteudoMensagem no EvolutionProvider) sobe pro Storage antes
-      // de gravar a mensagem, guardando só o caminho, nunca uma URL pública.
+      // Mídia: o webhook da Evolution não traz o conteúdo por padrão. Se veio
+      // com base64, usa; senão, rebusca no gateway pela key da mensagem. Sobe
+      // pro Storage privado guardando só o caminho, nunca uma URL pública.
       let mediaPath: string | undefined;
-      if (msg.media?.base64) {
-        try {
-          const caminho = caminhoMedia(sessao.id, conversa.id, msg.media.mimeType, msg.media.filename);
-          await uploadMedia(caminho, Buffer.from(msg.media.base64, "base64"), msg.media.mimeType);
-          mediaPath = caminho;
-        } catch (err) {
-          waLogger.error("falha ao subir mídia recebida", { erro: err, sessionId: sessao.id, conversationId: conversa.id });
+      if (msg.media) {
+        let base64 = msg.media.base64;
+        let mimeType = msg.media.mimeType;
+        let filename = msg.media.filename;
+        if (!base64 && msg.providerMessageKey && provider.baixarMedia) {
+          const baixado = await provider.baixarMedia(instanceName!, msg.providerMessageKey);
+          if (baixado) {
+            base64 = baixado.base64;
+            mimeType = baixado.mimeType || mimeType;
+            filename = baixado.filename ?? filename;
+          }
+        }
+        if (base64) {
+          try {
+            const caminho = caminhoMedia(sessao.id, conversa.id, mimeType, filename);
+            await uploadMedia(caminho, Buffer.from(base64, "base64"), mimeType);
+            mediaPath = caminho;
+          } catch (err) {
+            waLogger.error("falha ao subir mídia recebida", { erro: err, sessionId: sessao.id, conversationId: conversa.id });
+          }
         }
       }
 
-      await prisma.whatsAppMensagem.create({
-        data: {
-          conversaId: conversa.id,
-          providerMessageId: msg.providerMessageId,
-          direcao: "entrada",
-          tipo: msg.tipo,
-          conteudo: msg.conteudo ?? "",
-          remetenteNome: msg.remetenteNome ?? null,
-          remetentePhone: msg.remetentePhone ?? null,
-          mediaUrl: mediaPath,
-          enviadaEm: msg.timestamp,
-          // ENTREGUE (não o default ENVIANDO) — o enum de status modela o
-          // ciclo de vida de envio, que não se aplica a mensagens recebidas.
-          status: "ENTREGUE",
-        },
-      });
+      try {
+        await prisma.whatsAppMensagem.create({
+          data: {
+            conversaId: conversa.id,
+            providerMessageId: msg.providerMessageId,
+            direcao: fromMe ? "saida" : "entrada",
+            tipo: msg.tipo,
+            conteudo: msg.conteudo ?? "",
+            remetenteNome: msg.remetenteNome ?? null,
+            remetentePhone: msg.remetentePhone ?? null,
+            mediaUrl: mediaPath,
+            enviadaEm: msg.timestamp,
+            // Recebida = ENTREGUE (o enum de status modela o ciclo de envio).
+            // Enviada pelo celular = LIDA (já saiu do aparelho, sem eco de status).
+            status: fromMe ? "LIDA" : "ENTREGUE",
+          },
+        });
+      } catch (err) {
+        // Corrida com o envio pelo CRM: mesma mensagem, providerMessageId
+        // único já gravado. Ignora e segue.
+        waLogger.error("mensagem duplicada ignorada", { erro: err, conversationId: conversa.id });
+        continue;
+      }
 
-      await emit("MessageReceived", { conversaId: conversa.id, sessaoId: sessao.id, fromPhone }, correlationId);
+      if (!fromMe) {
+        await emit("MessageReceived", { conversaId: conversa.id, sessaoId: sessao.id, fromPhone }, correlationId);
+      }
       await emit("ConversationUpdated", { conversaId: conversa.id }, correlationId);
     }
 

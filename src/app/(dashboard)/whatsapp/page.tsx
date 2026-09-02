@@ -548,8 +548,25 @@ function ListaConversas({
 
 // ── Área do chat ───────────────────────────────────────────────────────────
 
+const LABEL_MIDIA: Record<string, string> = {
+  imagem: "Foto",
+  video: "Vídeo",
+  audio: "Áudio",
+  documento: "Documento",
+};
+
 function BolhaMedia({ msg }: { msg: Mensagem }) {
-  if (!msg.mediaUrl) return null;
+  if (!msg.mediaUrl) {
+    if (LABEL_MIDIA[msg.tipo]) {
+      return (
+        <div className="flex items-center gap-2 bg-black/5 dark:bg-white/5 rounded-lg px-3 py-2 mb-1.5 text-sm text-muted-foreground">
+          <Paperclip className="w-4 h-4 shrink-0" />
+          <span>{LABEL_MIDIA[msg.tipo]} (não recuperado)</span>
+        </div>
+      );
+    }
+    return null;
+  }
   if (msg.tipo === "imagem") {
     // eslint-disable-next-line @next/next/no-img-element
     return <img src={msg.mediaUrl} alt={msg.conteudo || "Imagem"} className="rounded-lg max-w-full max-h-64 mb-1.5" />;

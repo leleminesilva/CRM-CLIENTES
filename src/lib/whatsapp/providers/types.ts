@@ -35,6 +35,10 @@ export interface NormalizedMessage {
   isGrupo?: boolean;
   remetentePhone?: string;
   remetenteNome?: string;
+  /** Mensagem enviada pelo próprio número (via CRM ou pelo celular). */
+  fromMe?: boolean;
+  /** `key` bruta da mensagem — usada pra rebuscar mídia sob demanda no gateway. */
+  providerMessageKey?: Record<string, unknown>;
 }
 
 export interface NormalizedReceipt {
@@ -74,4 +78,14 @@ export interface IWhatsAppProvider {
     payload: MensagemPayload
   ): Promise<{ providerMessageId: string }>;
   parseWebhook(rawBody: unknown): NormalizedWebhookEvent[];
+  /** Rebusca o conteúdo de uma mídia no gateway (quando o webhook não trouxe base64). */
+  baixarMedia?(
+    providerSessionId: string,
+    messageKey: Record<string, unknown>
+  ): Promise<{ base64: string; mimeType: string; filename?: string } | null>;
+  /** Metadados de um grupo (nome/assunto). */
+  infoGrupo?(
+    providerSessionId: string,
+    groupJid: string
+  ): Promise<{ subject?: string } | null>;
 }

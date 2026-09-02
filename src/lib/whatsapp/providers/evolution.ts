@@ -205,10 +205,10 @@ export class EvolutionProvider implements IWhatsAppProvider {
 
     if (event === "messages.upsert") {
       const key = data.key as Record<string, unknown> | undefined;
-      if (key?.fromMe) return []; // eco da própria mensagem enviada, já persistida no envio
       const message = data.message as Record<string, unknown> | undefined;
       const { tipo, conteudo, media } = extrairConteudoMensagem(message, data);
 
+      const fromMe = !!key?.fromMe;
       const remoteJid = (key?.remoteJid as string) ?? "";
       const isGrupo = remoteJid.endsWith("@g.us");
       // Em grupo, remoteJid é o id do grupo e key.participant é quem enviou.
@@ -229,10 +229,14 @@ export class EvolutionProvider implements IWhatsAppProvider {
             timestamp: new Date(Number(data.messageTimestamp ?? Date.now() / 1000) * 1000),
             contatoNome: isGrupo
               ? ((data.groupSubject as string | undefined) ?? undefined)
-              : (data.pushName as string | undefined),
+              : fromMe
+                ? undefined
+                : (data.pushName as string | undefined),
             isGrupo,
-            remetentePhone: isGrupo && participant ? participant.replace(/@.*/, "") : undefined,
-            remetenteNome: isGrupo ? (data.pushName as string | undefined) : undefined,
+            fromMe,
+            providerMessageKey: key,
+            remetentePhone: isGrupo && !fromMe && participant ? participant.replace(/@.*/, "") : undefined,
+            remetenteNome: isGrupo && !fromMe ? (data.pushName as string | undefined) : undefined,
           },
         },
       ];
@@ -269,5 +273,44 @@ export class EvolutionProvider implements IWhatsAppProvider {
     }
 
     return [];
+  }
+
+  // Rebusca a mídia no gateway quando o webhook chega sem base64 (Evolution
+  // não manda o conteúdo por padrão). Ver docs/architecture/whatsapp.md.
+  async baixarMedia(
+    providerSessionId: string,
+    messageKey: Record<string, unknown>
+  ): Promise<{ base64: string; mimeType: string; filename?: string } | null> {
+    try {
+      const res = await chamarComRetry(`/chat/getBase64FromMediaMessage/${providerSessionId}`, {
+        method: "POST",
+        body: JSON.stringify({ message: { key: messageKey }, convertToMp4: false }),
+      });
+      if (!res.ok) return null;
+      const data = (await res.json()) as Record<string, unknown>;
+      const base64 = (data.base64 as string) ?? undefined;
+      if (!base64) return null;
+      return {
+        base64,
+        mimeType: (data.mimetype as string) ?? (data.mimeType as string) ?? "application/octet-stream",
+        filename: (data.fileName as string) ?? (data.filename as string) ?? undefined,
+      };
+    } catch {
+      return null;
+    }
+  }
+
+  async infoGrupo(providerSessionId: string, groupJid: string): Promise<{ subject?: string } | null> {
+    try {
+      const res = await chamarComRetry(
+        `/group/findGroupInfos/${providerSessionId}?groupJid=${encodeURIComponent(groupJid)}`,
+        { method: "GET" }
+      );
+      if (!res.ok) return null;
+      const data = (await res.json()) as Record<string, unknown>;
+      return { subject: (data.subject as string) ?? undefined };
+    } catch {
+      return null;
+    }
   }
 }

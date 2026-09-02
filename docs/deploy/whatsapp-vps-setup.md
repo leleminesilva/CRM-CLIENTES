@@ -96,12 +96,14 @@ WEBHOOK_GLOBAL_URL=
 version: "3.8"
 services:
   evolution-api:
-    image: evoapicloud/evolution-api:v2.1.1   # namespace oficial atual (o antigo atendai/ está defasado); versão pinada de propósito
+    image: evoapicloud/evolution-api:v2.3.7   # v2.1.1 tinha Baileys velho demais: QR nunca gerava, loop silencioso de ChannelStartupService sem erro. v2.3.7 negocia a versão do WhatsApp Web sozinha.
     restart: always
     ports:
       - "127.0.0.1:8080:8080"   # só localhost — o Nginx é quem expõe pra internet
     environment:
       AUTHENTICATION_API_KEY: "${AUTHENTICATION_API_KEY}"
+      CONFIG_SESSION_PHONE_CLIENT: "Infinity Glass CRM"   # nome que aparece em "Aparelhos conectados" no celular
+      CONFIG_SESSION_PHONE_NAME: "Chrome"
       DATABASE_PROVIDER: "postgresql"
       DATABASE_CONNECTION_URI: "postgresql://evolution:${POSTGRES_PASSWORD}@postgres:5432/evolution?schema=public"
       DATABASE_CONNECTION_CLIENT_NAME: "evolution_crm"
@@ -146,6 +148,8 @@ docker compose ps          # confirma os 3 containers "Up"
 curl -s http://localhost:8080 | head   # deve responder um JSON de status, não "connection refused"
 docker compose logs -f evolution-api   # acompanhar o boot; Ctrl+C pra sair
 ```
+
+> **Webhook por evento (v2.3.x).** A Evolution v2.3.7 entrega o webhook global em `{WEBHOOK_GLOBAL_URL}/{evento-kebab}` (ex: `.../api/whatsapp/webhook/qrcode-updated`), **mesmo com `WEBHOOK_GLOBAL_WEBHOOK_BY_EVENTS: "false"`**. O corpo é idêntico ao do endpoint único (`event` em dot-notation, `data`, `instance`), então o CRM só ganhou um catch-all [`src/app/api/whatsapp/webhook/[...event]/route.ts`](../../src/app/api/whatsapp/webhook/[...event]/route.ts) que reaproveita o mesmo handler. Verificado contra a instância real em 2026-09-02: `qrcode.updated` → `data.qrcode.base64`, `connection.update` → `data.state` — casam com o `parseWebhook` sem mudança.
 
 > **Mídia (base64) — verificar na frente 3.** O CRM ([`src/lib/whatsapp/providers/evolution.ts`](../../src/lib/whatsapp/providers/evolution.ts), `extrairConteudoMensagem`) espera o conteúdo da mídia **decodificado em base64 dentro do payload do webhook**. No v2 atual isso não é mais um env global (`WEBHOOK_GLOBAL_WEBHOOK_BASE64` foi removido) — virou config **por instância**, definida no payload de `/instance/create` ou via `/webhook/set/{instance}`. Enquanto isso não estiver ligado, texto/status/QR funcionam normalmente e mensagens de mídia entram só com tipo + legenda (sem o arquivo). O ajuste é pequeno e fica pra frente 3, quando a instância real existir pra confirmar o shape exato do payload nessa versão — **não bloqueia** subir a VPS nem o teste de texto.
 

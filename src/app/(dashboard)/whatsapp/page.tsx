@@ -883,7 +883,7 @@ function WhatsAppContent() {
   const [conversa, setConversa] = useState<Conversa | null>(null);
   const [searchConversa, setSearchConversa] = useState("");
   const [modalAberto, setModalAberto] = useState(false);
-  const [painelConfig, setPainelConfig] = useState(false);
+  const [aba, setAba] = useState<"conversas" | "canais">("conversas");
   const [escopo, setEscopo] = useState<"todas" | "minhas">("todas");
   const queryClient = useQueryClient();
 
@@ -935,7 +935,7 @@ function WhatsAppContent() {
     if (match) {
       setSessaoId(match.sessaoId);
       setConversa(match);
-      setPainelConfig(false);
+      setAba("conversas");
     }
   }, [phoneParam, todasConversas]);
 
@@ -968,85 +968,96 @@ function WhatsAppContent() {
     );
   }
 
-  return (
-    <div className="h-full flex overflow-hidden rounded-xl border border-border bg-background shadow-sm -m-4 md:-m-6">
-      {/* Painel de sessões */}
-      <PainelSessoes
-        sessoes={sessoes}
-        selected={sessaoId}
-        onSelect={(id) => { setSessaoId(id); setConversa(null); setPainelConfig(false); }}
-        onAdd={() => setModalAberto(true)}
-        podeAdicionar={podeAdicionar}
-      />
+  const abaBtn = (id: "conversas" | "canais", label: string, extra?: React.ReactNode) => (
+    <button
+      onClick={() => { setAba(id); if (id === "canais") setConversa(null); }}
+      className={cn(
+        "px-3 py-1.5 rounded-md text-sm font-medium transition-colors flex items-center gap-1.5",
+        aba === id ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+      )}
+    >
+      {label}
+      {extra}
+    </button>
+  );
 
-      {/* Se não há sessões, mostra onboarding */}
-      {sessoes.length === 0 ? (
-        <div className="flex-1 flex flex-col items-center justify-center gap-4 p-8 text-center">
-          <div className="w-20 h-20 rounded-2xl bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
-            <MessageCircle className="w-10 h-10 text-green-600" />
-          </div>
-          <div>
-            <h2 className="text-xl font-semibold">Conecte um WhatsApp</h2>
-            <p className="text-muted-foreground mt-2 max-w-sm">
-              Crie uma sessão pra conectar um WhatsApp ao CRM via QR Code — sem migrar o número pra Meta.
-            </p>
-          </div>
-          {podeAdicionar && (
-            <Button onClick={() => setModalAberto(true)} className="bg-green-600 hover:bg-green-700 text-white gap-2">
-              <Plus className="w-4 h-4" />
-              Criar primeira sessão
-            </Button>
-          )}
-        </div>
-      ) : painelConfig ? (
-        <PainelConfig
+  return (
+    <div className="h-full flex flex-col overflow-hidden rounded-xl border border-border bg-background shadow-sm -m-4 md:-m-6">
+      {/* Navegação do módulo — Conversas | Canais (gestão de números) */}
+      <div className="flex items-center gap-1 px-2.5 h-11 border-b border-border bg-muted/40 shrink-0">
+        {abaBtn("conversas", "Conversas")}
+        {abaBtn(
+          "canais",
+          "Canais",
+          sessoes.length > 0 ? (
+            <span className="text-[11px] font-semibold rounded-full bg-muted px-1.5 leading-tight">{sessoes.length}</span>
+          ) : undefined
+        )}
+      </div>
+
+      <div className="flex-1 flex overflow-hidden">
+        {/* Rail de sessões */}
+        <PainelSessoes
           sessoes={sessoes}
-          onDelete={deletarSessao}
+          selected={sessaoId}
+          onSelect={(id) => { setSessaoId(id); setConversa(null); setAba("conversas"); }}
           onAdd={() => setModalAberto(true)}
           podeAdicionar={podeAdicionar}
-          podeVerTodas={podeVerTodas}
-          meuUserId={user?.id}
-          escopo={escopo}
-          onEscopoChange={setEscopo}
         />
-      ) : (
-        <>
-          {/* Lista de conversas — esconde no mobile quando chat está aberto */}
-          <div className={cn("flex flex-col border-r border-border", painelChat ? "hidden md:flex md:w-80" : "flex flex-1 md:flex-none md:w-80")}>
-            <ListaConversas
-              conversas={conversas}
-              sessao={sessaoAtual}
-              selectedId={conversa?.id ?? null}
-              onSelect={(c) => setConversa(c)}
-              search={searchConversa}
-              onSearchChange={setSearchConversa}
-            />
-          </div>
 
-          {/* Área do chat — esconde no mobile quando não há conversa */}
-          <div className={cn("flex-1 flex flex-col min-w-0", !painelChat && "hidden md:flex")}>
-            <AreaChat
-              conversa={conversa}
-              onBack={() => setConversa(null)}
-            />
+        {aba === "canais" ? (
+          <PainelConfig
+            sessoes={sessoes}
+            onDelete={deletarSessao}
+            onAdd={() => setModalAberto(true)}
+            podeAdicionar={podeAdicionar}
+            podeVerTodas={podeVerTodas}
+            meuUserId={user?.id}
+            escopo={escopo}
+            onEscopoChange={setEscopo}
+          />
+        ) : sessoes.length === 0 ? (
+          <div className="flex-1 flex flex-col items-center justify-center gap-4 p-8 text-center">
+            <div className="w-20 h-20 rounded-2xl bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
+              <MessageCircle className="w-10 h-10 text-green-600" />
+            </div>
+            <div>
+              <h2 className="text-xl font-semibold">Conecte um WhatsApp</h2>
+              <p className="text-muted-foreground mt-2 max-w-sm">
+                Crie uma sessão pra conectar um WhatsApp ao CRM via QR Code — sem migrar o número pra Meta.
+              </p>
+            </div>
+            {podeAdicionar && (
+              <Button onClick={() => setModalAberto(true)} className="bg-green-600 hover:bg-green-700 text-white gap-2">
+                <Plus className="w-4 h-4" />
+                Criar primeira sessão
+              </Button>
+            )}
           </div>
-        </>
-      )}
+        ) : (
+          <>
+            {/* Lista de conversas — esconde no mobile quando chat está aberto */}
+            <div className={cn("flex flex-col border-r border-border", painelChat ? "hidden md:flex md:w-80" : "flex flex-1 md:flex-none md:w-80")}>
+              <ListaConversas
+                conversas={conversas}
+                sessao={sessaoAtual}
+                selectedId={conversa?.id ?? null}
+                onSelect={(c) => setConversa(c)}
+                search={searchConversa}
+                onSearchChange={setSearchConversa}
+              />
+            </div>
 
-      {/* Botão de configurações — todo mundo com sessão pode abrir pra
-          gerenciar/remover a própria; Admin/Dev também têm o toggle Minhas/Todas. */}
-      {sessoes.length > 0 && (
-        <button
-          onClick={() => { setPainelConfig(!painelConfig); setConversa(null); }}
-          className={cn(
-            "absolute top-4 right-4 p-2 rounded-lg transition-colors",
-            painelConfig ? "bg-accent text-foreground" : "text-muted-foreground hover:text-foreground hover:bg-accent"
-          )}
-          title="Configurações"
-        >
-          <Settings className="w-4 h-4" />
-        </button>
-      )}
+            {/* Área do chat — esconde no mobile quando não há conversa */}
+            <div className={cn("flex-1 flex flex-col min-w-0", !painelChat && "hidden md:flex")}>
+              <AreaChat
+                conversa={conversa}
+                onBack={() => setConversa(null)}
+              />
+            </div>
+          </>
+        )}
+      </div>
 
       <ModalNovaSessao
         open={modalAberto}

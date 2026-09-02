@@ -433,8 +433,8 @@ function ListaConversas({
   });
 
   return (
-    <div className="w-full md:w-80 flex flex-col border-r border-border shrink-0">
-      <div className="h-14 flex items-center px-4 border-b border-border gap-2 bg-[#f0f2f5] dark:bg-[#202c33]">
+    <div className="w-full md:w-80 flex flex-col border-r border-border shrink-0 h-full min-h-0 overflow-hidden">
+      <div className="h-14 shrink-0 flex items-center px-4 border-b border-border gap-2 bg-[#f0f2f5] dark:bg-[#202c33]">
         <div className="flex-1 min-w-0">
           <p className="font-semibold text-sm truncate">{sessao?.nome ?? "Selecione uma sessão"}</p>
           {sessao?.numero && (
@@ -443,7 +443,7 @@ function ListaConversas({
         </div>
       </div>
 
-      <div className="p-2 border-b border-border bg-[#f0f2f5] dark:bg-[#202c33] space-y-2">
+      <div className="p-2 shrink-0 border-b border-border bg-[#f0f2f5] dark:bg-[#202c33] space-y-2">
         <div className="relative">
           <Search className="absolute left-3 top-2.5 w-4 h-4 text-muted-foreground" />
           <Input
@@ -471,7 +471,7 @@ function ListaConversas({
         </div>
       </div>
 
-      <ScrollArea className="flex-1">
+      <ScrollArea className="flex-1 min-h-0">
         {filtered.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-40 text-muted-foreground gap-2">
             <MessageCircle className="w-8 h-8 opacity-30" />
@@ -744,7 +744,7 @@ function AreaChat({
 
       {/* Mensagens */}
       <ScrollArea
-        className="flex-1 px-4 py-4 bg-[#efeae2] dark:bg-[#0b141a] [--wa-dot:rgba(0,0,0,0.06)] dark:[--wa-dot:rgba(255,255,255,0.04)]"
+        className="flex-1 min-h-0 px-4 py-4 bg-[#efeae2] dark:bg-[#0b141a] [--wa-dot:rgba(0,0,0,0.06)] dark:[--wa-dot:rgba(255,255,255,0.04)]"
         style={{ backgroundImage: "radial-gradient(circle, var(--wa-dot) 1px, transparent 1px)", backgroundSize: "22px 22px" }}
       >
         {isLoading ? (
@@ -2181,7 +2181,7 @@ function WhatsAppContent() {
   );
 
   return (
-    <div className="h-full flex flex-col overflow-hidden rounded-xl border border-border bg-background shadow-sm -m-4 md:-m-6">
+    <div className="h-[calc(100svh-4rem)] min-h-0 flex flex-col overflow-hidden rounded-xl border border-border bg-background shadow-sm -m-4 md:-m-6">
       {/* Navegação do módulo — Caixa de entrada | Quadro | Automações | Canais */}
       <div className="flex items-center gap-1 px-2.5 h-11 border-b border-border bg-muted/40 shrink-0">
         <div className="flex items-center gap-2 pl-1 pr-3 mr-1 border-r border-border shrink-0">
@@ -2202,7 +2202,7 @@ function WhatsAppContent() {
         )}
       </div>
 
-      <div className="flex-1 flex overflow-hidden">
+      <div className="flex-1 flex min-h-0 min-w-0 overflow-hidden">
         {/* Rail de sessões */}
         <PainelSessoes
           sessoes={sessoes}
@@ -2251,7 +2251,7 @@ function WhatsAppContent() {
         ) : (
           <>
             {/* Lista de conversas — esconde no mobile quando chat está aberto */}
-            <div className={cn("flex flex-col border-r border-border", painelChat ? "hidden md:flex md:w-80" : "flex flex-1 md:flex-none md:w-80")}>
+            <div className={cn("flex flex-col border-r border-border min-h-0 overflow-hidden", painelChat ? "hidden md:flex md:w-80" : "flex flex-1 md:flex-none md:w-80")}>
               <ListaConversas
                 conversas={conversas}
                 sessao={sessaoAtual}

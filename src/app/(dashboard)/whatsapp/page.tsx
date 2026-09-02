@@ -4,6 +4,12 @@ import { useState, useEffect, useRef, useCallback, useMemo, Suspense } from "rea
 import { useSearchParams, useRouter } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
+import {
+  DndContext, closestCenter, PointerSensor, useSensor, useSensors,
+  useDroppable, type DragEndEvent,
+} from "@dnd-kit/core";
+import { useSortable, SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { format, isToday, isYesterday } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import {
@@ -72,6 +78,7 @@ interface Conversa {
   agentEstado?: { estado: string } | null;
   cliente?: ClienteVinculado | null;
   status?: ConversaStatus;
+  etapa?: EtapaQuadro;
   responsavelId?: string | null;
   responsavel?: { id: string; nome: string } | null;
 }
@@ -92,6 +99,19 @@ const FILTROS_FILA: { id: FiltroFila; label: string }[] = [
   { id: "nao_atribuidas", label: "Não atribuídas" },
   { id: "pendentes", label: "Pendentes" },
   { id: "resolvidas", label: "Resolvidas" },
+];
+
+type EtapaQuadro =
+  | "NOVA" | "EM_ATENDIMENTO" | "AGUARDANDO_CLIENTE"
+  | "ORCAMENTO_ENVIADO" | "FECHADO" | "SEM_RETORNO";
+
+const ETAPAS_QUADRO: { id: EtapaQuadro; label: string; cor: string }[] = [
+  { id: "NOVA",               label: "Novas",              cor: "bg-slate-400" },
+  { id: "EM_ATENDIMENTO",     label: "Em atendimento",     cor: "bg-blue-500" },
+  { id: "AGUARDANDO_CLIENTE", label: "Aguardando cliente", cor: "bg-amber-500" },
+  { id: "ORCAMENTO_ENVIADO",  label: "Orçamento enviado",  cor: "bg-green-500" },
+  { id: "FECHADO",            label: "Fechado",            cor: "bg-emerald-600" },
+  { id: "SEM_RETORNO",        label: "Sem retorno",        cor: "bg-rose-500" },
 ];
 
 const BOT_ATIVO_ESTADOS = ["TRIAGEM", "COLETANDO", "AGUARDANDO_CONFIRMACAO"];
@@ -1138,6 +1158,149 @@ function PainelConfig({
   );
 }
 
+// ── Quadro (kanban de atendimento) ───────────────────────────────────────
+
+function KanbanCard({ c, onAbrir }: { c: Conversa; onAbrir: (c: Conversa) => void }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: c.id,
+    data: { etapa: (c.etapa ?? "NOVA") as EtapaQuadro },
+  });
+  const lastMsg = c.mensagens?.[0];
+  return (
+    <div
+      ref={setNodeRef}
+      style={{ transform: CSS.Translate.toString(transform), transition }}
+      className={cn(
+        "rounded-lg border border-border bg-card p-2.5 text-left cursor-grab active:cursor-grabbing",
+        isDragging && "opacity-50"
+      )}
+      {...attributes}
+      {...listeners}
+      onClick={() => !isDragging && onAbrir(c)}
+    >
+      <div className="flex items-start justify-between gap-2">
+        <p className="text-xs font-semibold leading-tight line-clamp-2">
+          {c.cliente?.nome ?? c.contatoNome ?? formatPhone(c.contatoPhone)}
+        </p>
+        {c.naoLidas > 0 && <span className="w-2 h-2 rounded-full bg-green-500 shrink-0 mt-1" />}
+      </div>
+      {lastMsg?.conteudo && (
+        <p className="text-[11px] text-muted-foreground mt-1 line-clamp-1">{lastMsg.conteudo}</p>
+      )}
+      <div className="flex items-center gap-2 mt-2">
+        {c.responsavel ? (
+          <span className="w-4 h-4 rounded-full bg-blue-500 text-white text-[8px] font-bold flex items-center justify-center">
+            {getInitials(c.responsavel.nome)}
+          </span>
+        ) : (
+          <span className="w-4 h-4 rounded-full border border-dashed border-muted-foreground/50" />
+        )}
+        {c.status && c.status !== "ABERTA" && (
+          <span className={cn("text-[9px] font-semibold", STATUS_COR[c.status])}>{STATUS_LABEL[c.status]}</span>
+        )}
+        <span className="ml-auto text-[10px] text-muted-foreground">{c.ultimaMsgEm ? formatTime(c.ultimaMsgEm) : ""}</span>
+      </div>
+    </div>
+  );
+}
+
+function KanbanColuna({
+  etapa, label, cor, conversas, onAbrir,
+}: {
+  etapa: EtapaQuadro; label: string; cor: string; conversas: Conversa[]; onAbrir: (c: Conversa) => void;
+}) {
+  const { setNodeRef, isOver } = useDroppable({ id: etapa, data: { etapa } });
+  return (
+    <div className="w-64 shrink-0 flex flex-col rounded-xl border border-border bg-muted/30 max-h-full">
+      <div className="px-3 py-2.5 border-b border-border/60 flex items-center gap-2">
+        <span className={cn("w-2 h-2 rounded-full", cor)} />
+        <span className="text-xs font-bold">{label}</span>
+        <span className="ml-auto text-[11px] font-semibold text-muted-foreground bg-background rounded-full px-1.5">
+          {conversas.length}
+        </span>
+      </div>
+      <div
+        ref={setNodeRef}
+        className={cn("flex-1 overflow-y-auto p-2 flex flex-col gap-2 min-h-[60px]", isOver && "bg-green-500/5")}
+      >
+        <SortableContext items={conversas.map((c) => c.id)} strategy={verticalListSortingStrategy}>
+          {conversas.map((c) => (
+            <KanbanCard key={c.id} c={c} onAbrir={onAbrir} />
+          ))}
+        </SortableContext>
+      </div>
+    </div>
+  );
+}
+
+function QuadroKanban({
+  sessaoId, onAbrir,
+}: {
+  sessaoId: string | null; onAbrir: (c: Conversa) => void;
+}) {
+  const queryClient = useQueryClient();
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
+
+  const { data: conversas = [] } = useQuery({
+    queryKey: ["wa-quadro", sessaoId],
+    queryFn: async () => {
+      const qs = sessaoId ? `?sessaoId=${sessaoId}` : "";
+      const { data } = await axios.get(`/api/whatsapp/conversas${qs}`);
+      return data as Conversa[];
+    },
+    enabled: !!sessaoId,
+    refetchInterval: 8000,
+  });
+
+  const mover = useMutation({
+    mutationFn: ({ id, etapa }: { id: string; etapa: EtapaQuadro }) =>
+      axios.patch(`/api/whatsapp/conversas/${id}`, { etapa }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["wa-quadro"] });
+      queryClient.invalidateQueries({ queryKey: ["wa-conversas"] });
+    },
+    onError: () => toast.error("Erro ao mover a conversa"),
+  });
+
+  const porEtapa = (e: EtapaQuadro) => conversas.filter((c) => (c.etapa ?? "NOVA") === e);
+  const naoAtribuidas = conversas.filter((c) => !c.responsavelId).length;
+
+  function onDragEnd(evt: DragEndEvent) {
+    const { active, over } = evt;
+    if (!over) return;
+    const de = (active.data.current as { etapa?: EtapaQuadro })?.etapa;
+    const para = ((over.data.current as { etapa?: EtapaQuadro })?.etapa ?? over.id) as EtapaQuadro;
+    if (de !== para && ETAPAS_QUADRO.some((x) => x.id === para)) {
+      mover.mutate({ id: active.id as string, etapa: para });
+    }
+  }
+
+  return (
+    <div className="flex-1 flex flex-col min-w-0 p-4 gap-3 overflow-hidden">
+      <div className="flex items-baseline gap-3">
+        <h2 className="text-base font-bold">Quadro de atendimento</h2>
+        <span className="text-xs text-muted-foreground">
+          {conversas.length} conversas · {naoAtribuidas} sem responsável
+        </span>
+      </div>
+      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
+        <div className="flex-1 flex gap-3 overflow-x-auto pb-2">
+          {ETAPAS_QUADRO.map((col) => (
+            <KanbanColuna
+              key={col.id}
+              etapa={col.id}
+              label={col.label}
+              cor={col.cor}
+              conversas={porEtapa(col.id)}
+              onAbrir={onAbrir}
+            />
+          ))}
+        </div>
+      </DndContext>
+    </div>
+  );
+}
+
 // ── Página principal ───────────────────────────────────────────────────────
 
 function WhatsAppContent() {
@@ -1153,7 +1316,7 @@ function WhatsAppContent() {
   const [conversa, setConversa] = useState<Conversa | null>(null);
   const [searchConversa, setSearchConversa] = useState("");
   const [modalAberto, setModalAberto] = useState(false);
-  const [aba, setAba] = useState<"conversas" | "canais">("conversas");
+  const [aba, setAba] = useState<"conversas" | "quadro" | "canais">("conversas");
   const [escopo, setEscopo] = useState<"todas" | "minhas">("todas");
   const [filtro, setFiltro] = useState<FiltroFila>("todas");
   const queryClient = useQueryClient();
@@ -1241,9 +1404,9 @@ function WhatsAppContent() {
     );
   }
 
-  const abaBtn = (id: "conversas" | "canais", label: string, extra?: React.ReactNode) => (
+  const abaBtn = (id: "conversas" | "quadro" | "canais", label: string, extra?: React.ReactNode) => (
     <button
-      onClick={() => { setAba(id); if (id === "canais") setConversa(null); }}
+      onClick={() => { setAba(id); if (id !== "conversas") setConversa(null); }}
       className={cn(
         "px-3 py-1.5 rounded-md text-sm font-medium transition-colors flex items-center gap-1.5",
         aba === id ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
@@ -1259,6 +1422,7 @@ function WhatsAppContent() {
       {/* Navegação do módulo — Conversas | Canais (gestão de números) */}
       <div className="flex items-center gap-1 px-2.5 h-11 border-b border-border bg-muted/40 shrink-0">
         {abaBtn("conversas", "Conversas")}
+        {sessoes.length > 0 && abaBtn("quadro", "Quadro")}
         {abaBtn(
           "canais",
           "Canais",
@@ -1288,6 +1452,11 @@ function WhatsAppContent() {
             meuUserId={user?.id}
             escopo={escopo}
             onEscopoChange={setEscopo}
+          />
+        ) : aba === "quadro" && sessoes.length > 0 ? (
+          <QuadroKanban
+            sessaoId={sessaoId}
+            onAbrir={(c) => { setSessaoId(c.sessaoId); setConversa(c); setAba("conversas"); }}
           />
         ) : sessoes.length === 0 ? (
           <div className="flex-1 flex flex-col items-center justify-center gap-4 p-8 text-center">

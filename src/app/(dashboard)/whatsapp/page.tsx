@@ -35,6 +35,7 @@ interface Sessao {
   status: "ONLINE" | "OFFLINE" | "RECONNECTING" | "WAITING_QR" | "ERROR" | "UNKNOWN";
   healthStatus: "HEALTHY" | "STALE" | "UNKNOWN";
   ativo: boolean;
+  atendenteId: string | null;
   atendente: { id: string; nome: string } | null;
 }
 
@@ -239,13 +240,13 @@ function PainelSessoes({
   selected,
   onSelect,
   onAdd,
-  isAdmin,
+  podeAdicionar,
 }: {
   sessoes: Sessao[];
   selected: string | null;
   onSelect: (id: string) => void;
   onAdd: () => void;
-  isAdmin: boolean;
+  podeAdicionar: boolean;
 }) {
   return (
     <div className="w-16 md:w-20 flex flex-col bg-sidebar border-r border-border shrink-0">
@@ -272,7 +273,7 @@ function PainelSessoes({
           ))}
         </div>
       </ScrollArea>
-      {isAdmin && (
+      {podeAdicionar && (
         <div className="p-2 border-t border-border flex flex-col items-center gap-1">
           <Button size="icon" variant="ghost" className="w-10 h-10 rounded-xl" onClick={onAdd} title="Nova sessão">
             <Plus className="w-4 h-4" />
@@ -685,11 +686,11 @@ interface LogSessao {
 
 function LinhaSessao({
   sessao,
-  isAdmin,
+  podeGerenciar,
   onDelete,
 }: {
   sessao: Sessao;
-  isAdmin: boolean;
+  podeGerenciar: boolean;
   onDelete: (id: string) => void;
 }) {
   const [logsAbertos, setLogsAbertos] = useState(false);
@@ -753,7 +754,7 @@ function LinhaSessao({
             </Badge>
           )}
         </div>
-        {isAdmin && (
+        {podeGerenciar && (
           <div className="flex items-center gap-1 shrink-0">
             <Button size="icon" variant="ghost" className="w-8 h-8" title="Reiniciar" onClick={() => reiniciar.mutate()} disabled={reiniciar.isPending}>
               <RefreshCw className={cn("w-4 h-4", reiniciar.isPending && "animate-spin")} />
@@ -802,12 +803,20 @@ function PainelConfig({
   sessoes,
   onDelete,
   onAdd,
-  isAdmin,
+  podeAdicionar,
+  podeVerTodas,
+  meuUserId,
+  escopo,
+  onEscopoChange,
 }: {
   sessoes: Sessao[];
   onDelete: (id: string) => void;
   onAdd: () => void;
-  isAdmin: boolean;
+  podeAdicionar: boolean;
+  podeVerTodas: boolean;
+  meuUserId: string | undefined;
+  escopo: "todas" | "minhas";
+  onEscopoChange: (v: "todas" | "minhas") => void;
 }) {
   return (
     <div className="flex-1 flex flex-col p-6 gap-6 overflow-auto">
@@ -821,12 +830,34 @@ function PainelConfig({
         </p>
       </div>
 
+      {podeVerTodas && (
+        <div className="inline-flex rounded-lg border border-border p-0.5 text-sm w-fit">
+          {(["todas", "minhas"] as const).map((op) => (
+            <button
+              key={op}
+              onClick={() => onEscopoChange(op)}
+              className={cn(
+                "px-3 py-1 rounded-md transition-colors capitalize",
+                escopo === op ? "bg-accent text-foreground font-medium" : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              {op === "todas" ? "Todas" : "Minhas"}
+            </button>
+          ))}
+        </div>
+      )}
+
       <div className="space-y-3 max-w-xl">
         {sessoes.map((s) => (
-          <LinhaSessao key={s.id} sessao={s} isAdmin={isAdmin} onDelete={onDelete} />
+          <LinhaSessao
+            key={s.id}
+            sessao={s}
+            podeGerenciar={podeVerTodas || s.atendenteId === meuUserId}
+            onDelete={onDelete}
+          />
         ))}
 
-        {isAdmin && (
+        {podeAdicionar && (
           <Button variant="outline" className="w-full" onClick={onAdd}>
             <Plus className="w-4 h-4 mr-2" />
             Nova sessão
@@ -843,26 +874,29 @@ function WhatsAppContent() {
   const { user } = useAuth();
   const searchParams = useSearchParams();
   const phoneParam = useMemo(() => searchParams.get("phone"), [searchParams]);
-  // Fase 1: módulo restrito só a Desenvolvedor (ver src/lib/rbac.ts e
-  // docs/architecture/whatsapp.md) — o escopo por atendenteId pra outros
-  // cargos já está pronto no backend, só dormente até ser liberado.
-  const isAdmin = user?.role === "DESENVOLVEDOR";
+  // Admin e Dev gerenciam qualquer sessão e têm o toggle "Minhas / Todas".
+  // Os demais cargos (Gestor, Comercial, Operacional) só veem/gerenciam a
+  // própria — 1 por pessoa. Ver src/lib/rbac.ts e docs/architecture/whatsapp.md.
+  const podeVerTodas = user?.role === "DESENVOLVEDOR" || user?.role === "ADMINISTRADOR";
 
   const [sessaoId, setSessaoId] = useState<string | null>(null);
   const [conversa, setConversa] = useState<Conversa | null>(null);
   const [searchConversa, setSearchConversa] = useState("");
   const [modalAberto, setModalAberto] = useState(false);
   const [painelConfig, setPainelConfig] = useState(false);
+  const [escopo, setEscopo] = useState<"todas" | "minhas">("todas");
   const queryClient = useQueryClient();
 
   const { data: sessoes = [] } = useQuery({
-    queryKey: ["wa-sessoes"],
+    queryKey: ["wa-sessoes", escopo],
     queryFn: async () => {
-      const { data } = await axios.get("/api/whatsapp/sessoes");
+      const { data } = await axios.get(`/api/whatsapp/sessoes?escopo=${escopo}`);
       return data as Sessao[];
     },
-    enabled: isAdmin,
+    enabled: !!user,
   });
+
+  const podeAdicionar = podeVerTodas || sessoes.length === 0;
 
   const { data: conversas = [] } = useQuery({
     queryKey: ["wa-conversas", sessaoId],
@@ -934,20 +968,6 @@ function WhatsAppContent() {
     );
   }
 
-  if (user && !isAdmin) {
-    return (
-      <div className="flex flex-col items-center justify-center h-full gap-4 text-center">
-        <MessageCircle className="w-16 h-16 text-muted-foreground opacity-30" />
-        <div>
-          <h2 className="text-xl font-semibold">Acesso restrito</h2>
-          <p className="text-muted-foreground mt-1 text-sm">
-            O módulo WhatsApp está em validação e disponível apenas para Desenvolvedor por enquanto.
-          </p>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="h-full flex overflow-hidden rounded-xl border border-border bg-background shadow-sm -m-4 md:-m-6">
       {/* Painel de sessões */}
@@ -956,7 +976,7 @@ function WhatsAppContent() {
         selected={sessaoId}
         onSelect={(id) => { setSessaoId(id); setConversa(null); setPainelConfig(false); }}
         onAdd={() => setModalAberto(true)}
-        isAdmin={isAdmin}
+        podeAdicionar={podeAdicionar}
       />
 
       {/* Se não há sessões, mostra onboarding */}
@@ -971,7 +991,7 @@ function WhatsAppContent() {
               Crie uma sessão pra conectar um WhatsApp ao CRM via QR Code — sem migrar o número pra Meta.
             </p>
           </div>
-          {isAdmin && (
+          {podeAdicionar && (
             <Button onClick={() => setModalAberto(true)} className="bg-green-600 hover:bg-green-700 text-white gap-2">
               <Plus className="w-4 h-4" />
               Criar primeira sessão
@@ -983,7 +1003,11 @@ function WhatsAppContent() {
           sessoes={sessoes}
           onDelete={deletarSessao}
           onAdd={() => setModalAberto(true)}
-          isAdmin={isAdmin}
+          podeAdicionar={podeAdicionar}
+          podeVerTodas={podeVerTodas}
+          meuUserId={user?.id}
+          escopo={escopo}
+          onEscopoChange={setEscopo}
         />
       ) : (
         <>
@@ -1009,8 +1033,9 @@ function WhatsAppContent() {
         </>
       )}
 
-      {/* Botão de configurações */}
-      {sessoes.length > 0 && isAdmin && (
+      {/* Botão de configurações — todo mundo com sessão pode abrir pra
+          gerenciar/remover a própria; Admin/Dev também têm o toggle Minhas/Todas. */}
+      {sessoes.length > 0 && (
         <button
           onClick={() => { setPainelConfig(!painelConfig); setConversa(null); }}
           className={cn(

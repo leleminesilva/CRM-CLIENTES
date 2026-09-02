@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
 import { hasPermission } from "@/lib/rbac";
-import { WhatsAppService } from "@/lib/whatsapp/service";
+import { WhatsAppService, LimiteSessaoError } from "@/lib/whatsapp/service";
 
 export const dynamic = "force-dynamic";
 
@@ -16,14 +16,18 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Sem permissão" }, { status: 403 });
   }
 
-  const sessoes = await WhatsAppService.listarSessoes(payload);
+  // escopo=todas só tem efeito pra Admin/Dev (o service reforça); os demais
+  // sempre recebem só as próprias.
+  const escopo =
+    request.nextUrl.searchParams.get("escopo") === "todas" ? "todas" : "minhas";
+  const sessoes = await WhatsAppService.listarSessoes(payload, escopo);
   return NextResponse.json(sessoes);
 }
 
 export async function POST(request: NextRequest) {
   const payload = await getCurrentUser(request);
   if (!payload) return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
-  if (!hasPermission(payload.role, "whatsapp:manage_sessoes")) {
+  if (!hasPermission(payload.role, "whatsapp:use")) {
     return NextResponse.json({ error: "Sem permissão" }, { status: 403 });
   }
 
@@ -32,9 +36,13 @@ export async function POST(request: NextRequest) {
   if (!nome) return NextResponse.json({ error: "Nome é obrigatório" }, { status: 400 });
 
   try {
-    const sessao = await WhatsAppService.criarSessao(nome, atendenteId ?? null);
+    // cargo comum: o service ignora atendenteId e força o próprio usuário.
+    const sessao = await WhatsAppService.criarSessao(payload, nome, atendenteId ?? null);
     return NextResponse.json(sessao, { status: 201 });
   } catch (error) {
+    if (error instanceof LimiteSessaoError) {
+      return NextResponse.json({ error: error.message }, { status: 409 });
+    }
     console.error("[WA Sessoes]", error);
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Erro ao criar sessão" },

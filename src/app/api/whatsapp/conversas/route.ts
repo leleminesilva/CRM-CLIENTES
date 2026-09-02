@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
-import { hasPermission, canViewAll } from "@/lib/rbac";
+import { hasPermission, isAdmin } from "@/lib/rbac";
 import prisma from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
   const conversas = await prisma.whatsAppConversa.findMany({
     where: {
       ...(sessaoId ? { sessaoId } : {}),
-      ...(canViewAll(payload.role) ? {} : { sessao: { atendenteId: payload.userId } }),
+      ...(isAdmin(payload.role) ? {} : { sessao: { atendenteId: payload.userId } }),
     },
     orderBy: { ultimaMsgEm: "desc" },
     include: {

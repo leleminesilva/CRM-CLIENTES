@@ -1,5 +1,5 @@
 import prisma from "@/lib/prisma";
-import { canViewAll } from "@/lib/rbac";
+import { isAdmin } from "@/lib/rbac";
 import type { JWTPayload } from "@/types";
 import { SessionManager, calcularHealthStatus, type HealthStatus } from "./session-manager";
 import { waLogger } from "./logger";
@@ -34,16 +34,22 @@ const SELECT_SESSAO_SEGURO = {
   atendente: { select: { id: true, nome: true } },
 } as const;
 
+// "Ver/gerenciar tudo" no WhatsApp é só Admin e Dev — Gestor NÃO (diferente do
+// canViewAll genérico do resto do CRM). Ver docs/architecture/whatsapp.md.
 function semPosse(sessao: Pick<WhatsAppSessao, "atendenteId">, payload: JWTPayload): boolean {
-  return !canViewAll(payload.role) && sessao.atendenteId !== payload.userId;
+  return !isAdmin(payload.role) && sessao.atendenteId !== payload.userId;
 }
 
 export const WhatsAppService = {
-  async listarSessoes(payload: JWTPayload): Promise<SessaoComHealth[]> {
+  async listarSessoes(
+    payload: JWTPayload,
+    escopo: "minhas" | "todas" = "minhas"
+  ): Promise<SessaoComHealth[]> {
+    const verTodas = escopo === "todas" && isAdmin(payload.role);
     const sessoes = await prisma.whatsAppSessao.findMany({
       where: {
         ativo: true,
-        ...(canViewAll(payload.role) ? {} : { atendenteId: payload.userId }),
+        ...(verTodas ? {} : { atendenteId: payload.userId }),
       },
       select: SELECT_SESSAO_SEGURO,
       orderBy: { createdAt: "asc" },
@@ -51,8 +57,21 @@ export const WhatsAppService = {
     return sessoes.map((s) => ({ ...s, healthStatus: calcularHealthStatus(s) })) as SessaoComHealth[];
   },
 
-  async criarSessao(nome: string, atendenteId: string | null): Promise<WhatsAppSessao> {
-    waLogger.info("criando sessão", { sessionId: undefined });
+  async criarSessao(
+    payload: JWTPayload,
+    nome: string,
+    atendenteIdSolicitado: string | null
+  ): Promise<WhatsAppSessao> {
+    const admin = isAdmin(payload.role);
+    // Cargo comum só cria a PRÓPRIA sessão, e no máximo uma ativa.
+    const atendenteId = admin ? atendenteIdSolicitado ?? null : payload.userId;
+    if (!admin) {
+      const jaTem = await prisma.whatsAppSessao.count({
+        where: { ativo: true, atendenteId: payload.userId },
+      });
+      if (jaTem > 0) throw new LimiteSessaoError();
+    }
+    waLogger.info("criando sessão", { sessionId: undefined, userId: payload.userId });
     return SessionManager.criar(nome, atendenteId);
   },
 
@@ -77,9 +96,11 @@ export const WhatsAppService = {
     await SessionManager.reiniciar(sessaoId);
   },
 
-  async excluirSessao(sessaoId: string): Promise<void> {
-    // Só quem tem whatsapp:manage_sessoes chega aqui (checado no controller) —
-    // gestão de sessão não é uma operação de posse do atendente.
+  async excluirSessao(sessaoId: string, payload: JWTPayload): Promise<void> {
+    // Dono exclui a própria; Admin/Dev excluem qualquer uma. Remove a
+    // instância no gateway (Evolution) e faz soft-delete no CRM.
+    const sessao = await prisma.whatsAppSessao.findUniqueOrThrow({ where: { id: sessaoId } });
+    if (semPosse(sessao, payload)) throw new PosseError();
     await SessionManager.excluir(sessaoId);
   },
 
@@ -102,5 +123,12 @@ export class PosseError extends Error {
   constructor() {
     super("Você não tem acesso a esta sessão");
     this.name = "PosseError";
+  }
+}
+
+export class LimiteSessaoError extends Error {
+  constructor() {
+    super("Você já tem uma sessão de WhatsApp. Remova a atual antes de criar outra.");
+    this.name = "LimiteSessaoError";
   }
 }

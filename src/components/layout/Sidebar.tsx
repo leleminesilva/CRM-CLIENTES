@@ -30,7 +30,7 @@ const navItems: { href: string; label: string; icon: React.ElementType; roles?: 
   { href: "/tarefas",    label: "Tarefas",    icon: CheckSquare },
   { href: "/agenda",     label: "Agenda",     icon: Calendar },
   { href: "/chat",       label: "Chat",       icon: MessageSquare },
-  { href: "/whatsapp",   label: "WhatsApp",   icon: MessageCircle, roles: ["DESENVOLVEDOR"] },
+  { href: "/whatsapp",   label: "WhatsApp",   icon: MessageCircle },
   { href: "/pesquisa",   label: "Pesquisa",   icon: Search },
 ];
 

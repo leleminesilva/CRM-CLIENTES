@@ -318,13 +318,16 @@ Duas requisições concorrentes (ex: `restart` e `disconnect` chegando quase jun
 
 ## Como funciona o RBAC
 
-Duas permissões em `src/lib/rbac.ts`: `whatsapp:manage_sessoes` (criar/conectar/desconectar/reiniciar/excluir sessão, reatribuir atendente) e `whatsapp:use` (ver/usar a própria sessão).
+Duas permissões em `src/lib/rbac.ts`: `whatsapp:manage_sessoes` (reatribuir atendente — só via PATCH) e `whatsapp:use` (acessar o módulo, criar/conectar/desconectar/reiniciar/**excluir a própria sessão**, ver/usar as próprias conversas).
 
-**Estado atual (deliberado)**: só o cargo `DESENVOLVEDOR` tem as duas permissões — nem `ADMINISTRADOR`, mesmo os dois tendo o mesmo conjunto de permissões em todo o resto do sistema. É uma restrição temporária enquanto o módulo está em validação.
+**Estado atual** (aberto em 2026-09-02, módulo validado em produção):
+- `whatsapp:use` → **todos os cargos** (Admin, Dev, Gestor, Comercial, Operacional).
+- `whatsapp:manage_sessoes` → só **Admin e Dev** (via `ADMIN_PERMISSIONS`).
+- **Ver/gerenciar tudo** = `isAdmin(role)` (só `ADMINISTRADOR` e `DESENVOLVEDOR`) — deliberadamente **diferente** do `canViewAll` genérico do resto do CRM, que inclui `GESTOR`. No WhatsApp, Gestor vê só a própria sessão, igual Comercial/Operacional.
+- **Autoatendimento**: cada cargo comum cria a **própria** sessão (o service ignora `atendenteId` do request e força `payload.userId`), no máximo **1 ativa** por pessoa (`LimiteSessaoError` → `409`). Pode excluir a própria a qualquer momento (número errado, troca de aparelho) — a rota `DELETE /sessoes/[id]` agora exige só `whatsapp:use` + checagem de posse no service (`PosseError` → `403`).
+- **UI** (`whatsapp/page.tsx`): `podeVerTodas` = `DESENVOLVEDOR || ADMINISTRADOR` habilita o toggle **"Minhas / Todas"** (no painel de configuração, ícone de engrenagem), começando em "Todas". A listagem manda `?escopo=todas|minhas`; o service reforça que `todas` só vale pra `isAdmin`.
 
-O escopo por dono está implementado em toda rota que expõe dado de sessão/conversa/mensagem: `canViewAll(role)` (Admin/Dev/Gestor veem tudo) + comparação `sessao.atendenteId === payload.userId` (Comercial/Operacional veriam só a própria sessão). `conversas` (lista e detalhe) e `enviar` — que no código antigo baseado em Meta não tinham checagem nenhuma além de estar logado — agora exigem `whatsapp:use` e checam posse, com `403` direto (não `requirePermission`, que cai em 500 no catch genérico dessas rotas).
-
-Hoje isso é **funcionalmente dormente** só porque `whatsapp:use` está restrito a `DESENVOLVEDOR`, que é `canViewAll` — ou seja, todo Desenvolvedor já vê tudo, então a checagem de posse nunca é o fator decisivo na prática ainda. Validado de verdade concedendo `whatsapp:use` a um cargo não-`canViewAll` temporariamente em ambiente local (nunca commitado) e confirmando: usuário só vê a própria conversa na listagem, recebe `403` ao tentar abrir ou enviar mensagem em conversa alheia por ID direto. Pra abrir o módulo pra mais gente de verdade no futuro, basta adicionar as permissões aos arrays dos outros cargos em `rbac.ts` — nenhuma rota muda, o escopo já está pronto e testado.
+Escopo por dono nas rotas de conversa/mensagem: `isAdmin(role) ? {} : { sessao: { atendenteId: payload.userId } }` em `conversas` (lista e detalhe) e `enviar`, com `403` direto (não `requirePermission`, que cai em 500 no catch genérico dessas rotas).
 
 **Auditoria de credenciais** (Fase 4): confirmado que `EVOLUTION_API_KEY` só é lida dentro de `providers/evolution.ts`, nunca armazenada em coluna de banco (diferente do modelo antigo da Meta, que guardava `accessToken` direto em `WhatsAppInstancia`) — não existe campo de credencial em `WhatsAppSessao` pra vazar. `supabaseAdmin` (service role do Supabase) só é importado em código server-side (`realtime.ts`, `media.ts`, rotas de API); o frontend usa exclusivamente o client anônimo `supabase`.
 
@@ -382,7 +385,7 @@ Toda operação do módulo loga com um conjunto padrão de campos (quando dispon
 | QR Code nunca persistido no banco | É um dado efêmero (dura segundos, não é histórico) — persistir seria gravação desnecessária. O gateway já mantém esse estado enquanto a sessão está aguardando conexão; o CRM só repassa. |
 | Supabase Realtime em vez de polling ou WebSocket próprio | Vercel (onde o CRM roda) não sustenta um servidor WebSocket persistente em funções serverless. Supabase Realtime já faz parte do stack (mesmo projeto do Postgres) — zero infraestrutura nova. |
 | Retry com backoff + timeout fixo no envio | Problemas temporários de rede acontecem; retry absorve isso sem exigir reenvio manual. Timeout evita requisição presa indefinidamente. |
-| Acesso restrito só a `DESENVOLVEDOR` por enquanto | Feature nova, ainda não validada em produção com dado real. O desenho de escopo por funcionário (`atendenteId` + `canViewAll`) já está pronto no código, só dormente — abrir pra mais cargos depois é mudança de configuração, não de arquitetura. |
+| Módulo aberto a todos os cargos com autoatendimento (2026-09-02) | Validado em produção. Cada cargo comum gerencia a própria sessão (1 por pessoa); só Admin/Dev veem/gerenciam todas. "Ver tudo" no WhatsApp usa `isAdmin(role)`, não `canViewAll` (Gestor fica de fora de propósito — no WhatsApp ele é um atendente como outro qualquer). O `NEXT_PUBLIC_WHATSAPP_STANDBY` continua sendo o disjuntor geral acima de tudo. |
 | `WhatsAppConversa.sessao` com `onDelete: Restrict` (não `Cascade`) | Achado durante a Fase 1: o schema tinha herdado `Cascade` do modelo Meta antigo — excluir uma sessão apagaria todo o histórico de conversas junto, o oposto do que essa arquitetura existe pra garantir. "Excluir sessão" é soft-delete (`WhatsAppSessao.ativo = false`); o `Restrict` é uma rede de segurança contra um DELETE direto acidental. |
 
 ## Fora de escopo (arquitetura)

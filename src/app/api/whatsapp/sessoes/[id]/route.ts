@@ -1,21 +1,26 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
 import { hasPermission } from "@/lib/rbac";
-import { WhatsAppService } from "@/lib/whatsapp/service";
+import { WhatsAppService, PosseError } from "@/lib/whatsapp/service";
 
 export const dynamic = "force-dynamic";
 
 export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
   const payload = await getCurrentUser(request);
   if (!payload) return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
-  if (!hasPermission(payload.role, "whatsapp:manage_sessoes")) {
+  // Dono pode remover a própria sessão (número errado, trocar de aparelho…);
+  // Admin/Dev removem qualquer uma. A checagem de posse é no service.
+  if (!hasPermission(payload.role, "whatsapp:use")) {
     return NextResponse.json({ error: "Sem permissão" }, { status: 403 });
   }
 
   try {
-    await WhatsAppService.excluirSessao(params.id);
+    await WhatsAppService.excluirSessao(params.id, payload);
     return NextResponse.json({ ok: true });
   } catch (error) {
+    if (error instanceof PosseError) {
+      return NextResponse.json({ error: error.message }, { status: 403 });
+    }
     console.error("[WA Sessoes]", error);
     return NextResponse.json({ error: "Erro ao remover sessão" }, { status: 500 });
   }

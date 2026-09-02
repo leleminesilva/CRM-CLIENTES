@@ -96,14 +96,17 @@ const ADMIN_PERMISSIONS: Permission[] = [
   "auditoria:view",
   "configuracoes:view",
   "configuracoes:update",
+  // WhatsApp: Admin e Dev gerenciam qualquer sessão e enxergam as de todos
+  // (toggle "Minhas/Todas" na UI). Os demais cargos têm só `whatsapp:use` —
+  // criam/conectam/excluem a PRÓPRIA sessão (1 por pessoa) e só veem a sua.
+  // Ver docs/architecture/whatsapp.md ("Como funciona o RBAC").
+  "whatsapp:manage_sessoes",
+  "whatsapp:use",
 ];
 
 const PERMISSIONS: Record<Role, Permission[]> = {
   ADMINISTRADOR: ADMIN_PERMISSIONS,
-  // WhatsApp (gateway self-hosted) fica restrito só a Desenvolvedor por
-  // enquanto, deliberadamente à parte de ADMIN_PERMISSIONS — feature nova,
-  // ainda não validada em produção. Ver docs/architecture/whatsapp.md.
-  DESENVOLVEDOR: [...ADMIN_PERMISSIONS, "whatsapp:manage_sessoes", "whatsapp:use"],
+  DESENVOLVEDOR: ADMIN_PERMISSIONS,
   GESTOR: [
     "dashboard:view",
     "dashboard:view_all",
@@ -138,6 +141,7 @@ const PERMISSIONS: Record<Role, Permission[]> = {
     "tarefas:read_all",
     "relatorios:view",
     "configuracoes:view",
+    "whatsapp:use",
   ],
   COMERCIAL: [
     "dashboard:view",
@@ -161,6 +165,7 @@ const PERMISSIONS: Record<Role, Permission[]> = {
     "tarefas:create",
     "tarefas:update",
     "tarefas:delete",
+    "whatsapp:use",
   ],
   OPERACIONAL: [
     "dashboard:view",
@@ -173,6 +178,7 @@ const PERMISSIONS: Record<Role, Permission[]> = {
     "tarefas:create",
     "tarefas:update",
     "tarefas:delete",
+    "whatsapp:use",
   ],
 };
 

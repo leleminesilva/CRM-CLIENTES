@@ -18,6 +18,7 @@ import {
   Search, Smartphone, RefreshCw, PowerOff, History,
   Paperclip, FileText, X as XIcon, Download, UserRound, ExternalLink, Sparkles,
   Zap, Clock, ArrowRight, Activity, Inbox, CreditCard, StickyNote,
+  Users, PanelRightClose, PanelRight, Pencil,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -54,6 +55,8 @@ interface Mensagem {
   mediaUrl?: string | null;
   status: string;
   enviadaEm: string;
+  remetenteNome?: string | null;
+  remetentePhone?: string | null;
 }
 
 interface ClienteVinculado {
@@ -88,6 +91,7 @@ interface Conversa {
   cliente?: ClienteVinculado | null;
   status?: ConversaStatus;
   etapa?: EtapaQuadro;
+  isGrupo?: boolean;
   responsavelId?: string | null;
   responsavel?: { id: string; nome: string } | null;
   notaInterna?: string | null;
@@ -491,12 +495,13 @@ function ListaConversas({
                   )}
                 >
                   <div className="w-10 h-10 rounded-full bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 flex items-center justify-center text-sm font-bold shrink-0">
-                    {getInitials(c.contatoNome, c.contatoPhone)}
+                    {c.isGrupo ? <Users className="w-4 h-4" /> : getInitials(c.contatoNome, c.contatoPhone)}
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between gap-1">
                       <span className={cn("text-sm truncate flex items-center gap-1", c.naoLidas > 0 && "font-semibold")}>
-                        {c.contatoNome ?? formatPhone(c.contatoPhone)}
+                        {c.isGrupo && <Users className="w-3 h-3 shrink-0 text-muted-foreground" />}
+                        {c.contatoNome ?? (c.isGrupo ? "Grupo do WhatsApp" : formatPhone(c.contatoPhone))}
                         {c.agentEstado && BOT_ATIVO_ESTADOS.includes(c.agentEstado.estado) && (
                           <span title="Agente de IA está atendendo" className="shrink-0">🤖</span>
                         )}
@@ -512,8 +517,10 @@ function ListaConversas({
                         {lastMsg
                           ? lastMsg.direcao === "saida"
                             ? `Você: ${lastMsg.conteudo}`
-                            : lastMsg.conteudo
-                          : formatPhone(c.contatoPhone)}
+                            : c.isGrupo && lastMsg.remetenteNome
+                              ? `${lastMsg.remetenteNome.split(" ")[0]}: ${lastMsg.conteudo}`
+                              : lastMsg.conteudo
+                          : c.isGrupo ? "Grupo" : formatPhone(c.contatoPhone)}
                       </span>
                       {c.naoLidas > 0 && (
                         <Badge className="bg-green-600 text-white h-5 min-w-[20px] shrink-0 text-xs px-1.5">
@@ -578,6 +585,7 @@ function AreaChat({
 }) {
   const [texto, setTexto] = useState("");
   const [arquivo, setArquivo] = useState<File | null>(null);
+  const [ctxAberto, setCtxAberto] = useState(true);
   const [leiturasFoto, setLeiturasFoto] = useState<Record<string, { loading?: boolean; texto?: string; erro?: boolean }>>({});
   const [transcricoes, setTranscricoes] = useState<Record<string, { loading?: boolean; texto?: string; erro?: boolean }>>({});
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -693,6 +701,8 @@ function AreaChat({
   }
 
   const mensagens = data?.mensagens ?? [];
+  const grupo = !!conversa.isGrupo;
+  const tituloContato = conversa.contatoNome ?? (grupo ? "Grupo do WhatsApp" : formatPhone(conversa.contatoPhone));
 
   // Janela de resposta livre do WhatsApp: 24 h após a última mensagem do
   // cliente. Depois disso só modelo aprovado (regra da Meta).
@@ -724,22 +734,33 @@ function AreaChat({
     <div className="flex-1 flex min-w-0 min-h-0 overflow-hidden">
     <div className="flex-1 flex flex-col min-w-0 min-h-0 overflow-hidden">
       {/* Header */}
-      <div className="h-14 flex items-center gap-3 px-4 border-b border-border bg-[#f0f2f5] dark:bg-[#202c33] shrink-0">
+      <div className="h-14 flex items-center gap-2 px-4 border-b border-border bg-[#f0f2f5] dark:bg-[#202c33] shrink-0">
         <button onClick={onBack} className="md:hidden p-1 -ml-1 rounded hover:bg-accent">
           <ChevronLeft className="w-5 h-5" />
         </button>
-        <div className="w-9 h-9 rounded-full bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 flex items-center justify-center text-sm font-bold shrink-0">
-          {getInitials(conversa.contatoNome, conversa.contatoPhone)}
-        </div>
-        <div className="flex-1 min-w-0">
-          <p className="font-semibold text-sm truncate">
-            {conversa.contatoNome ?? formatPhone(conversa.contatoPhone)}
-          </p>
-          <p className="text-xs text-muted-foreground flex items-center gap-1">
-            <Phone className="w-3 h-3" />
-            {formatPhone(conversa.contatoPhone)}
-          </p>
-        </div>
+        <button
+          onClick={() => setCtxAberto((v) => !v)}
+          title={ctxAberto ? "Ocultar detalhes" : "Mostrar detalhes"}
+          className="flex-1 min-w-0 flex items-center gap-3 -mx-1 px-1 py-1 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 text-left"
+        >
+          <div className="w-9 h-9 rounded-full bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 flex items-center justify-center text-sm font-bold shrink-0">
+            {grupo ? <Users className="w-4 h-4" /> : getInitials(conversa.contatoNome, conversa.contatoPhone)}
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="font-semibold text-sm truncate">{tituloContato}</p>
+            <p className="text-xs text-muted-foreground flex items-center gap-1">
+              {grupo ? <Users className="w-3 h-3" /> : <Phone className="w-3 h-3" />}
+              {grupo ? "Grupo do WhatsApp" : formatPhone(conversa.contatoPhone)}
+            </p>
+          </div>
+        </button>
+        <button
+          onClick={() => setCtxAberto((v) => !v)}
+          title={ctxAberto ? "Ocultar detalhes" : "Mostrar detalhes"}
+          className="hidden xl:flex shrink-0 w-8 h-8 items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-black/5 dark:hover:bg-white/5"
+        >
+          {ctxAberto ? <PanelRightClose className="w-4 h-4" /> : <PanelRight className="w-4 h-4" />}
+        </button>
       </div>
 
       {/* Mensagens */}
@@ -781,6 +802,11 @@ function AreaChat({
                             : "bg-white dark:bg-[#202c33] text-[#111b21] dark:text-[#e9edef] rounded-tl-sm border border-black/5 dark:border-white/5"
                         )}
                       >
+                        {grupo && msg.direcao === "entrada" && (msg.remetenteNome || msg.remetentePhone) && (
+                          <p className={cn("text-[11px] font-bold mb-0.5", corEtiqueta(msg.remetenteNome || msg.remetentePhone || "").split(" ").find((c) => c.startsWith("text-")))}>
+                            {msg.remetenteNome || formatPhone(msg.remetentePhone || "")}
+                          </p>
+                        )}
                         <BolhaMedia msg={msg} />
                         {(msg.tipo === "texto" || msg.conteudo) && msg.tipo !== "documento" && (
                           <p className="whitespace-pre-wrap break-words">{msg.conteudo}</p>
@@ -928,14 +954,17 @@ function AreaChat({
         )}
       </div>
     </div>
-    <PainelContexto conversa={conversa} sessaoNome={sessaoNome} />
+    {ctxAberto && (
+      <PainelContexto conversa={conversa} sessaoNome={sessaoNome} onClose={() => setCtxAberto(false)} />
+    )}
     </div>
   );
 }
 
 // ── Painel de contexto (ficha do cliente na conversa) ─────────────────────
 
-function PainelContexto({ conversa, sessaoNome }: { conversa: Conversa; sessaoNome?: string }) {
+function PainelContexto({ conversa, sessaoNome, onClose }: { conversa: Conversa; sessaoNome?: string; onClose?: () => void }) {
+  const grupo = !!conversa.isGrupo;
   const router = useRouter();
   const queryClient = useQueryClient();
   const { user } = useAuth();
@@ -1001,6 +1030,19 @@ function PainelContexto({ conversa, sessaoNome }: { conversa: Conversa; sessaoNo
 
   const [nota, setNota] = useState(conversa.notaInterna ?? "");
   useEffect(() => setNota(conversa.notaInterna ?? ""), [conversa.id, conversa.notaInterna]);
+
+  const [editandoNome, setEditandoNome] = useState(false);
+  const [nomeEdit, setNomeEdit] = useState(conversa.contatoNome ?? "");
+  const [nomeSalvo, setNomeSalvo] = useState<string | null>(null);
+  useEffect(() => { setEditandoNome(false); setNomeEdit(conversa.contatoNome ?? ""); setNomeSalvo(null); }, [conversa.id, conversa.contatoNome]);
+  const nomeAtual = nomeSalvo ?? conversa.contatoNome ?? null;
+  const salvarNome = () => {
+    setEditandoNome(false);
+    const v = nomeEdit.trim();
+    if (v === (nomeAtual ?? "")) return;
+    setNomeSalvo(v || "");
+    patch.mutate({ contatoNome: v || null });
+  };
   const salvarNota = () => {
     const v = nota.trim();
     if (v === (conversa.notaInterna ?? "").trim()) return;
@@ -1019,27 +1061,57 @@ function PainelContexto({ conversa, sessaoNome }: { conversa: Conversa; sessaoNo
   });
 
   return (
-    <aside className="hidden xl:flex flex-col w-72 border-l border-border bg-background shrink-0 min-h-0 overflow-y-auto">
+    <aside className="hidden xl:flex flex-col w-72 border-l border-border bg-background shrink-0 min-h-0 overflow-y-auto relative">
+      {onClose && (
+        <button
+          onClick={onClose}
+          title="Ocultar detalhes"
+          className="absolute top-2 right-2 z-10 w-7 h-7 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent"
+        >
+          <PanelRightClose className="w-4 h-4" />
+        </button>
+      )}
       <div className="p-4 text-center border-b border-border">
         <div className="w-14 h-14 rounded-full mx-auto mb-2 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 flex items-center justify-center text-lg font-bold">
-          {getInitials(conversa.contatoNome, conversa.contatoPhone)}
+          {grupo ? <Users className="w-6 h-6" /> : getInitials(conversa.contatoNome, conversa.contatoPhone)}
         </div>
-        <p className="font-semibold text-sm">{conversa.contatoNome ?? formatPhone(conversa.contatoPhone)}</p>
-        <p className="text-xs text-muted-foreground">{formatPhone(conversa.contatoPhone)}</p>
+        {editandoNome ? (
+          <input
+            autoFocus
+            value={nomeEdit}
+            onChange={(e) => setNomeEdit(e.target.value)}
+            onBlur={salvarNome}
+            onKeyDown={(e) => { if (e.key === "Enter") salvarNome(); if (e.key === "Escape") setEditandoNome(false); }}
+            placeholder={grupo ? "Nome do grupo" : "Nome do contato"}
+            className="w-full text-center text-sm font-semibold rounded-md border border-border bg-background px-2 py-1 outline-none focus:ring-2 focus:ring-green-500/30"
+          />
+        ) : (
+          <button
+            onClick={() => { setNomeEdit(nomeAtual ?? ""); setEditandoNome(true); }}
+            title="Renomear"
+            className="group inline-flex items-center gap-1 font-semibold text-sm hover:text-green-600"
+          >
+            {nomeAtual ?? (grupo ? "Grupo do WhatsApp" : formatPhone(conversa.contatoPhone))}
+            <Pencil className="w-3 h-3 opacity-0 group-hover:opacity-60" />
+          </button>
+        )}
+        <p className="text-xs text-muted-foreground">{grupo ? "Grupo" : formatPhone(conversa.contatoPhone)}</p>
         <div className="flex gap-2 justify-center mt-3">
           {cliente && (
             <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => router.push(`/clientes/${cliente.id}`)}>
               <ExternalLink className="w-3 h-3 mr-1" /> Abrir ficha
             </Button>
           )}
-          <a
-            href={`https://wa.me/${conversa.contatoPhone.replace(/\D/g, "")}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="h-7 px-2.5 inline-flex items-center gap-1 text-xs rounded-md border border-border text-muted-foreground hover:text-foreground"
-          >
-            <Phone className="w-3 h-3" /> WhatsApp
-          </a>
+          {!grupo && (
+            <a
+              href={`https://wa.me/${conversa.contatoPhone.replace(/\D/g, "")}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="h-7 px-2.5 inline-flex items-center gap-1 text-xs rounded-md border border-border text-muted-foreground hover:text-foreground"
+            >
+              <Phone className="w-3 h-3" /> WhatsApp
+            </a>
+          )}
         </div>
       </div>
 
@@ -1194,6 +1266,7 @@ function PainelContexto({ conversa, sessaoNome }: { conversa: Conversa; sessaoNo
         />
       </div>
 
+      {!grupo && (
       <div className="p-4 space-y-3">
         <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Registro no CRM</p>
 
@@ -1272,6 +1345,7 @@ function PainelContexto({ conversa, sessaoNome }: { conversa: Conversa; sessaoNo
           </div>
         )}
       </div>
+      )}
 
       {/* Negócio vinculado — vem do orçamento do cliente no CRM */}
       {cliente && (cliente.servicoBuscado || formatBRL(cliente.valorOrcamento)) && (
@@ -2155,6 +2229,23 @@ function WhatsAppContent() {
           <h2 className="text-xl font-semibold">Sistema em standby</h2>
           <p className="text-muted-foreground mt-1 text-sm max-w-sm">
             O módulo WhatsApp está temporariamente pausado para todos os cargos, inclusive Desenvolvedor.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // Módulo liberado só para o Desenvolvedor por enquanto. Some da sidebar para
+  // os demais cargos (inclusive Administrador); aqui bloqueia o acesso direto
+  // pela URL.
+  if (user && user.role !== "DESENVOLVEDOR") {
+    return (
+      <div className="flex flex-col items-center justify-center h-full gap-4 text-center">
+        <MessageCircle className="w-16 h-16 text-muted-foreground opacity-30" />
+        <div>
+          <h2 className="text-xl font-semibold">Acesso restrito</h2>
+          <p className="text-muted-foreground mt-1 text-sm max-w-sm">
+            O módulo WhatsApp está disponível apenas para o Desenvolvedor por enquanto.
           </p>
         </div>
       </div>

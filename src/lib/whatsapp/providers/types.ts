@@ -32,6 +32,9 @@ export interface NormalizedMessage {
   media?: NormalizedMedia;
   timestamp: Date;
   contatoNome?: string;
+  isGrupo?: boolean;
+  remetentePhone?: string;
+  remetenteNome?: string;
 }
 
 export interface NormalizedReceipt {

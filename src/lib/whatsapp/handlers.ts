@@ -37,6 +37,10 @@ export function registrarHandlersWhatsApp(): void {
     });
     if (!conversa) return;
 
+    // Grupo não tem "um cliente" nem faz sentido rodar bot de triagem —
+    // é conversa coletiva. Fica só como caixa de entrada.
+    if (conversa.isGrupo) return;
+
     // Costura com o CRM: se a conversa ainda não aponta pra ninguém e existe
     // um Cliente com esse telefone, vincula automaticamente — a partir daí a
     // ficha do cliente aparece no painel da conversa. Ver

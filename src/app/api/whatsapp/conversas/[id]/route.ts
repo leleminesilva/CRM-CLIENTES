@@ -36,10 +36,18 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     responsavelId?: string | null;
     tags?: string[];
     notaInterna?: string | null;
+    contatoNome?: string | null;
   } = {};
 
   if (typeof body.status === "string" && STATUS_VALIDOS.includes(body.status)) {
     data.status = body.status as WhatsAppConversaStatus;
+  }
+  if ("contatoNome" in body) {
+    if (body.contatoNome === null || body.contatoNome === "") {
+      data.contatoNome = null;
+    } else if (typeof body.contatoNome === "string") {
+      data.contatoNome = body.contatoNome.trim().slice(0, 80) || null;
+    }
   }
   if ("notaInterna" in body) {
     if (body.notaInterna === null || body.notaInterna === "") {

@@ -652,6 +652,7 @@ model WhatsAppConversa {
   responsavelId String?
   tags          String[]               @default([])
   notaInterna   String?
+  isGrupo       Boolean                @default(false)
   ultimaMsgEm   DateTime?
   naoLidas      Int                    @default(0)
   createdAt     DateTime               @default(now())
@@ -680,6 +681,8 @@ model WhatsAppMensagem {
   direcao           String   // 'entrada' | 'saida'
   tipo              String   @default("texto")
   conteudo          String
+  remetenteNome     String?  // nome de quem enviou (só faz sentido em grupo)
+  remetentePhone    String?  // telefone de quem enviou dentro do grupo
   mediaUrl          String?
   status            WhatsAppMensagemStatus  @default(ENVIANDO)
   enviadaEm         DateTime @default(now())

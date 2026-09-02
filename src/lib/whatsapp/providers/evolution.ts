@@ -209,6 +209,12 @@ export class EvolutionProvider implements IWhatsAppProvider {
       const message = data.message as Record<string, unknown> | undefined;
       const { tipo, conteudo, media } = extrairConteudoMensagem(message, data);
 
+      const remoteJid = (key?.remoteJid as string) ?? "";
+      const isGrupo = remoteJid.endsWith("@g.us");
+      // Em grupo, remoteJid é o id do grupo e key.participant é quem enviou.
+      // pushName, nesse caso, é o nome de quem enviou — não o do grupo.
+      const participant = (key?.participant as string) ?? "";
+
       return [
         {
           schemaVersion: 1,
@@ -216,12 +222,17 @@ export class EvolutionProvider implements IWhatsAppProvider {
           type: "message",
           data: {
             providerMessageId: (key?.id as string) ?? providerEventId,
-            fromPhone: ((key?.remoteJid as string) ?? "").replace(/@.*/, ""),
+            fromPhone: remoteJid.replace(/@.*/, ""),
             tipo,
             conteudo,
             media,
             timestamp: new Date(Number(data.messageTimestamp ?? Date.now() / 1000) * 1000),
-            contatoNome: data.pushName as string | undefined,
+            contatoNome: isGrupo
+              ? ((data.groupSubject as string | undefined) ?? undefined)
+              : (data.pushName as string | undefined),
+            isGrupo,
+            remetentePhone: isGrupo && participant ? participant.replace(/@.*/, "") : undefined,
+            remetenteNome: isGrupo ? (data.pushName as string | undefined) : undefined,
           },
         },
       ];

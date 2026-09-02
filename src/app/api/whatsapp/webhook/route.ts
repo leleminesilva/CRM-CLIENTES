@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { normalizeWhatsAppPhone } from "@/lib/utils/phone";
+import { normalizeWhatsAppPhone, normalizePhone } from "@/lib/utils/phone";
 import { getProvider } from "@/lib/whatsapp/providers";
 import { emit } from "@/lib/whatsapp/events";
 import { registrarHandlersWhatsApp } from "@/lib/whatsapp/handlers";
@@ -86,7 +86,13 @@ export async function POST(request: NextRequest) {
 
       // evento.type === "message"
       const msg = evento.data;
-      const fromPhone = normalizeWhatsAppPhone(msg.fromPhone);
+      // Ignora eventos de grupo/sistema sem conteúdo útil (reações, protocol
+      // messages, distribuição de chave, etc.) — eles poluem a conversa com
+      // balões vazios, ainda mais em grupo.
+      if (msg.tipo === "texto" && !(msg.conteudo ?? "").trim() && !msg.media?.base64) continue;
+      // Grupo mantém o id do grupo como "telefone" (não passa pelo ajuste do
+      // 9º dígito, que só vale pra celular BR).
+      const fromPhone = msg.isGrupo ? normalizePhone(msg.fromPhone) : normalizeWhatsAppPhone(msg.fromPhone);
 
       // A sessão que recebeu essa mensagem — o webhook da Evolution não traz
       // o nome da instância diretamente no evento normalizado de mensagem
@@ -103,11 +109,15 @@ export async function POST(request: NextRequest) {
           sessaoId: sessao.id,
           contatoPhone: fromPhone,
           contatoNome: msg.contatoNome,
+          isGrupo: msg.isGrupo ?? false,
           ultimaMsgEm: msg.timestamp,
           naoLidas: 1,
         },
         update: {
+          // Em grupo, msg.contatoNome só vem preenchido quando o gateway
+          // manda o assunto do grupo — nunca sobrescreve com nome de pessoa.
           contatoNome: msg.contatoNome ?? undefined,
+          isGrupo: msg.isGrupo ? true : undefined,
           ultimaMsgEm: msg.timestamp,
           naoLidas: { increment: 1 },
         },
@@ -139,6 +149,8 @@ export async function POST(request: NextRequest) {
           direcao: "entrada",
           tipo: msg.tipo,
           conteudo: msg.conteudo ?? "",
+          remetenteNome: msg.remetenteNome ?? null,
+          remetentePhone: msg.remetentePhone ?? null,
           mediaUrl: mediaPath,
           enviadaEm: msg.timestamp,
           // ENTREGUE (não o default ENVIANDO) — o enum de status modela o

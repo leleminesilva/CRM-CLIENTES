@@ -105,6 +105,15 @@ type EtapaQuadro =
   | "NOVA" | "EM_ATENDIMENTO" | "AGUARDANDO_CLIENTE"
   | "ORCAMENTO_ENVIADO" | "FECHADO" | "SEM_RETORNO";
 
+function formatDuracao(ms: number): string {
+  const s = Math.round(ms / 1000);
+  if (s < 60) return `${s}s`;
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m}m ${String(s % 60).padStart(2, "0")}s`;
+  const h = Math.floor(m / 60);
+  return `${h}h ${String(m % 60).padStart(2, "0")}m`;
+}
+
 const RESPOSTAS_RAPIDAS = [
   "Bom dia! Como posso ajudar?",
   "Pode me passar as medidas (largura × altura)?",
@@ -1292,6 +1301,18 @@ function QuadroKanban({
     refetchInterval: 8000,
   });
 
+  const { data: metricas } = useQuery({
+    queryKey: ["wa-metricas"],
+    queryFn: async () => {
+      const { data } = await axios.get("/api/whatsapp/metricas");
+      return data as {
+        emAberto: number; naoAtribuidas: number; resolvidasHoje: number;
+        primeiraRespostaMs: number | null; conversao7d: number | null;
+      };
+    },
+    refetchInterval: 30000,
+  });
+
   const mover = useMutation({
     mutationFn: ({ id, etapa }: { id: string; etapa: EtapaQuadro }) =>
       axios.patch(`/api/whatsapp/conversas/${id}`, { etapa }),
@@ -1315,6 +1336,16 @@ function QuadroKanban({
     }
   }
 
+  const kpis: { lbl: string; v: string }[] = metricas
+    ? [
+        { lbl: "Em aberto", v: String(metricas.emAberto) },
+        { lbl: "Sem responsável", v: String(metricas.naoAtribuidas) },
+        { lbl: "Resolvidas hoje", v: String(metricas.resolvidasHoje) },
+        { lbl: "1ª resposta (méd)", v: metricas.primeiraRespostaMs != null ? formatDuracao(metricas.primeiraRespostaMs) : "—" },
+        { lbl: "Conversão 7d", v: metricas.conversao7d != null ? `${metricas.conversao7d}%` : "—" },
+      ]
+    : [];
+
   return (
     <div className="flex-1 flex flex-col min-w-0 p-4 gap-3 overflow-hidden">
       <div className="flex items-baseline gap-3">
@@ -1323,6 +1354,16 @@ function QuadroKanban({
           {conversas.length} conversas · {naoAtribuidas} sem responsável
         </span>
       </div>
+      {kpis.length > 0 && (
+        <div className="flex gap-2 flex-wrap">
+          {kpis.map((k) => (
+            <div key={k.lbl} className="rounded-lg border border-border bg-card px-3 py-1.5 min-w-[104px]">
+              <div className="text-[10px] uppercase tracking-wide text-muted-foreground">{k.lbl}</div>
+              <div className="text-base font-bold tabular-nums">{k.v}</div>
+            </div>
+          ))}
+        </div>
+      )}
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
         <div className="flex-1 flex gap-3 overflow-x-auto pb-2">
           {ETAPAS_QUADRO.map((col) => (

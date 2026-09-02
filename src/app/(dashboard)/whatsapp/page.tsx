@@ -81,7 +81,23 @@ interface Conversa {
   etapa?: EtapaQuadro;
   responsavelId?: string | null;
   responsavel?: { id: string; nome: string } | null;
+  tags?: string[];
 }
+
+const CORES_ETIQUETA = [
+  "bg-blue-500/15 text-blue-600 dark:text-blue-400",
+  "bg-green-500/15 text-green-600 dark:text-green-400",
+  "bg-amber-500/15 text-amber-600 dark:text-amber-400",
+  "bg-purple-500/15 text-purple-600 dark:text-purple-400",
+  "bg-rose-500/15 text-rose-600 dark:text-rose-400",
+  "bg-cyan-500/15 text-cyan-600 dark:text-cyan-400",
+];
+function corEtiqueta(nome: string) {
+  let h = 0;
+  for (let i = 0; i < nome.length; i++) h = (h * 31 + nome.charCodeAt(i)) | 0;
+  return CORES_ETIQUETA[Math.abs(h) % CORES_ETIQUETA.length];
+}
+const ETIQUETAS_SUGERIDAS = ["Orçamento", "Box", "Espelho", "Porta", "Obra", "Instalação", "Retorno", "Urgente"];
 
 const STATUS_LABEL: Record<ConversaStatus, string> = {
   ABERTA: "Aberta",
@@ -474,6 +490,13 @@ function ListaConversas({
                         </Badge>
                       )}
                     </div>
+                    {c.tags && c.tags.length > 0 && (
+                      <div className="flex gap-1 mt-1 flex-wrap">
+                        {c.tags.slice(0, 3).map((t) => (
+                          <span key={t} className={cn("text-[10px] font-medium rounded px-1.5 py-0.5", corEtiqueta(t))}>{t}</span>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </button>
               );
@@ -804,8 +827,16 @@ function PainelContexto({ conversa }: { conversa: Conversa }) {
   const [busca, setBusca] = useState("");
   const [vinculando, setVinculando] = useState(false);
   const [atribuindo, setAtribuindo] = useState(false);
+  const [novaTag, setNovaTag] = useState("");
   const cliente = conversa.cliente ?? null;
   const status: ConversaStatus = conversa.status ?? "ABERTA";
+  const tags = conversa.tags ?? [];
+  const addTag = (t: string) => {
+    const v = t.trim();
+    if (v && !tags.includes(v)) patch.mutate({ tags: [...tags, v] });
+    setNovaTag("");
+  };
+  const removeTag = (t: string) => patch.mutate({ tags: tags.filter((x) => x !== t) });
 
   const { data: resultados = [] } = useQuery({
     queryKey: ["clientes-busca-wa", busca],
@@ -916,6 +947,39 @@ function PainelContexto({ conversa }: { conversa: Conversa }) {
             </Button>
           </div>
         )}
+      </div>
+
+      <div className="p-4 space-y-2 border-b border-border">
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Etiquetas</p>
+        <div className="flex flex-wrap gap-1.5">
+          {tags.map((t) => (
+            <span key={t} className={cn("text-[11px] font-medium rounded px-1.5 py-0.5 flex items-center gap-1", corEtiqueta(t))}>
+              {t}
+              <button onClick={() => removeTag(t)} className="opacity-60 hover:opacity-100">
+                <XIcon className="w-2.5 h-2.5" />
+              </button>
+            </span>
+          ))}
+          {tags.length === 0 && <span className="text-[11px] text-muted-foreground">nenhuma</span>}
+        </div>
+        <div className="flex flex-wrap gap-1">
+          {ETIQUETAS_SUGERIDAS.filter((s) => !tags.includes(s)).slice(0, 6).map((s) => (
+            <button
+              key={s}
+              onClick={() => addTag(s)}
+              className="text-[11px] text-muted-foreground border border-dashed border-border rounded px-1.5 py-0.5 hover:text-foreground hover:border-foreground/40"
+            >
+              + {s}
+            </button>
+          ))}
+        </div>
+        <input
+          value={novaTag}
+          onChange={(e) => setNovaTag(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter") addTag(novaTag); }}
+          placeholder="Nova etiqueta + Enter"
+          className="w-full text-xs rounded-md border border-border bg-background px-2 py-1 outline-none focus:ring-2 focus:ring-green-500/30"
+        />
       </div>
 
       <div className="p-4 space-y-3">

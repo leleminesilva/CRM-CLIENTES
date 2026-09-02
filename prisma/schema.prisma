@@ -650,6 +650,7 @@ model WhatsAppConversa {
   status        WhatsAppConversaStatus @default(ABERTA)
   etapa         WhatsAppConversaEtapa  @default(NOVA)
   responsavelId String?
+  tags          String[]               @default([])
   ultimaMsgEm   DateTime?
   naoLidas      Int                    @default(0)
   createdAt     DateTime               @default(now())

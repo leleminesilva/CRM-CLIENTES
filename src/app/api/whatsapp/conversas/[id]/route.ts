@@ -34,6 +34,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     status?: WhatsAppConversaStatus;
     etapa?: WhatsAppConversaEtapa;
     responsavelId?: string | null;
+    tags?: string[];
   } = {};
 
   if (typeof body.status === "string" && STATUS_VALIDOS.includes(body.status)) {
@@ -41,6 +42,17 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
   }
   if (typeof body.etapa === "string" && ETAPA_VALIDA.includes(body.etapa)) {
     data.etapa = body.etapa as WhatsAppConversaEtapa;
+  }
+  if (Array.isArray(body.tags)) {
+    data.tags = Array.from(
+      new Set(
+        body.tags
+          .filter((t: unknown): t is string => typeof t === "string")
+          .map((t: string) => t.trim())
+          .filter(Boolean)
+          .slice(0, 12)
+      )
+    );
   }
   if ("responsavelId" in body) {
     if (body.responsavelId === null) {

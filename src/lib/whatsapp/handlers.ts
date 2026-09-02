@@ -1,5 +1,5 @@
 import prisma from "@/lib/prisma";
-import { on } from "./events";
+import { on, emit } from "./events";
 import { publicarConversa } from "./realtime";
 import { findClienteByPhone } from "@/lib/utils/phone";
 import { processarAgenteWhatsApp } from "./agent";
@@ -35,11 +35,27 @@ export function registrarHandlersWhatsApp(): void {
       where: { id: conversaId },
       include: { sessao: true },
     });
-    if (!conversa || conversa.clienteId) return;
+    if (!conversa) return;
 
-    const clienteExistente = await findClienteByPhone(fromPhone);
-    if (clienteExistente) return;
+    // Costura com o CRM: se a conversa ainda não aponta pra ninguém e existe
+    // um Cliente com esse telefone, vincula automaticamente — a partir daí a
+    // ficha do cliente aparece no painel da conversa. Ver
+    // docs/architecture/whatsapp-crm-integracao.md.
+    if (!conversa.clienteId) {
+      const clienteExistente = await findClienteByPhone(fromPhone);
+      if (clienteExistente) {
+        await prisma.whatsAppConversa.update({
+          where: { id: conversaId },
+          data: { clienteId: clienteExistente.id },
+        });
+        await emit("ConversationUpdated", { conversaId }, conversaId);
+        return; // cliente conhecido: não dispara o bot de triagem
+      }
+    } else {
+      return; // já vinculado: bot não roda
+    }
 
+    // Número desconhecido → agente de triagem
     const agentEstado = await prisma.whatsAppAgentEstado.findUnique({ where: { conversaId } });
     if (agentEstado?.estado === "HUMANO" || agentEstado?.estado === "CONCLUIDO") return;
 

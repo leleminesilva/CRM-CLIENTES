@@ -34,5 +34,24 @@ export async function GET(request: NextRequest) {
     },
   });
 
-  return NextResponse.json(conversas);
+  // Anexa o Cliente vinculado (clienteId é campo solto, sem @relation no
+  // schema — junção manual por id pra não exigir migration). Ver
+  // docs/architecture/whatsapp-crm-integracao.md.
+  const clienteIds = Array.from(
+    new Set(conversas.map((c) => c.clienteId).filter((v): v is string => !!v))
+  );
+  const clientes = clienteIds.length
+    ? await prisma.cliente.findMany({
+        where: { id: { in: clienteIds } },
+        select: { id: true, nome: true, cidade: true, estado: true, telefone: true, whatsapp: true },
+      })
+    : [];
+  const porId = new Map(clientes.map((c) => [c.id, c]));
+
+  return NextResponse.json(
+    conversas.map((c) => ({
+      ...c,
+      cliente: c.clienteId ? porId.get(c.clienteId) ?? null : null,
+    }))
+  );
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback, useMemo, Suspense } from "react";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
 import { format, isToday, isYesterday } from "date-fns";
@@ -10,7 +10,7 @@ import {
   MessageCircle, Plus, Trash2, Phone, Send,
   Loader2, Settings, ChevronLeft, Check, CheckCheck,
   Search, Smartphone, RefreshCw, PowerOff, ChevronDown, ChevronUp, History,
-  Paperclip, FileText, X as XIcon, Download,
+  Paperclip, FileText, X as XIcon, Download, UserRound, ExternalLink,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -49,6 +49,15 @@ interface Mensagem {
   enviadaEm: string;
 }
 
+interface ClienteVinculado {
+  id: string;
+  nome: string;
+  cidade?: string | null;
+  estado?: string | null;
+  telefone?: string | null;
+  whatsapp?: string | null;
+}
+
 interface Conversa {
   id: string;
   sessaoId: string;
@@ -58,6 +67,7 @@ interface Conversa {
   ultimaMsgEm?: string;
   mensagens?: Mensagem[];
   agentEstado?: { estado: string } | null;
+  cliente?: ClienteVinculado | null;
 }
 
 const BOT_ATIVO_ESTADOS = ["TRIAGEM", "COLETANDO", "AGUARDANDO_CONFIRMACAO"];
@@ -529,6 +539,7 @@ function AreaChat({
   }
 
   return (
+    <div className="flex-1 flex min-w-0">
     <div className="flex-1 flex flex-col min-w-0">
       {/* Header */}
       <div className="h-14 flex items-center gap-3 px-4 border-b border-border bg-[#f0f2f5] dark:bg-[#202c33] shrink-0">
@@ -666,6 +677,138 @@ function AreaChat({
         </div>
       </div>
     </div>
+    <PainelContexto conversa={conversa} />
+    </div>
+  );
+}
+
+// ── Painel de contexto (ficha do cliente na conversa) ─────────────────────
+
+function PainelContexto({ conversa }: { conversa: Conversa }) {
+  const router = useRouter();
+  const queryClient = useQueryClient();
+  const [busca, setBusca] = useState("");
+  const [vinculando, setVinculando] = useState(false);
+  const cliente = conversa.cliente ?? null;
+
+  const { data: resultados = [] } = useQuery({
+    queryKey: ["clientes-busca-wa", busca],
+    queryFn: async () => {
+      const { data } = await axios.get(`/api/clientes?search=${encodeURIComponent(busca)}&limit=6`);
+      return (data.clientes ?? data ?? []) as ClienteVinculado[];
+    },
+    enabled: vinculando && busca.trim().length >= 2,
+  });
+
+  const vincular = useMutation({
+    mutationFn: (body: Record<string, unknown>) =>
+      axios.post(`/api/whatsapp/conversas/${conversa.id}/vincular`, body),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["wa-conversas"] });
+      setVinculando(false);
+      setBusca("");
+      toast.success("Conversa vinculada");
+    },
+    onError: () => toast.error("Erro ao vincular"),
+  });
+
+  return (
+    <aside className="hidden xl:flex flex-col w-72 border-l border-border bg-background shrink-0 overflow-y-auto">
+      <div className="p-4 text-center border-b border-border">
+        <div className="w-14 h-14 rounded-full mx-auto mb-2 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 flex items-center justify-center text-lg font-bold">
+          {getInitials(conversa.contatoNome, conversa.contatoPhone)}
+        </div>
+        <p className="font-semibold text-sm">{conversa.contatoNome ?? formatPhone(conversa.contatoPhone)}</p>
+        <p className="text-xs text-muted-foreground">{formatPhone(conversa.contatoPhone)}</p>
+      </div>
+
+      <div className="p-4 space-y-3">
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Registro no CRM</p>
+
+        {cliente ? (
+          <div className="rounded-lg border border-border bg-muted/40 p-3">
+            <div className="flex items-start gap-2">
+              <div className="w-8 h-8 rounded-md bg-blue-500/15 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0">
+                <UserRound className="w-4 h-4" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-medium truncate">{cliente.nome}</p>
+                <p className="text-[11px] text-muted-foreground truncate">
+                  Cliente{cliente.cidade ? ` · ${cliente.cidade}${cliente.estado ? `/${cliente.estado}` : ""}` : ""}
+                </p>
+              </div>
+            </div>
+            <div className="flex gap-2 mt-3">
+              <Button size="sm" variant="outline" className="h-7 text-xs flex-1" onClick={() => router.push(`/clientes/${cliente.id}`)}>
+                <ExternalLink className="w-3 h-3 mr-1" /> Abrir ficha
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-7 text-xs text-muted-foreground"
+                onClick={() => vincular.mutate({ acao: "desvincular" })}
+                disabled={vincular.isPending}
+              >
+                Desvincular
+              </Button>
+            </div>
+          </div>
+        ) : !vinculando ? (
+          <div className="rounded-lg border border-dashed border-border p-3 text-center">
+            <p className="text-xs text-muted-foreground mb-3">Este contato ainda não está no CRM.</p>
+            <div className="flex flex-col gap-2">
+              <Button
+                size="sm"
+                className="h-8 text-xs bg-green-600 hover:bg-green-700 text-white"
+                onClick={() => vincular.mutate({ acao: "criar" })}
+                disabled={vincular.isPending}
+              >
+                <Plus className="w-3.5 h-3.5 mr-1" /> Criar cliente
+              </Button>
+              <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => setVinculando(true)}>
+                Vincular a um existente
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <div className="rounded-lg border border-border p-3 space-y-2">
+            <input
+              autoFocus
+              value={busca}
+              onChange={(e) => setBusca(e.target.value)}
+              placeholder="Buscar por nome ou telefone"
+              className="w-full text-xs rounded-md border border-border bg-background px-2.5 py-1.5 outline-none focus:ring-2 focus:ring-green-500/30"
+            />
+            <div className="max-h-52 overflow-y-auto -mx-1">
+              {resultados.map((c) => (
+                <button
+                  key={c.id}
+                  onClick={() => vincular.mutate({ clienteId: c.id })}
+                  className="w-full text-left px-2 py-1.5 rounded-md hover:bg-accent text-xs"
+                >
+                  <span className="font-medium">{c.nome}</span>
+                  {c.whatsapp && <span className="text-muted-foreground"> · {c.whatsapp}</span>}
+                </button>
+              ))}
+              {busca.trim().length >= 2 && resultados.length === 0 && (
+                <p className="px-2 py-1.5 text-xs text-muted-foreground">Nenhum cliente encontrado</p>
+              )}
+            </div>
+            <Button size="sm" variant="ghost" className="h-6 text-xs w-full text-muted-foreground" onClick={() => { setVinculando(false); setBusca(""); }}>
+              Cancelar
+            </Button>
+          </div>
+        )}
+      </div>
+
+      {conversa.agentEstado && BOT_ATIVO_ESTADOS.includes(conversa.agentEstado.estado) && (
+        <div className="px-4 pb-4">
+          <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-700 dark:text-amber-400">
+            🤖 O agente de IA está conduzindo a triagem desta conversa.
+          </div>
+        </div>
+      )}
+    </aside>
   );
 }
 

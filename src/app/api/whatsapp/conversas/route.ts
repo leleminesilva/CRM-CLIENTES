@@ -58,7 +58,12 @@ export async function GET(request: NextRequest) {
   const clientes = clienteIds.length
     ? await prisma.cliente.findMany({
         where: { id: { in: clienteIds } },
-        select: { id: true, nome: true, cidade: true, estado: true, telefone: true, whatsapp: true },
+        select: {
+          id: true, nome: true, cidade: true, estado: true, telefone: true, whatsapp: true,
+          createdAt: true, servicoBuscado: true,
+          numeroOrcamento: true, valorOrcamento: true, prazoOrcamento: true,
+          statusOrcamento: true, orcamentoEnviadoEm: true,
+        },
       })
     : [];
   const porId = new Map(clientes.map((c) => [c.id, c]));

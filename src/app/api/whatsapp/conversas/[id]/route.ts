@@ -35,10 +35,18 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     etapa?: WhatsAppConversaEtapa;
     responsavelId?: string | null;
     tags?: string[];
+    notaInterna?: string | null;
   } = {};
 
   if (typeof body.status === "string" && STATUS_VALIDOS.includes(body.status)) {
     data.status = body.status as WhatsAppConversaStatus;
+  }
+  if ("notaInterna" in body) {
+    if (body.notaInterna === null || body.notaInterna === "") {
+      data.notaInterna = null;
+    } else if (typeof body.notaInterna === "string") {
+      data.notaInterna = body.notaInterna.slice(0, 2000);
+    }
   }
   if (typeof body.etapa === "string" && ETAPA_VALIDA.includes(body.etapa)) {
     data.etapa = body.etapa as WhatsAppConversaEtapa;

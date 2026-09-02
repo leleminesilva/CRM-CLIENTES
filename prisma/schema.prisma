@@ -651,6 +651,7 @@ model WhatsAppConversa {
   etapa         WhatsAppConversaEtapa  @default(NOVA)
   responsavelId String?
   tags          String[]               @default([])
+  notaInterna   String?
   ultimaMsgEm   DateTime?
   naoLidas      Int                    @default(0)
   createdAt     DateTime               @default(now())

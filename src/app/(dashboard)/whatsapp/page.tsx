@@ -14,10 +14,10 @@ import { format, isToday, isYesterday } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import {
   MessageCircle, Plus, Trash2, Phone, Send,
-  Loader2, Settings, ChevronLeft, Check, CheckCheck,
-  Search, Smartphone, RefreshCw, PowerOff, ChevronDown, ChevronUp, History,
+  Loader2, ChevronLeft, Check, CheckCheck,
+  Search, Smartphone, RefreshCw, PowerOff, History,
   Paperclip, FileText, X as XIcon, Download, UserRound, ExternalLink, Sparkles,
-  Zap, Clock, ArrowRight, Activity, Inbox,
+  Zap, Clock, ArrowRight, Activity, Inbox, CreditCard, StickyNote,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -63,6 +63,13 @@ interface ClienteVinculado {
   estado?: string | null;
   telefone?: string | null;
   whatsapp?: string | null;
+  createdAt?: string | null;
+  servicoBuscado?: string | null;
+  numeroOrcamento?: string | null;
+  valorOrcamento?: string | number | null;
+  prazoOrcamento?: string | null;
+  statusOrcamento?: "PENDENTE" | "APROVADO" | "NAO_APROVADO" | null;
+  orcamentoEnviadoEm?: string | null;
 }
 
 type ConversaStatus = "ABERTA" | "PENDENTE" | "RESOLVIDA";
@@ -75,6 +82,7 @@ interface Conversa {
   contatoNome?: string;
   naoLidas: number;
   ultimaMsgEm?: string;
+  createdAt?: string;
   mensagens?: Mensagem[];
   agentEstado?: { estado: string } | null;
   cliente?: ClienteVinculado | null;
@@ -82,6 +90,7 @@ interface Conversa {
   etapa?: EtapaQuadro;
   responsavelId?: string | null;
   responsavel?: { id: string; nome: string } | null;
+  notaInterna?: string | null;
   tags?: string[];
 }
 
@@ -131,6 +140,19 @@ function formatDuracao(ms: number): string {
   return `${h}h ${String(m % 60).padStart(2, "0")}m`;
 }
 
+function formatBRL(v: string | number | null | undefined): string | null {
+  if (v == null || v === "") return null;
+  const n = typeof v === "string" ? parseFloat(v) : v;
+  if (!isFinite(n)) return null;
+  return n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+}
+
+const ORC_STATUS: Record<string, { label: string; cor: string }> = {
+  PENDENTE: { label: "Aguardando decisão", cor: "text-amber-600 dark:text-amber-400" },
+  APROVADO: { label: "Aprovado", cor: "text-green-600 dark:text-green-400" },
+  NAO_APROVADO: { label: "Não aprovado", cor: "text-rose-600 dark:text-rose-400" },
+};
+
 const RESPOSTAS_RAPIDAS = [
   "Bom dia! Como posso ajudar?",
   "Pode me passar as medidas (largura × altura)?",
@@ -140,13 +162,21 @@ const RESPOSTAS_RAPIDAS = [
   "Consegue me mandar uma foto do local?",
 ];
 
-const ETAPAS_QUADRO: { id: EtapaQuadro; label: string; cor: string }[] = [
-  { id: "NOVA",               label: "Novas",              cor: "bg-slate-400" },
-  { id: "EM_ATENDIMENTO",     label: "Em atendimento",     cor: "bg-blue-500" },
-  { id: "AGUARDANDO_CLIENTE", label: "Aguardando cliente", cor: "bg-amber-500" },
-  { id: "ORCAMENTO_ENVIADO",  label: "Orçamento enviado",  cor: "bg-green-500" },
-  { id: "FECHADO",            label: "Fechado",            cor: "bg-emerald-600" },
-  { id: "SEM_RETORNO",        label: "Sem retorno",        cor: "bg-rose-500" },
+const ETAPAS_QUADRO: { id: EtapaQuadro; label: string; cor: string; resumo: string }[] = [
+  { id: "NOVA",               label: "Novas",              cor: "bg-slate-400",   resumo: "Sem responsável · aguardando triagem" },
+  { id: "EM_ATENDIMENTO",     label: "Em atendimento",     cor: "bg-blue-500",    resumo: "Responsável ativo na conversa" },
+  { id: "AGUARDANDO_CLIENTE", label: "Aguardando cliente", cor: "bg-amber-500",   resumo: "Bola com o cliente · lembrete em 24 h" },
+  { id: "ORCAMENTO_ENVIADO",  label: "Orçamento enviado",  cor: "bg-green-500",   resumo: "Aguardando decisão do cliente" },
+  { id: "FECHADO",            label: "Fechado",            cor: "bg-emerald-600", resumo: "Negócio ganho" },
+  { id: "SEM_RETORNO",        label: "Sem retorno",        cor: "bg-rose-500",    resumo: "Sem resposta há +3 dias" },
+];
+
+type AgrupamentoQuadro = "etapa" | "responsavel" | "canal" | "etiqueta";
+const AGRUPAMENTOS: { id: AgrupamentoQuadro; label: string }[] = [
+  { id: "etapa",       label: "Etapa do atendimento" },
+  { id: "responsavel", label: "Responsável" },
+  { id: "canal",       label: "Canal" },
+  { id: "etiqueta",    label: "Etiqueta" },
 ];
 
 const BOT_ATIVO_ESTADOS = ["TRIAGEM", "COLETANDO", "AGUARDANDO_CONFIRMACAO"];
@@ -548,9 +578,34 @@ function AreaChat({
 }) {
   const [texto, setTexto] = useState("");
   const [arquivo, setArquivo] = useState<File | null>(null);
+  const [leiturasFoto, setLeiturasFoto] = useState<Record<string, { loading?: boolean; texto?: string; erro?: boolean }>>({});
+  const [transcricoes, setTranscricoes] = useState<Record<string, { loading?: boolean; texto?: string; erro?: boolean }>>({});
   const bottomRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const queryClient = useQueryClient();
+
+  async function lerFoto(msgId: string) {
+    setLeiturasFoto((s) => ({ ...s, [msgId]: { loading: true } }));
+    try {
+      const { data } = await axios.post(`/api/whatsapp/conversas/${conversa!.id}/mensagens/${msgId}/ler-foto`);
+      setLeiturasFoto((s) => ({ ...s, [msgId]: { texto: (data as { leitura: string }).leitura } }));
+    } catch {
+      setLeiturasFoto((s) => ({ ...s, [msgId]: { erro: true } }));
+      toast.error("Não foi possível ler a imagem");
+    }
+  }
+
+  async function transcrever(msgId: string) {
+    setTranscricoes((s) => ({ ...s, [msgId]: { loading: true } }));
+    try {
+      const { data } = await axios.post(`/api/whatsapp/conversas/${conversa!.id}/mensagens/${msgId}/transcrever`);
+      setTranscricoes((s) => ({ ...s, [msgId]: { texto: (data as { transcricao: string }).transcricao } }));
+    } catch (e: unknown) {
+      setTranscricoes((s) => ({ ...s, [msgId]: { erro: true } }));
+      const msg = (e as { response?: { data?: { error?: string } } })?.response?.data?.error;
+      toast.error(msg ?? "Não foi possível transcrever o áudio");
+    }
+  }
 
   const { data, isLoading } = useQuery({
     queryKey: ["wa-mensagens", conversa?.id],
@@ -730,6 +785,44 @@ function AreaChat({
                         {(msg.tipo === "texto" || msg.conteudo) && msg.tipo !== "documento" && (
                           <p className="whitespace-pre-wrap break-words">{msg.conteudo}</p>
                         )}
+                        {msg.direcao === "entrada" && msg.tipo === "audio" && msg.mediaUrl && (
+                          <div className="mt-1.5">
+                            {transcricoes[msg.id]?.texto ? (
+                              <div className="border-l-2 border-blue-500/50 pl-2 text-[11px] text-muted-foreground">
+                                {transcricoes[msg.id]!.texto}
+                                <span className="block text-[10px] opacity-70 mt-0.5">Transcrito pela IA · pt-BR</span>
+                              </div>
+                            ) : (
+                              <button
+                                onClick={() => transcrever(msg.id)}
+                                disabled={transcricoes[msg.id]?.loading}
+                                className="inline-flex items-center gap-1 text-[11px] font-semibold text-blue-600 dark:text-blue-400 hover:underline disabled:opacity-50"
+                              >
+                                {transcricoes[msg.id]?.loading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
+                                {transcricoes[msg.id]?.erro ? "Tentar de novo" : "Transcrever"}
+                              </button>
+                            )}
+                          </div>
+                        )}
+                        {msg.direcao === "entrada" && msg.tipo === "imagem" && msg.mediaUrl && (
+                          <div className="mt-1.5">
+                            {leiturasFoto[msg.id]?.texto ? (
+                              <div className="rounded-lg border border-blue-500/30 bg-blue-500/10 p-2 text-[11px] text-blue-900 dark:text-blue-200 flex gap-1.5">
+                                <Sparkles className="w-3 h-3 mt-0.5 shrink-0 text-blue-600 dark:text-blue-400" />
+                                <span>A IA leu a foto: {leiturasFoto[msg.id]!.texto}</span>
+                              </div>
+                            ) : (
+                              <button
+                                onClick={() => lerFoto(msg.id)}
+                                disabled={leiturasFoto[msg.id]?.loading}
+                                className="inline-flex items-center gap-1 text-[11px] font-semibold text-blue-600 dark:text-blue-400 hover:underline disabled:opacity-50"
+                              >
+                                {leiturasFoto[msg.id]?.loading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
+                                {leiturasFoto[msg.id]?.erro ? "Tentar de novo" : "Ler pela IA"}
+                              </button>
+                            )}
+                          </div>
+                        )}
                         <div className={cn(
                           "flex items-center gap-1 mt-1",
                           msg.direcao === "saida" ? "justify-end" : "justify-start"
@@ -835,14 +928,14 @@ function AreaChat({
         )}
       </div>
     </div>
-    <PainelContexto conversa={conversa} />
+    <PainelContexto conversa={conversa} sessaoNome={sessaoNome} />
     </div>
   );
 }
 
 // ── Painel de contexto (ficha do cliente na conversa) ─────────────────────
 
-function PainelContexto({ conversa }: { conversa: Conversa }) {
+function PainelContexto({ conversa, sessaoNome }: { conversa: Conversa; sessaoNome?: string }) {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { user } = useAuth();
@@ -905,6 +998,14 @@ function PainelContexto({ conversa }: { conversa: Conversa }) {
 
   const [resumo, setResumo] = useState<{ itens: { rotulo: string; texto: string }[]; baseadoEm: string } | null>(null);
   useEffect(() => setResumo(null), [conversa.id]);
+
+  const [nota, setNota] = useState(conversa.notaInterna ?? "");
+  useEffect(() => setNota(conversa.notaInterna ?? ""), [conversa.id, conversa.notaInterna]);
+  const salvarNota = () => {
+    const v = nota.trim();
+    if (v === (conversa.notaInterna ?? "").trim()) return;
+    patch.mutate({ notaInterna: v });
+  };
   const gerarResumo = useMutation({
     mutationFn: async () => {
       const { data } = await axios.post(`/api/whatsapp/conversas/${conversa.id}/resumo`);
@@ -925,6 +1026,21 @@ function PainelContexto({ conversa }: { conversa: Conversa }) {
         </div>
         <p className="font-semibold text-sm">{conversa.contatoNome ?? formatPhone(conversa.contatoPhone)}</p>
         <p className="text-xs text-muted-foreground">{formatPhone(conversa.contatoPhone)}</p>
+        <div className="flex gap-2 justify-center mt-3">
+          {cliente && (
+            <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => router.push(`/clientes/${cliente.id}`)}>
+              <ExternalLink className="w-3 h-3 mr-1" /> Abrir ficha
+            </Button>
+          )}
+          <a
+            href={`https://wa.me/${conversa.contatoPhone.replace(/\D/g, "")}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="h-7 px-2.5 inline-flex items-center gap-1 text-xs rounded-md border border-border text-muted-foreground hover:text-foreground"
+          >
+            <Phone className="w-3 h-3" /> WhatsApp
+          </a>
+        </div>
       </div>
 
       {/* Resumo da IA — gerado sob demanda, não persiste */}
@@ -1030,6 +1146,19 @@ function PainelContexto({ conversa }: { conversa: Conversa }) {
             </Button>
           </div>
         )}
+
+        <dl className="grid grid-cols-[70px_1fr] gap-y-1.5 gap-x-2 text-[11px] pt-1">
+          {sessaoNome && (
+            <>
+              <dt className="text-muted-foreground">Canal</dt>
+              <dd className="font-medium">{sessaoNome}</dd>
+            </>
+          )}
+          <dt className="text-muted-foreground">1º contato</dt>
+          <dd className="font-medium tabular-nums">
+            {conversa.createdAt ? format(new Date(conversa.createdAt), "dd/MM/yy HH:mm") : "—"}
+          </dd>
+        </dl>
       </div>
 
       <div className="p-4 space-y-2 border-b border-border">
@@ -1144,6 +1273,108 @@ function PainelContexto({ conversa }: { conversa: Conversa }) {
         )}
       </div>
 
+      {/* Negócio vinculado — vem do orçamento do cliente no CRM */}
+      {cliente && (cliente.servicoBuscado || formatBRL(cliente.valorOrcamento)) && (
+        <div className="p-4 space-y-2 border-b border-border">
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Negócio vinculado</p>
+          <div className="rounded-lg border border-border overflow-hidden">
+            <div className="p-3 bg-muted/40">
+              <p className="text-xs font-medium">{cliente.servicoBuscado ?? "Orçamento em andamento"}</p>
+              {formatBRL(cliente.valorOrcamento) && (
+                <p className="text-sm font-bold mt-0.5 tabular-nums">{formatBRL(cliente.valorOrcamento)}</p>
+              )}
+            </div>
+            {cliente.statusOrcamento && (
+              <div className="px-3 py-2 text-[11px] flex items-center gap-1.5">
+                <span className="text-muted-foreground">Situação:</span>
+                <span className={cn("font-semibold", ORC_STATUS[cliente.statusOrcamento]?.cor)}>
+                  {ORC_STATUS[cliente.statusOrcamento]?.label ?? cliente.statusOrcamento}
+                </span>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Orçamento — resumo do que está no CRM + ações */}
+      {cliente && formatBRL(cliente.valorOrcamento) && (
+        <div className="p-4 space-y-2 border-b border-border">
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Orçamento</p>
+          <div className="rounded-lg border border-border overflow-hidden">
+            <div className="p-3 space-y-1">
+              {cliente.numeroOrcamento && (
+                <div className="flex justify-between text-[11px]">
+                  <span className="text-muted-foreground">Nº</span>
+                  <span className="font-medium">{cliente.numeroOrcamento}</span>
+                </div>
+              )}
+              {cliente.prazoOrcamento && (
+                <div className="flex justify-between text-[11px]">
+                  <span className="text-muted-foreground">Prazo</span>
+                  <span className="font-medium">{format(new Date(cliente.prazoOrcamento), "dd/MM/yy")}</span>
+                </div>
+              )}
+              <div className="flex justify-between text-xs border-t border-dashed border-border pt-1.5 mt-1">
+                <span className="font-medium">Total</span>
+                <span className="font-bold tabular-nums">{formatBRL(cliente.valorOrcamento)}</span>
+              </div>
+            </div>
+            <div className="flex gap-2 p-2 border-t border-border bg-muted/40">
+              <Button size="sm" variant="outline" className="h-7 text-[11px] flex-1" onClick={() => router.push(`/clientes/${cliente.id}`)}>
+                <ExternalLink className="w-3 h-3 mr-1" /> Abrir no CRM
+              </Button>
+              <Button
+                size="sm"
+                className="h-7 text-[11px] flex-1 bg-green-600 hover:bg-green-700 text-white opacity-60"
+                disabled
+                title="Integração de pagamento entra na próxima fase"
+              >
+                <CreditCard className="w-3 h-3 mr-1" /> Link de pagamento
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Notas da equipe */}
+      <div className="p-4 space-y-2 border-b border-border">
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground flex items-center gap-1.5">
+          <StickyNote className="w-3 h-3" /> Notas da equipe
+        </p>
+        <textarea
+          value={nota}
+          onChange={(e) => setNota(e.target.value)}
+          onBlur={salvarNota}
+          rows={2}
+          placeholder="Anotação visível só pra equipe…"
+          className="w-full text-xs rounded-md border border-dashed border-border bg-muted/40 px-2.5 py-2 outline-none focus:ring-2 focus:ring-green-500/30 resize-none"
+        />
+        {patch.isPending && <p className="text-[10px] text-muted-foreground">salvando…</p>}
+      </div>
+
+      {/* Atividade */}
+      <div className="p-4 space-y-2">
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground flex items-center gap-1.5">
+          <Activity className="w-3 h-3" /> Atividade
+        </p>
+        <div className="relative pl-4 space-y-2.5 before:absolute before:left-[3px] before:top-1 before:bottom-1 before:w-px before:bg-border">
+          {[
+            cliente?.orcamentoEnviadoEm && { t: "Orçamento enviado", d: cliente.orcamentoEnviadoEm, g: true },
+            conversa.responsavel && { t: `Responsável: ${conversa.responsavel.nome}`, d: null, g: false },
+            cliente?.createdAt && { t: "Cliente registrado no CRM", d: cliente.createdAt, g: true },
+            conversa.createdAt && { t: "Conversa iniciada no WhatsApp", d: conversa.createdAt, g: false },
+          ]
+            .filter((x): x is { t: string; d: string | null; g: boolean } => Boolean(x))
+            .map((ev, i) => (
+              <div key={i} className="relative text-[11px] text-muted-foreground">
+                <span className={cn("absolute -left-4 top-1 w-1.5 h-1.5 rounded-full ring-2 ring-background", ev.g ? "bg-green-500" : "bg-muted-foreground/50")} />
+                <span className="text-foreground">{ev.t}</span>
+                {ev.d && <span className="block text-[10px]">{format(new Date(ev.d), "dd/MM/yy HH:mm")}</span>}
+              </div>
+            ))}
+        </div>
+      </div>
+
       {conversa.agentEstado && BOT_ATIVO_ESTADOS.includes(conversa.agentEstado.estado) && (
         <div className="px-4 pb-4">
           <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-700 dark:text-amber-400">
@@ -1156,12 +1387,6 @@ function PainelContexto({ conversa }: { conversa: Conversa }) {
 }
 
 // ── Painel de configurações ────────────────────────────────────────────────
-
-const HEALTH_BADGE: Record<Sessao["healthStatus"], string> = {
-  HEALTHY: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
-  STALE: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
-  UNKNOWN: "",
-};
 
 interface LogSessao {
   id: string;
@@ -1215,55 +1440,95 @@ function LinhaSessao({
     },
   });
 
+  const online = sessao.status === "ONLINE";
+  const aguardandoQr = sessao.status === "WAITING_QR";
+  const stale = sessao.healthStatus === "STALE";
+
   return (
-    <div className="rounded-xl border border-border bg-card overflow-hidden">
-      <div className="flex items-center gap-3 p-4">
-        <div className="w-10 h-10 rounded-xl bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 flex items-center justify-center text-sm font-bold shrink-0">
+    <div className="rounded-xl border border-border bg-card overflow-hidden shadow-sm">
+      <div className="flex items-center gap-3.5 p-4">
+        <div
+          className={cn(
+            "w-11 h-11 rounded-xl flex items-center justify-center text-sm font-bold shrink-0",
+            stale
+              ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
+              : online
+                ? "bg-green-600 text-white"
+                : "bg-muted text-muted-foreground border border-border"
+          )}
+        >
           {getInitials(sessao.nome)}
         </div>
         <div className="flex-1 min-w-0">
-          <p className="font-medium text-sm">{sessao.nome}</p>
-          <p className="text-xs text-muted-foreground truncate">
-            {sessao.numero ? formatPhone(sessao.numero) : "Aguardando conexão via QR Code"}
-          </p>
-          <p className="text-xs text-muted-foreground">
-            {sessao.atendente ? `Atendente: ${sessao.atendente.nome}` : "Não atribuído"}
-          </p>
-        </div>
-        <div className="flex flex-col items-end gap-1 shrink-0">
-          <Badge variant={sessao.status === "ONLINE" ? "default" : "secondary"} className={sessao.status === "ONLINE" ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400" : ""}>
-            {sessao.status}
-          </Badge>
-          {sessao.healthStatus !== "UNKNOWN" && (
-            <Badge variant="secondary" className={cn("text-[10px]", HEALTH_BADGE[sessao.healthStatus])}>
-              {sessao.healthStatus === "STALE" ? "sem sinal há tempo" : "saudável"}
-            </Badge>
-          )}
+          <p className="font-semibold text-sm">{sessao.nome}</p>
+          <div className="flex flex-wrap items-center gap-1.5 mt-1 text-[11px]">
+            <span className="text-muted-foreground">
+              {sessao.numero ? formatPhone(sessao.numero) : "Aguardando conexão via QR Code"}
+            </span>
+            <span
+              className={cn(
+                "inline-flex items-center gap-1 rounded-full border px-1.5 py-px font-semibold",
+                online
+                  ? "border-green-500/40 text-green-600 dark:text-green-400"
+                  : aguardandoQr
+                    ? "border-amber-500/40 text-amber-600 dark:text-amber-400"
+                    : "border-border text-muted-foreground"
+              )}
+            >
+              <span className={cn("w-1.5 h-1.5 rounded-full", online ? "bg-green-500" : aguardandoQr ? "bg-amber-500" : "bg-muted-foreground")} />
+              {online ? "Conectado" : aguardandoQr ? "Aguardando leitura" : "Desconectado"}
+            </span>
+            {sessao.healthStatus !== "UNKNOWN" && (
+              <span className={cn("inline-flex items-center gap-1 rounded-full border border-border px-1.5 py-px font-semibold", stale ? "text-amber-600 dark:text-amber-400" : "text-muted-foreground")}>
+                <span className={cn("w-1.5 h-1.5 rounded-full", stale ? "bg-amber-500" : "bg-green-500")} />
+                {stale ? "Sem sinal há tempo" : "Saudável"}
+              </span>
+            )}
+          </div>
         </div>
         {podeGerenciar && (
-          <div className="flex items-center gap-1 shrink-0">
-            <Button size="icon" variant="ghost" className="w-8 h-8" title="Reiniciar" onClick={() => reiniciar.mutate()} disabled={reiniciar.isPending}>
-              <RefreshCw className={cn("w-4 h-4", reiniciar.isPending && "animate-spin")} />
+          <div className="flex items-center gap-1.5 shrink-0">
+            <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => reiniciar.mutate()} disabled={reiniciar.isPending}>
+              <RefreshCw className={cn("w-3.5 h-3.5 mr-1", reiniciar.isPending && "animate-spin")} />
+              Reconectar
             </Button>
-            <Button size="icon" variant="ghost" className="w-8 h-8" title="Desconectar" onClick={() => desconectar.mutate()} disabled={desconectar.isPending}>
-              <PowerOff className="w-4 h-4" />
+            <Button size="icon" variant="ghost" className="w-7 h-7" title="Desconectar" onClick={() => desconectar.mutate()} disabled={desconectar.isPending}>
+              <PowerOff className="w-3.5 h-3.5" />
             </Button>
-            <Button size="icon" variant="ghost" className="w-8 h-8" title="Histórico" onClick={() => setLogsAbertos((v) => !v)}>
-              <History className="w-4 h-4" />
-              {logsAbertos ? <ChevronUp className="w-3 h-3 -ml-1" /> : <ChevronDown className="w-3 h-3 -ml-1" />}
+            <Button size="icon" variant="ghost" className="w-7 h-7" title="Histórico" onClick={() => setLogsAbertos((v) => !v)}>
+              <History className="w-3.5 h-3.5" />
             </Button>
             <Button
-              size="icon"
+              size="sm"
               variant="ghost"
-              className="text-destructive hover:text-destructive hover:bg-destructive/10 w-8 h-8"
-              title="Remover sessão"
+              className="h-7 text-xs text-destructive hover:text-destructive hover:bg-destructive/10"
+              title="Remover canal"
               onClick={() => onDelete(sessao.id)}
             >
-              <Trash2 className="w-4 h-4" />
+              <Trash2 className="w-3.5 h-3.5 mr-1" />
+              Remover
             </Button>
           </div>
         )}
       </div>
+
+      <div className={cn("px-4 py-2 border-t border-border text-[11px] flex items-center gap-1.5", stale ? "text-amber-600 dark:text-amber-400" : "text-muted-foreground")}>
+        <Clock className="w-3 h-3 shrink-0" />
+        {stale
+          ? "Não recebe mensagens há um tempo. Verifique se o celular está online, ou reconecte."
+          : `Dono: ${sessao.atendente?.nome ?? "não atribuído"}`}
+      </div>
+
+      {aguardandoQr && (
+        <div className="border-t border-border bg-muted/30 px-4 py-3 text-[11px] text-muted-foreground">
+          <p className="font-semibold text-foreground mb-1">Para conectar este número:</p>
+          <ol className="list-decimal list-inside space-y-0.5">
+            <li>No celular: WhatsApp → <b>Aparelhos conectados</b></li>
+            <li>Toque em <b>Conectar um aparelho</b></li>
+            <li>Use <b>Reconectar</b> acima para gerar o QR Code</li>
+          </ol>
+        </div>
+      )}
 
       {logsAbertos && (
         <div className="border-t border-border bg-muted/30 px-4 py-3 text-xs space-y-1.5 max-h-48 overflow-auto">
@@ -1305,50 +1570,68 @@ function PainelConfig({
   onEscopoChange: (v: "todas" | "minhas") => void;
 }) {
   return (
-    <div className="flex-1 flex flex-col p-6 gap-6 overflow-auto">
-      <div>
-        <h2 className="text-lg font-semibold flex items-center gap-2">
-          <Settings className="w-5 h-5" />
-          Sessões WhatsApp
-        </h2>
-        <p className="text-sm text-muted-foreground mt-1">
-          Gerencie as sessões WhatsApp conectadas ao CRM via gateway próprio (sem migrar número pra Meta).
+    <div className="flex-1 min-w-0 overflow-y-auto">
+      <div className="max-w-3xl mx-auto px-6 py-7 pb-16">
+        <h2 className="text-xl font-bold tracking-tight">Canais conectados</h2>
+        <p className="text-sm text-muted-foreground mt-1 max-w-[60ch]">
+          Cada número de WhatsApp é um canal ligado ao CRM por QR Code — sem migrar pra Meta. Você
+          conecta, reconecta ou remove um número quando quiser (número errado, troca de aparelho,
+          sair e entrar de novo).
         </p>
-      </div>
 
-      {podeVerTodas && (
-        <div className="inline-flex rounded-lg border border-border p-0.5 text-sm w-fit">
-          {(["todas", "minhas"] as const).map((op) => (
-            <button
-              key={op}
-              onClick={() => onEscopoChange(op)}
-              className={cn(
-                "px-3 py-1 rounded-md transition-colors capitalize",
-                escopo === op ? "bg-accent text-foreground font-medium" : "text-muted-foreground hover:text-foreground"
-              )}
-            >
-              {op === "todas" ? "Todas" : "Minhas"}
-            </button>
-          ))}
+        <div className="flex items-center gap-3 mt-5 mb-4">
+          {podeVerTodas && (
+            <div className="inline-flex rounded-lg border border-border bg-muted/40 p-0.5 text-xs w-fit">
+              {(["todas", "minhas"] as const).map((op) => (
+                <button
+                  key={op}
+                  onClick={() => onEscopoChange(op)}
+                  className={cn(
+                    "px-3 py-1 rounded-md font-semibold transition-colors",
+                    escopo === op ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  {op === "todas" ? "Todos os canais" : "Só os meus"}
+                </button>
+              ))}
+            </div>
+          )}
+          <span className="flex-1" />
+          {podeAdicionar && (
+            <Button size="sm" className="h-8 text-xs bg-green-600 hover:bg-green-700 text-white" onClick={onAdd}>
+              <Plus className="w-3.5 h-3.5 mr-1" />
+              Adicionar número
+            </Button>
+          )}
         </div>
-      )}
 
-      <div className="space-y-3 max-w-xl">
-        {sessoes.map((s) => (
-          <LinhaSessao
-            key={s.id}
-            sessao={s}
-            podeGerenciar={podeVerTodas || s.atendenteId === meuUserId}
-            onDelete={onDelete}
-          />
-        ))}
+        <div className="space-y-3">
+          {sessoes.map((s) => (
+            <LinhaSessao
+              key={s.id}
+              sessao={s}
+              podeGerenciar={podeVerTodas || s.atendenteId === meuUserId}
+              onDelete={onDelete}
+            />
+          ))}
 
-        {podeAdicionar && (
-          <Button variant="outline" className="w-full" onClick={onAdd}>
-            <Plus className="w-4 h-4 mr-2" />
-            Nova sessão
-          </Button>
-        )}
+          {sessoes.length === 0 && (
+            <p className="text-sm text-muted-foreground text-center py-8">Nenhum canal conectado ainda.</p>
+          )}
+
+          {podeAdicionar && (
+            <div className="rounded-xl border border-dashed border-border p-5 text-center">
+              <p className="text-sm font-semibold">Adicionar mais um número</p>
+              <p className="text-xs text-muted-foreground mt-1 mb-3">
+                Conecte quantos números precisar. Cada atendente enxerga só o seu; Admin e Dev veem todos.
+              </p>
+              <Button size="sm" className="h-8 text-xs bg-green-600 hover:bg-green-700 text-white" onClick={onAdd}>
+                <Plus className="w-3.5 h-3.5 mr-1" />
+                Conectar número
+              </Button>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -1401,19 +1684,22 @@ function KanbanCard({ c, onAbrir }: { c: Conversa; onAbrir: (c: Conversa) => voi
 }
 
 function KanbanColuna({
-  etapa, label, cor, conversas, onAbrir,
+  etapa, label, cor, resumo, conversas, onAbrir,
 }: {
-  etapa: EtapaQuadro; label: string; cor: string; conversas: Conversa[]; onAbrir: (c: Conversa) => void;
+  etapa: EtapaQuadro; label: string; cor: string; resumo?: string; conversas: Conversa[]; onAbrir: (c: Conversa) => void;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: etapa, data: { etapa } });
   return (
     <div className="w-64 shrink-0 flex flex-col rounded-xl border border-border bg-muted/30 max-h-full">
-      <div className="px-3 py-2.5 border-b border-border/60 flex items-center gap-2">
-        <span className={cn("w-2 h-2 rounded-full", cor)} />
-        <span className="text-xs font-bold">{label}</span>
-        <span className="ml-auto text-[11px] font-semibold text-muted-foreground bg-background rounded-full px-1.5">
-          {conversas.length}
-        </span>
+      <div className="px-3 py-2.5 border-b border-border/60">
+        <div className="flex items-center gap-2">
+          <span className={cn("w-2 h-2 rounded-full", cor)} />
+          <span className="text-xs font-bold">{label}</span>
+          <span className="ml-auto text-[11px] font-semibold text-muted-foreground bg-background rounded-full px-1.5">
+            {conversas.length}
+          </span>
+        </div>
+        {resumo && <p className="text-[10px] text-muted-foreground mt-1">{resumo}</p>}
       </div>
       <div
         ref={setNodeRef}
@@ -1429,6 +1715,54 @@ function KanbanColuna({
   );
 }
 
+// Coluna estática (agrupamentos que não são "etapa" — sem arrastar)
+function ColunaSimples({
+  label, cor, conversas, onAbrir,
+}: {
+  label: string; cor: string; conversas: Conversa[]; onAbrir: (c: Conversa) => void;
+}) {
+  return (
+    <div className="w-64 shrink-0 flex flex-col rounded-xl border border-border bg-muted/30 max-h-full">
+      <div className="px-3 py-2.5 border-b border-border/60 flex items-center gap-2">
+        <span className={cn("w-2 h-2 rounded-full", cor)} />
+        <span className="text-xs font-bold truncate">{label}</span>
+        <span className="ml-auto text-[11px] font-semibold text-muted-foreground bg-background rounded-full px-1.5">
+          {conversas.length}
+        </span>
+      </div>
+      <div className="flex-1 overflow-y-auto p-2 flex flex-col gap-2 min-h-[60px]">
+        {conversas.map((c) => (
+          <button
+            key={c.id}
+            onClick={() => onAbrir(c)}
+            className="rounded-lg border border-border bg-card p-2.5 text-left"
+          >
+            <div className="flex items-start justify-between gap-2">
+              <p className="text-xs font-semibold leading-tight line-clamp-2">
+                {c.cliente?.nome ?? c.contatoNome ?? formatPhone(c.contatoPhone)}
+              </p>
+              {c.naoLidas > 0 && <span className="w-2 h-2 rounded-full bg-green-500 shrink-0 mt-1" />}
+            </div>
+            {c.mensagens?.[0]?.conteudo && (
+              <p className="text-[11px] text-muted-foreground mt-1 line-clamp-1">{c.mensagens[0].conteudo}</p>
+            )}
+            <div className="flex items-center gap-2 mt-2">
+              {c.responsavel ? (
+                <span className="w-4 h-4 rounded-full bg-blue-500 text-white text-[8px] font-bold flex items-center justify-center">
+                  {getInitials(c.responsavel.nome)}
+                </span>
+              ) : (
+                <span className="w-4 h-4 rounded-full border border-dashed border-muted-foreground/50" />
+              )}
+              <span className="ml-auto text-[10px] text-muted-foreground">{c.ultimaMsgEm ? formatTime(c.ultimaMsgEm) : ""}</span>
+            </div>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function QuadroKanban({
   sessaoId, onAbrir,
 }: {
@@ -1436,6 +1770,7 @@ function QuadroKanban({
 }) {
   const queryClient = useQueryClient();
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
+  const [agrupar, setAgrupar] = useState<AgrupamentoQuadro>("etapa");
 
   const { data: conversas = [] } = useQuery({
     queryKey: ["wa-quadro", sessaoId],
@@ -1446,6 +1781,15 @@ function QuadroKanban({
     },
     enabled: !!sessaoId,
     refetchInterval: 8000,
+  });
+
+  const { data: sessoesQuadro = [] } = useQuery({
+    queryKey: ["wa-sessoes-quadro"],
+    queryFn: async () => {
+      const { data } = await axios.get("/api/whatsapp/sessoes?escopo=todas");
+      return data as Sessao[];
+    },
+    enabled: agrupar === "canal",
   });
 
   const { data: metricas } = useQuery({
@@ -1473,6 +1817,39 @@ function QuadroKanban({
   const porEtapa = (e: EtapaQuadro) => conversas.filter((c) => (c.etapa ?? "NOVA") === e);
   const naoAtribuidas = conversas.filter((c) => !c.responsavelId).length;
 
+  // Colunas dinâmicas para agrupamentos que não são "etapa"
+  const CORES_COL = ["bg-blue-500", "bg-green-500", "bg-amber-500", "bg-purple-500", "bg-rose-500", "bg-cyan-500", "bg-slate-400"];
+  const VAZIO = ["Sem responsável", "Sem etiqueta", "Outro canal"];
+  const colunasDinamicas: { label: string; cor: string; conversas: Conversa[] }[] = (() => {
+    if (agrupar === "etapa") return [];
+    const nomeSessao = new Map(sessoesQuadro.map((s) => [s.id, s.nome]));
+    const grupos = new Map<string, Conversa[]>();
+    const add = (k: string, c: Conversa) => {
+      const arr = grupos.get(k);
+      if (arr) arr.push(c);
+      else grupos.set(k, [c]);
+    };
+    for (const c of conversas) {
+      if (agrupar === "responsavel") add(c.responsavel?.nome ?? "Sem responsável", c);
+      else if (agrupar === "canal") add(nomeSessao.get(c.sessaoId) ?? "Outro canal", c);
+      else {
+        const ts = c.tags && c.tags.length ? c.tags : ["Sem etiqueta"];
+        for (const t of ts) add(t, c);
+      }
+    }
+    return Array.from(grupos.entries())
+      .sort((a, b) => {
+        const av = VAZIO.includes(a[0]) ? 1 : 0;
+        const bv = VAZIO.includes(b[0]) ? 1 : 0;
+        return av - bv || b[1].length - a[1].length || a[0].localeCompare(b[0]);
+      })
+      .map(([label, cs], i) => ({
+        label,
+        cor: VAZIO.includes(label) ? "bg-slate-400" : CORES_COL[i % CORES_COL.length],
+        conversas: cs,
+      }));
+  })();
+
   function onDragEnd(evt: DragEndEvent) {
     const { active, over } = evt;
     if (!over) return;
@@ -1495,11 +1872,23 @@ function QuadroKanban({
 
   return (
     <div className="flex-1 flex flex-col min-w-0 p-4 gap-3 overflow-hidden">
-      <div className="flex items-baseline gap-3">
+      <div className="flex items-baseline gap-3 flex-wrap">
         <h2 className="text-base font-bold">Quadro de atendimento</h2>
         <span className="text-xs text-muted-foreground">
           {conversas.length} conversas · {naoAtribuidas} sem responsável
         </span>
+        <label className="ml-auto flex items-center gap-1.5 text-xs text-muted-foreground">
+          Agrupar por
+          <select
+            value={agrupar}
+            onChange={(e) => setAgrupar(e.target.value as AgrupamentoQuadro)}
+            className="text-xs font-semibold text-foreground bg-muted/40 border border-border rounded-md px-2 py-1 outline-none"
+          >
+            {AGRUPAMENTOS.map((a) => (
+              <option key={a.id} value={a.id}>{a.label}</option>
+            ))}
+          </select>
+        </label>
       </div>
       {kpis.length > 0 && (
         <div className="flex gap-2 flex-wrap">
@@ -1511,20 +1900,32 @@ function QuadroKanban({
           ))}
         </div>
       )}
-      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
+      {agrupar === "etapa" ? (
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
+          <div className="flex-1 flex gap-3 overflow-x-auto pb-2">
+            {ETAPAS_QUADRO.map((col) => (
+              <KanbanColuna
+                key={col.id}
+                etapa={col.id}
+                label={col.label}
+                cor={col.cor}
+                resumo={col.resumo}
+                conversas={porEtapa(col.id)}
+                onAbrir={onAbrir}
+              />
+            ))}
+          </div>
+        </DndContext>
+      ) : (
         <div className="flex-1 flex gap-3 overflow-x-auto pb-2">
-          {ETAPAS_QUADRO.map((col) => (
-            <KanbanColuna
-              key={col.id}
-              etapa={col.id}
-              label={col.label}
-              cor={col.cor}
-              conversas={porEtapa(col.id)}
-              onAbrir={onAbrir}
-            />
+          {colunasDinamicas.map((col) => (
+            <ColunaSimples key={col.label} label={col.label} cor={col.cor} conversas={col.conversas} onAbrir={onAbrir} />
           ))}
+          {colunasDinamicas.length === 0 && (
+            <p className="text-sm text-muted-foreground p-4">Nenhuma conversa pra agrupar.</p>
+          )}
         </div>
-      </DndContext>
+      )}
     </div>
   );
 }

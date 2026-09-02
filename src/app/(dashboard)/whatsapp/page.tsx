@@ -17,6 +17,7 @@ import {
   Loader2, Settings, ChevronLeft, Check, CheckCheck,
   Search, Smartphone, RefreshCw, PowerOff, ChevronDown, ChevronUp, History,
   Paperclip, FileText, X as XIcon, Download, UserRound, ExternalLink, Sparkles,
+  Zap, Clock, ArrowRight, Activity, Inbox,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -539,9 +540,11 @@ function BolhaMedia({ msg }: { msg: Mensagem }) {
 function AreaChat({
   conversa,
   onBack,
+  sessaoNome,
 }: {
   conversa: Conversa | null;
   onBack: () => void;
+  sessaoNome?: string;
 }) {
   const [texto, setTexto] = useState("");
   const [arquivo, setArquivo] = useState<File | null>(null);
@@ -635,6 +638,13 @@ function AreaChat({
   }
 
   const mensagens = data?.mensagens ?? [];
+
+  // Janela de resposta livre do WhatsApp: 24 h após a última mensagem do
+  // cliente. Depois disso só modelo aprovado (regra da Meta).
+  const ultimaEntrada = [...mensagens].reverse().find((m) => m.direcao === "entrada");
+  const janelaRestanteMs = ultimaEntrada
+    ? 24 * 3600 * 1000 - (Date.now() - new Date(ultimaEntrada.enviadaEm).getTime())
+    : null;
 
   // Agrupa mensagens por data
   const groups: { date: string; msgs: Mensagem[] }[] = [];
@@ -811,6 +821,18 @@ function AreaChat({
             )}
           </Button>
         </div>
+        {sessaoNome && (
+          <p className="flex items-center gap-1.5 mt-2 px-0.5 text-[11px] text-muted-foreground">
+            <Clock className="w-3 h-3 shrink-0" />
+            Respondendo pelo canal <b className="text-foreground font-semibold">{sessaoNome}</b>
+            {janelaRestanteMs != null && janelaRestanteMs > 0 && (
+              <span>· janela de resposta fecha em <span className="tabular-nums">{formatDuracao(janelaRestanteMs)}</span></span>
+            )}
+            {janelaRestanteMs != null && janelaRestanteMs <= 0 && (
+              <span className="text-amber-600 dark:text-amber-500">· janela de 24 h expirada — só modelo aprovado</span>
+            )}
+          </p>
+        )}
       </div>
     </div>
     <PainelContexto conversa={conversa} />
@@ -881,6 +903,20 @@ function PainelContexto({ conversa }: { conversa: Conversa }) {
     },
   });
 
+  const [resumo, setResumo] = useState<{ itens: { rotulo: string; texto: string }[]; baseadoEm: string } | null>(null);
+  useEffect(() => setResumo(null), [conversa.id]);
+  const gerarResumo = useMutation({
+    mutationFn: async () => {
+      const { data } = await axios.post(`/api/whatsapp/conversas/${conversa.id}/resumo`);
+      return data as { itens: { rotulo: string; texto: string }[]; baseadoEm: string };
+    },
+    onSuccess: (d) => setResumo(d),
+    onError: (e: unknown) => {
+      const msg = (e as { response?: { data?: { error?: string } } })?.response?.data?.error;
+      toast.error(msg ?? "Não foi possível gerar o resumo");
+    },
+  });
+
   return (
     <aside className="hidden xl:flex flex-col w-72 border-l border-border bg-background shrink-0 min-h-0 overflow-y-auto">
       <div className="p-4 text-center border-b border-border">
@@ -889,6 +925,53 @@ function PainelContexto({ conversa }: { conversa: Conversa }) {
         </div>
         <p className="font-semibold text-sm">{conversa.contatoNome ?? formatPhone(conversa.contatoPhone)}</p>
         <p className="text-xs text-muted-foreground">{formatPhone(conversa.contatoPhone)}</p>
+      </div>
+
+      {/* Resumo da IA — gerado sob demanda, não persiste */}
+      <div className="p-4 border-b border-border bg-blue-500/[0.04]">
+        <div className="flex items-center gap-2 mb-2">
+          <Sparkles className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+          <p className="text-[11px] font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400 flex-1">
+            Resumo da IA
+          </p>
+          {resumo && (
+            <button
+              onClick={() => gerarResumo.mutate()}
+              disabled={gerarResumo.isPending}
+              className="text-[10px] font-semibold text-muted-foreground hover:text-blue-600 flex items-center gap-1 disabled:opacity-50"
+            >
+              {gerarResumo.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
+              Atualizar
+            </button>
+          )}
+        </div>
+
+        {!resumo && !gerarResumo.isPending && (
+          <button
+            onClick={() => gerarResumo.mutate()}
+            className="w-full text-xs font-semibold rounded-md border border-blue-500/40 text-blue-600 dark:text-blue-400 py-1.5 hover:bg-blue-500/10"
+          >
+            Gerar resumo
+          </button>
+        )}
+        {gerarResumo.isPending && (
+          <div className="flex items-center gap-2 text-xs text-muted-foreground py-1">
+            <Loader2 className="w-3.5 h-3.5 animate-spin" /> Lendo a conversa…
+          </div>
+        )}
+        {resumo && (
+          <>
+            <ul className="space-y-1.5">
+              {resumo.itens.map((it, i) => (
+                <li key={i} className="grid grid-cols-[64px_1fr] gap-2 text-xs">
+                  <span className="text-[10px] uppercase tracking-wide text-muted-foreground pt-0.5">{it.rotulo}</span>
+                  <span className="text-foreground">{it.texto}</span>
+                </li>
+              ))}
+            </ul>
+            <p className="text-[10px] text-muted-foreground mt-2">Gerado a partir de {resumo.baseadoEm}</p>
+          </>
+        )}
       </div>
 
       <div className="p-4 space-y-3 border-b border-border">
@@ -1446,6 +1529,134 @@ function QuadroKanban({
   );
 }
 
+// ── Automações (gatilho → ação) ────────────────────────────────────────────
+
+interface RegraAuto {
+  ativa: boolean;
+  gatilho: string;
+  acoes: string[];
+  meta: string[];
+}
+
+const REGRAS_AUTO: RegraAuto[] = [
+  {
+    ativa: true,
+    gatilho: "Contato novo (número desconhecido)",
+    acoes: ["cria conversa em “Novas”", "envia saudação", "atribui por rodízio"],
+    meta: ["Disparou 47× esta semana", "Última: há 6 min"],
+  },
+  {
+    ativa: true,
+    gatilho: "Cliente envia áudio",
+    acoes: ["transcreve", "atualiza o resumo da IA"],
+    meta: ["Disparou 31× esta semana", "Custo médio: R$ 0,04 / áudio"],
+  },
+  {
+    ativa: true,
+    gatilho: "Sem resposta há 24 h em “Orçamento enviado”",
+    acoes: ["notifica o responsável", "move p/ “Aguardando cliente”"],
+    meta: ["Disparou 12× esta semana", "7 retomaram a conversa depois"],
+  },
+  {
+    ativa: true,
+    gatilho: "Cliente responde “fechado / aprovado / pode fazer”",
+    acoes: ["move p/ “Fechado”", "gera link de pagamento", "converte oportunidade em ganho"],
+    meta: ["Disparou 5× esta semana", "R$ 8.140 em pagamentos gerados"],
+  },
+  {
+    ativa: false,
+    gatilho: "Mensagem fora do horário (18h–8h e fins de semana)",
+    acoes: ["responde “retornamos no próximo dia útil”", "marca como “Pendente”"],
+    meta: ["Pausada"],
+  },
+];
+
+function PainelAutomacoes() {
+  const ativas = REGRAS_AUTO.filter((r) => r.ativa).length;
+  return (
+    <div className="flex-1 min-w-0 overflow-y-auto">
+      <div className="max-w-3xl mx-auto px-6 py-7 pb-16">
+        <h2 className="text-xl font-bold tracking-tight">Automações</h2>
+        <p className="text-sm text-muted-foreground mt-1 max-w-[60ch]">
+          Regras de <b className="text-foreground">gatilho → ação</b> que rodam sozinhas sobre cada
+          conversa, no mesmo motor de eventos do módulo — sem robô paralelo.
+        </p>
+
+        <div className="mt-4 rounded-lg border border-blue-500/30 bg-blue-500/5 px-3 py-2 text-xs text-blue-700 dark:text-blue-300 flex items-start gap-2">
+          <Sparkles className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+          <span>
+            <b>Prévia.</b> As regras abaixo mostram como o painel vai funcionar. O motor que liga e
+            desliga cada uma entra na próxima fase — por enquanto elas são só ilustrativas.
+          </span>
+        </div>
+
+        <div className="flex items-center mt-5 mb-3">
+          <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+            {ativas} ativas · {REGRAS_AUTO.length - ativas} pausada
+          </span>
+          <span className="flex-1" />
+          <Button size="sm" disabled className="h-8 text-xs bg-green-600 text-white opacity-60">
+            <Plus className="w-3.5 h-3.5 mr-1" /> Nova regra
+          </Button>
+        </div>
+
+        <div className="flex flex-col gap-2.5">
+          {REGRAS_AUTO.map((r, i) => (
+            <div
+              key={i}
+              className={cn(
+                "rounded-xl border border-border bg-background shadow-sm p-3.5 flex gap-3.5 items-start",
+                !r.ativa && "opacity-60"
+              )}
+            >
+              <span
+                className={cn(
+                  "mt-0.5 w-9 h-5 rounded-full shrink-0 relative transition-colors",
+                  r.ativa ? "bg-green-500" : "bg-muted-foreground/30"
+                )}
+              >
+                <span
+                  className={cn(
+                    "absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all",
+                    r.ativa ? "left-[18px]" : "left-0.5"
+                  )}
+                />
+              </span>
+              <div className="flex-1 min-w-0">
+                <div className="flex flex-wrap items-center gap-1.5 text-[13px]">
+                  <span className="inline-flex items-center gap-1 rounded-md border border-blue-500/35 bg-muted/60 px-2 py-0.5 text-xs font-semibold text-blue-600 dark:text-blue-400">
+                    <Zap className="w-3 h-3" />
+                    {r.gatilho}
+                  </span>
+                  {r.acoes.map((a, j) => (
+                    <span key={j} className="inline-flex items-center gap-1">
+                      <ArrowRight className="w-3 h-3 text-muted-foreground" />
+                      <span className="inline-flex items-center gap-1 rounded-md border border-green-500/35 bg-muted/60 px-2 py-0.5 text-xs font-semibold text-green-600 dark:text-green-400">
+                        {a}
+                      </span>
+                    </span>
+                  ))}
+                </div>
+                <div className="flex flex-wrap gap-x-3 gap-y-1 mt-2 text-[11px] text-muted-foreground">
+                  {r.meta.map((m, j) => (
+                    <span key={j}>{m}</span>
+                  ))}
+                </div>
+              </div>
+              <button
+                disabled
+                className="text-[11px] font-semibold rounded-md border border-border bg-muted/50 px-2.5 py-1 text-muted-foreground opacity-60 shrink-0"
+              >
+                Editar
+              </button>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Página principal ───────────────────────────────────────────────────────
 
 function WhatsAppContent() {
@@ -1461,7 +1672,7 @@ function WhatsAppContent() {
   const [conversa, setConversa] = useState<Conversa | null>(null);
   const [searchConversa, setSearchConversa] = useState("");
   const [modalAberto, setModalAberto] = useState(false);
-  const [aba, setAba] = useState<"conversas" | "quadro" | "canais">("conversas");
+  const [aba, setAba] = useState<"conversas" | "quadro" | "automacoes" | "canais">("conversas");
   const [escopo, setEscopo] = useState<"todas" | "minhas">("todas");
   const [filtro, setFiltro] = useState<FiltroFila>("todas");
   const queryClient = useQueryClient();
@@ -1549,7 +1760,12 @@ function WhatsAppContent() {
     );
   }
 
-  const abaBtn = (id: "conversas" | "quadro" | "canais", label: string, extra?: React.ReactNode) => (
+  const abaBtn = (
+    id: "conversas" | "quadro" | "automacoes" | "canais",
+    label: string,
+    icon: React.ReactNode,
+    extra?: React.ReactNode,
+  ) => (
     <button
       onClick={() => { setAba(id); if (id !== "conversas") setConversa(null); }}
       className={cn(
@@ -1557,6 +1773,7 @@ function WhatsAppContent() {
         aba === id ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
       )}
     >
+      {icon}
       {label}
       {extra}
     </button>
@@ -1564,13 +1781,20 @@ function WhatsAppContent() {
 
   return (
     <div className="h-full flex flex-col overflow-hidden rounded-xl border border-border bg-background shadow-sm -m-4 md:-m-6">
-      {/* Navegação do módulo — Conversas | Canais (gestão de números) */}
+      {/* Navegação do módulo — Caixa de entrada | Quadro | Automações | Canais */}
       <div className="flex items-center gap-1 px-2.5 h-11 border-b border-border bg-muted/40 shrink-0">
-        {abaBtn("conversas", "Conversas")}
-        {sessoes.length > 0 && abaBtn("quadro", "Quadro")}
+        <div className="flex items-center gap-2 pl-1 pr-3 mr-1 border-r border-border shrink-0">
+          <span className="w-2 h-2 rounded-full bg-green-500 shadow-[0_0_0_3px] shadow-green-500/20" />
+          <span className="text-sm font-bold tracking-tight hidden sm:inline">Atendimento WhatsApp</span>
+          <span className="text-[10px] font-bold tracking-wider text-blue-600 dark:text-blue-400 border border-blue-500/40 rounded px-1 py-px">IA</span>
+        </div>
+        {abaBtn("conversas", "Caixa de entrada", <Inbox className="w-4 h-4" />)}
+        {sessoes.length > 0 && abaBtn("quadro", "Quadro", <Activity className="w-4 h-4" />)}
+        {abaBtn("automacoes", "Automações", <Zap className="w-4 h-4" />)}
         {abaBtn(
           "canais",
           "Canais",
+          <Smartphone className="w-4 h-4" />,
           sessoes.length > 0 ? (
             <span className="text-[11px] font-semibold rounded-full bg-muted px-1.5 leading-tight">{sessoes.length}</span>
           ) : undefined
@@ -1587,7 +1811,9 @@ function WhatsAppContent() {
           podeAdicionar={podeAdicionar}
         />
 
-        {aba === "canais" ? (
+        {aba === "automacoes" ? (
+          <PainelAutomacoes />
+        ) : aba === "canais" ? (
           <PainelConfig
             sessoes={sessoes}
             onDelete={deletarSessao}
@@ -1642,6 +1868,7 @@ function WhatsAppContent() {
               <AreaChat
                 conversa={conversa}
                 onBack={() => setConversa(null)}
+                sessaoNome={sessaoAtual?.nome}
               />
             </div>
           </>

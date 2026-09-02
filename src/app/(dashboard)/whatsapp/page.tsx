@@ -656,8 +656,8 @@ function AreaChat({
   }
 
   return (
-    <div className="flex-1 flex min-w-0">
-    <div className="flex-1 flex flex-col min-w-0">
+    <div className="flex-1 flex min-w-0 min-h-0 overflow-hidden">
+    <div className="flex-1 flex flex-col min-w-0 min-h-0 overflow-hidden">
       {/* Header */}
       <div className="h-14 flex items-center gap-3 px-4 border-b border-border bg-[#f0f2f5] dark:bg-[#202c33] shrink-0">
         <button onClick={onBack} className="md:hidden p-1 -ml-1 rounded hover:bg-accent">
@@ -882,7 +882,7 @@ function PainelContexto({ conversa }: { conversa: Conversa }) {
   });
 
   return (
-    <aside className="hidden xl:flex flex-col w-72 border-l border-border bg-background shrink-0 overflow-y-auto">
+    <aside className="hidden xl:flex flex-col w-72 border-l border-border bg-background shrink-0 min-h-0 overflow-y-auto">
       <div className="p-4 text-center border-b border-border">
         <div className="w-14 h-14 rounded-full mx-auto mb-2 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 flex items-center justify-center text-lg font-bold">
           {getInitials(conversa.contatoNome, conversa.contatoPhone)}
@@ -1638,7 +1638,7 @@ function WhatsAppContent() {
             </div>
 
             {/* Área do chat — esconde no mobile quando não há conversa */}
-            <div className={cn("flex-1 flex flex-col min-w-0", !painelChat && "hidden md:flex")}>
+            <div className={cn("flex-1 flex flex-col min-w-0 min-h-0 overflow-hidden", !painelChat && "hidden md:flex")}>
               <AreaChat
                 conversa={conversa}
                 onBack={() => setConversa(null)}

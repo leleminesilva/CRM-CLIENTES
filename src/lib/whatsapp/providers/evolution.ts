@@ -4,6 +4,7 @@ import type {
   ProviderCapabilities,
   MensagemPayload,
   NormalizedMedia,
+  NormalizedMessage,
   NormalizedWebhookEvent,
 } from "./types";
 import type { WhatsAppSessaoStatus } from "@prisma/client";
@@ -59,6 +60,38 @@ function extrairConteudoMensagem(
   }
 
   return { tipo: "texto", conteudo: "" };
+}
+
+// Normaliza um registro de mensagem da Evolution (payload do webhook
+// messages.upsert OU registro de /chat/findMessages — mesma forma).
+function normalizarMensagem(data: Record<string, unknown>, fallbackId: string): NormalizedMessage {
+  const key = data.key as Record<string, unknown> | undefined;
+  const message = data.message as Record<string, unknown> | undefined;
+  const { tipo, conteudo, media } = extrairConteudoMensagem(message, data);
+
+  const fromMe = !!key?.fromMe;
+  const remoteJid = (key?.remoteJid as string) ?? "";
+  const isGrupo = remoteJid.endsWith("@g.us");
+  const participant = (key?.participant as string) ?? "";
+
+  return {
+    providerMessageId: (key?.id as string) ?? fallbackId,
+    fromPhone: remoteJid.replace(/@.*/, ""),
+    tipo,
+    conteudo,
+    media,
+    timestamp: new Date(Number(data.messageTimestamp ?? Date.now() / 1000) * 1000),
+    contatoNome: isGrupo
+      ? ((data.groupSubject as string | undefined) ?? undefined)
+      : fromMe
+        ? undefined
+        : (data.pushName as string | undefined),
+    isGrupo,
+    fromMe,
+    providerMessageKey: key,
+    remetentePhone: isGrupo && !fromMe && participant ? participant.replace(/@.*/, "") : undefined,
+    remetenteNome: isGrupo && !fromMe ? (data.pushName as string | undefined) : undefined,
+  };
 }
 
 function baseUrl(): string {
@@ -204,40 +237,12 @@ export class EvolutionProvider implements IWhatsAppProvider {
     const providerEventId = (data.id as string) ?? hashPayload(body);
 
     if (event === "messages.upsert") {
-      const key = data.key as Record<string, unknown> | undefined;
-      const message = data.message as Record<string, unknown> | undefined;
-      const { tipo, conteudo, media } = extrairConteudoMensagem(message, data);
-
-      const fromMe = !!key?.fromMe;
-      const remoteJid = (key?.remoteJid as string) ?? "";
-      const isGrupo = remoteJid.endsWith("@g.us");
-      // Em grupo, remoteJid é o id do grupo e key.participant é quem enviou.
-      // pushName, nesse caso, é o nome de quem enviou — não o do grupo.
-      const participant = (key?.participant as string) ?? "";
-
       return [
         {
           schemaVersion: 1,
           providerEventId,
           type: "message",
-          data: {
-            providerMessageId: (key?.id as string) ?? providerEventId,
-            fromPhone: remoteJid.replace(/@.*/, ""),
-            tipo,
-            conteudo,
-            media,
-            timestamp: new Date(Number(data.messageTimestamp ?? Date.now() / 1000) * 1000),
-            contatoNome: isGrupo
-              ? ((data.groupSubject as string | undefined) ?? undefined)
-              : fromMe
-                ? undefined
-                : (data.pushName as string | undefined),
-            isGrupo,
-            fromMe,
-            providerMessageKey: key,
-            remetentePhone: isGrupo && !fromMe && participant ? participant.replace(/@.*/, "") : undefined,
-            remetenteNome: isGrupo && !fromMe ? (data.pushName as string | undefined) : undefined,
-          },
+          data: normalizarMensagem(data, providerEventId),
         },
       ];
     }
@@ -326,6 +331,58 @@ export class EvolutionProvider implements IWhatsAppProvider {
       return url && url.startsWith("http") ? url : null;
     } catch {
       return null;
+    }
+  }
+
+  // ── Importação de histórico ─────────────────────────────────────────────
+
+  async listarChats(providerSessionId: string): Promise<{ remoteJid: string; nome?: string }[]> {
+    try {
+      const res = await chamarComRetry(`/chat/findChats/${providerSessionId}`, {
+        method: "POST",
+        body: JSON.stringify({}),
+      });
+      if (!res.ok) return [];
+      const data = (await res.json()) as unknown;
+      const arr = Array.isArray(data)
+        ? data
+        : (((data as Record<string, unknown>)?.chats as unknown[]) ??
+           ((data as Record<string, unknown>)?.records as unknown[]) ?? []);
+      return (arr as Record<string, unknown>[])
+        .map((c) => ({
+          remoteJid: (c.remoteJid as string) ?? (c.id as string) ?? "",
+          nome: (c.pushName as string) ?? (c.name as string) ?? undefined,
+        }))
+        .filter((c) => c.remoteJid && !c.remoteJid.includes("broadcast") && !c.remoteJid.includes("newsletter"));
+    } catch {
+      return [];
+    }
+  }
+
+  async buscarMensagens(
+    providerSessionId: string,
+    remoteJid: string,
+    limite: number,
+  ): Promise<NormalizedMessage[]> {
+    try {
+      const res = await chamarComRetry(`/chat/findMessages/${providerSessionId}`, {
+        method: "POST",
+        body: JSON.stringify({ where: { key: { remoteJid } }, limit: limite }),
+      });
+      if (!res.ok) return [];
+      const data = (await res.json()) as unknown;
+      let registros: unknown[];
+      if (Array.isArray(data)) registros = data;
+      else {
+        const d = data as Record<string, unknown>;
+        const m = d.messages as Record<string, unknown> | undefined;
+        registros = (m?.records as unknown[]) ?? (d.records as unknown[]) ?? [];
+      }
+      return (registros as Record<string, unknown>[]).map((r, i) =>
+        normalizarMensagem(r, `${remoteJid}-${i}`),
+      );
+    } catch {
+      return [];
     }
   }
 }

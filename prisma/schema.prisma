@@ -640,6 +640,7 @@ model WhatsAppSessao {
   atendenteId            String?
   empresaId              String?
   ativo                  Boolean               @default(true)
+  historicoImportadoEm   DateTime? // quando a importação do histórico terminou
   createdAt              DateTime              @default(now())
   updatedAt              DateTime              @updatedAt
 

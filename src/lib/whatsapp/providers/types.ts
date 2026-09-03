@@ -93,4 +93,14 @@ export interface IWhatsAppProvider {
     providerSessionId: string,
     numeroOuJid: string
   ): Promise<string | null>;
+  /** Lista as conversas conhecidas pelo gateway (pra importar histórico). */
+  listarChats?(
+    providerSessionId: string
+  ): Promise<{ remoteJid: string; nome?: string }[]>;
+  /** Últimas N mensagens de uma conversa, já normalizadas. */
+  buscarMensagens?(
+    providerSessionId: string,
+    remoteJid: string,
+    limite: number
+  ): Promise<NormalizedMessage[]>;
 }

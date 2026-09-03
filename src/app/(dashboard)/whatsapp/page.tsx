@@ -1586,6 +1586,31 @@ function LinhaSessao({
     },
   });
 
+  const importar = useMutation({
+    mutationFn: async () => {
+      let offset = 0;
+      let total = 0;
+      for (let i = 0; i < 15; i++) {
+        const { data } = await axios.post(
+          `/api/whatsapp/sessoes/${sessao.id}/importar-historico?dias=30&offset=${offset}`,
+        );
+        total += (data as { importadas: number }).importadas;
+        if ((data as { completo: boolean }).completo) break;
+        offset = (data as { proximoOffset: number }).proximoOffset;
+      }
+      return total;
+    },
+    onSuccess: (total) => {
+      toast.success(`Histórico importado — ${total} mensagem${total === 1 ? "" : "s"}`);
+      queryClient.invalidateQueries({ queryKey: ["wa-conversas"] });
+      queryClient.invalidateQueries({ queryKey: ["wa-quadro"] });
+    },
+    onError: (e: unknown) => {
+      const msg = (e as { response?: { data?: { error?: string } } })?.response?.data?.error;
+      toast.error(msg ?? "Erro ao importar histórico");
+    },
+  });
+
   const online = sessao.status === "ONLINE";
   const aguardandoQr = sessao.status === "WAITING_QR";
   const stale = sessao.healthStatus === "STALE";
@@ -1641,7 +1666,18 @@ function LinhaSessao({
             <Button size="icon" variant="ghost" className="w-7 h-7" title="Desconectar" onClick={() => desconectar.mutate()} disabled={desconectar.isPending}>
               <PowerOff className="w-3.5 h-3.5" />
             </Button>
-            <Button size="icon" variant="ghost" className="w-7 h-7" title="Histórico" onClick={() => setLogsAbertos((v) => !v)}>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-7 text-xs"
+              title="Importar as conversas do último mês do WhatsApp"
+              onClick={() => importar.mutate()}
+              disabled={importar.isPending}
+            >
+              {importar.isPending ? <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" /> : <Download className="w-3.5 h-3.5 mr-1" />}
+              Importar histórico
+            </Button>
+            <Button size="icon" variant="ghost" className="w-7 h-7" title="Eventos da sessão" onClick={() => setLogsAbertos((v) => !v)}>
               <History className="w-3.5 h-3.5" />
             </Button>
             <Button

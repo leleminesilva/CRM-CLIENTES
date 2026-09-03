@@ -98,6 +98,7 @@ export default function ClientesPage() {
   const [estagio, setEstagio] = useState(() => ss?.getItem("cf_estagio") ?? "");
   const [dataInicio, setDataInicio] = useState(() => ss?.getItem("cf_dataInicio") ?? "");
   const [dataFim, setDataFim] = useState(() => ss?.getItem("cf_dataFim") ?? "");
+  const [soParados, setSoParados] = useState(() => ss?.getItem("cf_soParados") === "1");
   const [filtersOpen, setFiltersOpen] = useState(false);
   // 0 = padrão (updatedAt desc), 1 = inclusão asc, 2 = inclusão desc
   const [sortMode, setSortMode] = useState(0);
@@ -140,12 +141,13 @@ export default function ClientesPage() {
   useEffect(() => { sessionStorage.setItem("cf_estagio", estagio); }, [estagio]);
   useEffect(() => { sessionStorage.setItem("cf_dataInicio", dataInicio); }, [dataInicio]);
   useEffect(() => { sessionStorage.setItem("cf_dataFim", dataFim); }, [dataFim]);
+  useEffect(() => { sessionStorage.setItem("cf_soParados", soParados ? "1" : ""); }, [soParados]);
   const qc = useQueryClient();
   const { user } = useAuth();
   const isAdmin = user?.role === "ADMINISTRADOR" || user?.role === "DESENVOLVEDOR";
 
-  const hasActiveFilters = !!(responsavelId || temperatura || servico || estagio || dataInicio || dataFim);
-  const activeFilterCount = [responsavelId, temperatura, servico, estagio, dataInicio || dataFim].filter(Boolean).length;
+  const hasActiveFilters = !!(responsavelId || temperatura || servico || estagio || dataInicio || dataFim || soParados);
+  const activeFilterCount = [responsavelId, temperatura, servico, estagio, dataInicio || dataFim, soParados].filter(Boolean).length;
 
   function clearFilters() {
     setSearch("");
@@ -155,8 +157,9 @@ export default function ClientesPage() {
     setEstagio("");
     setDataInicio("");
     setDataFim("");
+    setSoParados(false);
     setPage(1);
-    ["cf_search","cf_responsavelId","cf_temperatura","cf_servico","cf_estagio","cf_dataInicio","cf_dataFim"]
+    ["cf_search","cf_responsavelId","cf_temperatura","cf_servico","cf_estagio","cf_dataInicio","cf_dataFim","cf_soParados"]
       .forEach((k) => sessionStorage.removeItem(k));
   }
 
@@ -174,13 +177,17 @@ export default function ClientesPage() {
   // precisamos do conjunto filtrado inteiro (não só a página atual) — senão cada
   // página é ordenada isoladamente e a sequência "recomeça" a cada 100 itens.
   const clientSortActive = etapaSort > 0 || tempSort > 0 || respSort > 0;
+  // "Sem movimentação +2d" é calculado no client (updatedAt/revisadoEm), então
+  // quando o filtro está ligado precisamos do conjunto inteiro — filtrar só a
+  // página atual furaria a paginação e a contagem.
+  const fullFetch = clientSortActive || soParados;
 
   const { data, isLoading } = useQuery({
-    queryKey: ["clientes", page, search, responsavelId, temperatura, servico, estagio, dataInicio, dataFim, sortMode, clientSortActive],
+    queryKey: ["clientes", page, search, responsavelId, temperatura, servico, estagio, dataInicio, dataFim, sortMode, fullFetch],
     queryFn: async () => {
       const params = new URLSearchParams({
-        page: clientSortActive ? "1" : String(page),
-        limit: clientSortActive ? "5000" : String(PAGE_SIZE),
+        page: fullFetch ? "1" : String(page),
+        limit: fullFetch ? "5000" : String(PAGE_SIZE),
       });
       if (search) params.set("search", search);
       if (responsavelId) params.set("responsavelId", responsavelId);
@@ -217,10 +224,23 @@ export default function ClientesPage() {
 
   const TEMP_ORDER: Record<string, number> = { QUENTE: 0, MORNO: 1, FRIO: 2 };
 
+  // ⚠ "Sem movimentação há mais de 2 dias" — mesma regra da linha da tabela.
+  const LIMITE_2D_MS = 2 * 24 * 60 * 60 * 1000;
+  function semMovimentacao2d(c: Cliente): boolean {
+    const est = (c as unknown as { leads?: { estagio: string }[] }).leads?.[0]?.estagio;
+    const fechado = est === "FECHADO_GANHO" || est === "FECHADO_PERDIDO"
+      || c.statusOrcamento === "APROVADO" || c.statusOrcamento === "NAO_APROVADO";
+    if (fechado) return false;
+    const limite = Date.now() - LIMITE_2D_MS;
+    return new Date(c.updatedAt).getTime() < limite
+      && (!c.revisadoEm || new Date(c.revisadoEm).getTime() < limite);
+  }
+
   const clientesRaw: Cliente[] = data?.data || [];
+  const clientesBase = soParados ? clientesRaw.filter(semMovimentacao2d) : clientesRaw;
   const clientesOrdenados = (() => {
     if (etapaSort > 0) {
-      return [...clientesRaw].sort((a, b) => {
+      return [...clientesBase].sort((a, b) => {
         const ea = (a as unknown as { leads?: { estagio: string }[] }).leads?.[0]?.estagio ?? "";
         const eb = (b as unknown as { leads?: { estagio: string }[] }).leads?.[0]?.estagio ?? "";
         const d = (ESTAGIO_ORDER[ea] ?? 99) - (ESTAGIO_ORDER[eb] ?? 99);
@@ -228,27 +248,28 @@ export default function ClientesPage() {
       });
     }
     if (tempSort > 0) {
-      return [...clientesRaw].sort((a, b) => {
+      return [...clientesBase].sort((a, b) => {
         const d = (TEMP_ORDER[a.temperatura] ?? 99) - (TEMP_ORDER[b.temperatura] ?? 99);
         return tempSort === 1 ? d : -d;
       });
     }
     if (respSort > 0) {
-      return [...clientesRaw].sort((a, b) => {
+      return [...clientesBase].sort((a, b) => {
         const na = a.responsavel?.nome ?? "";
         const nb = b.responsavel?.nome ?? "";
         return respSort === 1 ? na.localeCompare(nb, "pt") : nb.localeCompare(na, "pt");
       });
     }
-    return clientesRaw;
+    return clientesBase;
   })();
-  const total = data?.total || 0;
-  // Com sort client-side ativo já buscamos o conjunto inteiro (não a página do
-  // backend), então a paginação exibida também precisa ser fatiada no client.
-  const clientes = clientSortActive
+  // Com filtro "parados" o total real é o do conjunto filtrado no client.
+  const total = soParados ? clientesBase.length : (data?.total || 0);
+  // Com fetch do conjunto inteiro (sort client-side ou filtro "parados"), a
+  // paginação exibida também precisa ser fatiada no client.
+  const clientes = fullFetch
     ? clientesOrdenados.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
     : clientesOrdenados;
-  const totalPages = clientSortActive ? Math.max(1, Math.ceil(total / PAGE_SIZE)) : (data?.totalPages || 1);
+  const totalPages = fullFetch ? Math.max(1, Math.ceil(total / PAGE_SIZE)) : (data?.totalPages || 1);
 
   function renderFilterFields(layout: "inline" | "stacked") {
     const stacked = layout === "stacked";
@@ -333,6 +354,23 @@ export default function ClientesPage() {
             />
           </div>
         </div>
+
+        <button
+          type="button"
+          onClick={() => { setSoParados((v) => !v); setPage(1); }}
+          aria-pressed={soParados}
+          title="Mostrar apenas clientes sem movimentação há mais de 2 dias"
+          className={cn(
+            "h-9 rounded-md border px-3 text-sm font-medium transition-colors inline-flex items-center justify-center gap-1.5",
+            stacked ? "w-full" : "shrink-0",
+            soParados
+              ? "border-red-500/40 bg-red-500/10 text-red-500"
+              : "border-input bg-background text-muted-foreground hover:text-foreground",
+          )}
+        >
+          <span aria-hidden>⚠</span>
+          Sem movimentação +2d
+        </button>
       </>
     );
   }
@@ -365,7 +403,9 @@ export default function ClientesPage() {
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div>
           <h2 className="text-xl md:text-2xl font-bold">Clientes</h2>
-          <p className="text-sm text-muted-foreground">{total} clientes cadastrados</p>
+          <p className="text-sm text-muted-foreground">
+            {soParados ? `${total} sem movimentação há +2 dias` : `${total} clientes cadastrados`}
+          </p>
         </div>
         <Link href="/clientes/novo">
           <Button className="bg-indigo-600 hover:bg-indigo-700" size="sm">
@@ -587,11 +627,7 @@ export default function ClientesPage() {
                   </td>
                 </tr>
               ) : clientes.map((c) => {
-                const estagio = (c as unknown as { leads?: { estagio: string }[] }).leads?.[0]?.estagio;
-                const fechado = estagio === "FECHADO_GANHO" || estagio === "FECHADO_PERDIDO"
-                  || c.statusOrcamento === "APROVADO" || c.statusOrcamento === "NAO_APROVADO";
-                const limite2d = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000);
-                const parado = !fechado && new Date(c.updatedAt) < limite2d && (!c.revisadoEm || new Date(c.revisadoEm) < limite2d);
+                const parado = semMovimentacao2d(c);
                 const notificado = !c.notificacaoLida && !!c.notificacaoMensagem;
                 return (
                 <tr key={c.id} className={cn(

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 
 function parseBRL(raw: string): number {
@@ -31,7 +31,7 @@ import {
   useSortable,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { Plus, Flame, Minus, Snowflake, DollarSign, User2, ThumbsDown } from "lucide-react";
+import { Plus, Flame, Minus, Snowflake, DollarSign, User2, ThumbsDown, CalendarDays, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -247,6 +247,7 @@ function NovoLeadDialog({ estagio, onSuccess }: { estagio: EstagioLead; onSucces
 
 export default function LeadsKanbanPage() {
   const qc = useQueryClient();
+  const ls = typeof window !== "undefined" ? sessionStorage : null;
   const [activeId, setActiveId] = useState<string | null>(null);
   const [cancelPendente, setCancelPendente] = useState<{ id: string } | null>(null);
   const [dataCancelamento, setDataCancelamento] = useState(() => new Date().toISOString().slice(0, 10));
@@ -254,6 +255,12 @@ export default function LeadsKanbanPage() {
   const [motivoCancelamento, setMotivoCancelamento] = useState("");
   const [reengajar, setReengajar] = useState(false);
   const [proximoContato, setProximoContato] = useState("");
+
+  // Filtro por data de criação do lead (persistido na sessão)
+  const [dataInicio, setDataInicio] = useState(() => ls?.getItem("lf_dataInicio") ?? "");
+  const [dataFim, setDataFim] = useState(() => ls?.getItem("lf_dataFim") ?? "");
+  useEffect(() => { sessionStorage.setItem("lf_dataInicio", dataInicio); }, [dataInicio]);
+  useEffect(() => { sessionStorage.setItem("lf_dataFim", dataFim); }, [dataFim]);
 
   const MOTIVOS = ["Prazo", "Preço", "Distância", "Não Realizamos", "Cliente não responde", "Outros"];
 
@@ -276,7 +283,17 @@ export default function LeadsKanbanPage() {
     onError: () => toast.error("Erro ao mover lead"),
   });
 
-  const leads = data || [];
+  const leadsRaw = data || [];
+  const temFiltroData = !!(dataInicio || dataFim);
+  const leads = (() => {
+    if (!temFiltroData) return leadsRaw;
+    const ini = dataInicio ? new Date(`${dataInicio}T00:00:00`).getTime() : -Infinity;
+    const fim = dataFim ? new Date(`${dataFim}T23:59:59.999`).getTime() : Infinity;
+    return leadsRaw.filter((l) => {
+      const t = new Date(l.createdAt).getTime();
+      return t >= ini && t <= fim;
+    });
+  })();
   const activeLead = leads.find((l) => l.id === activeId);
 
   const getLeadsForEstagio = (estagio: EstagioLead) =>
@@ -342,12 +359,46 @@ export default function LeadsKanbanPage() {
           <h2 className="text-2xl font-bold">Pipeline de Leads</h2>
           <p className="text-muted-foreground">
             {totalLeads} leads · {formatCurrency(valorTotal)} em pipeline
+            {temFiltroData && " (filtrado por data)"}
           </p>
         </div>
         <Button className="bg-indigo-600 hover:bg-indigo-700">
           <Plus className="w-4 h-4 mr-2" />
           Novo Lead
         </Button>
+      </div>
+
+      {/* Filtro por data de criação */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <CalendarDays className="w-4 h-4 text-muted-foreground shrink-0" />
+        <span className="text-sm text-muted-foreground shrink-0">Criados de</span>
+        <input
+          type="date"
+          value={dataInicio}
+          max={dataFim || undefined}
+          onChange={(e) => setDataInicio(e.target.value)}
+          className="h-9 w-[150px] rounded-md border border-input bg-background px-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+          title="Data inicial"
+        />
+        <span className="text-sm text-muted-foreground shrink-0">até</span>
+        <input
+          type="date"
+          value={dataFim}
+          min={dataInicio || undefined}
+          onChange={(e) => setDataFim(e.target.value)}
+          className="h-9 w-[150px] rounded-md border border-input bg-background px-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+          title="Data final"
+        />
+        {temFiltroData && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => { setDataInicio(""); setDataFim(""); }}
+            className="text-muted-foreground hover:text-foreground shrink-0"
+          >
+            <X className="w-3.5 h-3.5 mr-1" />Limpar
+          </Button>
+        )}
       </div>
 
       {/* Dialog de cancelamento via drag */}
@@ -449,7 +500,7 @@ export default function LeadsKanbanPage() {
           onDragStart={handleDragStart}
           onDragEnd={handleDragEnd}
         >
-          <div className="flex gap-4 min-w-max h-[calc(100vh-260px)] min-h-[400px]">
+          <div className="flex gap-4 min-w-max h-[calc(100vh-320px)] min-h-[400px]">
             {ESTAGIOS.map((estagio) => {
               const estagioLeads = getLeadsForEstagio(estagio);
               const estagioValor = estagioLeads.reduce((s, l) => s + Number(l.valorEstimado || 0), 0);

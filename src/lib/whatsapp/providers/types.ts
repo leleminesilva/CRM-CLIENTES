@@ -88,4 +88,9 @@ export interface IWhatsAppProvider {
     providerSessionId: string,
     groupJid: string
   ): Promise<{ subject?: string } | null>;
+  /** URL da foto de perfil de um contato ou grupo (null se não tiver / privado). */
+  fotoPerfil?(
+    providerSessionId: string,
+    numeroOuJid: string
+  ): Promise<string | null>;
 }

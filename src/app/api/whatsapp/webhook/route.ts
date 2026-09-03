@@ -152,6 +152,21 @@ export async function POST(request: NextRequest) {
         }
       }
 
+      // Foto de perfil: sincroniza se nunca buscou ou já faz +24h (a URL do
+      // WhatsApp expira). Não bloqueia o resto — falha em silêncio.
+      const fotoVelha = !conversa.fotoSyncEm || Date.now() - conversa.fotoSyncEm.getTime() > 24 * 3600 * 1000;
+      if (fotoVelha && provider.fotoPerfil) {
+        try {
+          const url = await provider.fotoPerfil(instanceName!, msg.isGrupo ? `${fromPhone}@g.us` : fromPhone);
+          await prisma.whatsAppConversa.update({
+            where: { id: conversa.id },
+            data: { fotoUrl: url, fotoSyncEm: new Date() },
+          });
+        } catch (err) {
+          waLogger.error("falha ao buscar foto de perfil", { erro: err, conversationId: conversa.id });
+        }
+      }
+
       await prisma.whatsAppSessao.update({
         where: { id: sessao.id },
         data: { ultimaMensagemRecebida: msg.timestamp },

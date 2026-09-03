@@ -92,6 +92,7 @@ interface Conversa {
   status?: ConversaStatus;
   etapa?: EtapaQuadro;
   isGrupo?: boolean;
+  fotoUrl?: string | null;
   responsavelId?: string | null;
   responsavel?: { id: string; nome: string } | null;
   notaInterna?: string | null;
@@ -227,6 +228,34 @@ function formatMsgTime(date: string) {
 function getInitials(name?: string, phone?: string) {
   if (name) return name.split(" ").slice(0, 2).map((w) => w[0]).join("").toUpperCase();
   return (phone ?? "?").slice(-2);
+}
+
+// Avatar do contato: foto de perfil do WhatsApp quando existe, senão iniciais
+// (ou ícone de grupo). Cai pras iniciais se a URL da foto falhar/expirar.
+function AvatarWA({
+  fotoUrl, nome, phone, grupo, className, iconClass,
+}: {
+  fotoUrl?: string | null;
+  nome?: string;
+  phone?: string;
+  grupo?: boolean;
+  className: string;
+  iconClass?: string;
+}) {
+  const [erro, setErro] = useState(false);
+  const base = cn(
+    "rounded-full shrink-0 flex items-center justify-center font-bold overflow-hidden bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400",
+    className,
+  );
+  if (fotoUrl && !erro) {
+    // eslint-disable-next-line @next/next/no-img-element
+    return <img src={fotoUrl} alt={nome ?? "Contato"} onError={() => setErro(true)} className={cn(base, "object-cover")} />;
+  }
+  return (
+    <div className={base}>
+      {grupo ? <Users className={iconClass ?? "w-4 h-4"} /> : getInitials(nome, phone)}
+    </div>
+  );
 }
 
 function StatusIcon({ status }: { status: string }) {
@@ -513,9 +542,13 @@ function ListaConversas({
                     selectedId === c.id && "bg-accent"
                   )}
                 >
-                  <div className="w-10 h-10 rounded-full bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 flex items-center justify-center text-sm font-bold shrink-0">
-                    {c.isGrupo ? <Users className="w-4 h-4" /> : getInitials(c.contatoNome, c.contatoPhone)}
-                  </div>
+                  <AvatarWA
+                    fotoUrl={c.fotoUrl}
+                    nome={c.contatoNome}
+                    phone={c.contatoPhone}
+                    grupo={c.isGrupo}
+                    className="w-10 h-10 text-sm"
+                  />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between gap-1">
                       <span className={cn("text-sm truncate flex items-center gap-1", c.naoLidas > 0 && "font-semibold")}>
@@ -776,9 +809,13 @@ function AreaChat({
           title={ctxAberto ? "Ocultar detalhes" : "Mostrar detalhes"}
           className="flex-1 min-w-0 flex items-center gap-3 -mx-1 px-1 py-1 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 text-left"
         >
-          <div className="w-9 h-9 rounded-full bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 flex items-center justify-center text-sm font-bold shrink-0">
-            {grupo ? <Users className="w-4 h-4" /> : getInitials(conversa.contatoNome, conversa.contatoPhone)}
-          </div>
+          <AvatarWA
+            fotoUrl={conversa.fotoUrl}
+            nome={conversa.contatoNome}
+            phone={conversa.contatoPhone}
+            grupo={grupo}
+            className="w-9 h-9 text-sm"
+          />
           <div className="flex-1 min-w-0">
             <p className="font-semibold text-sm truncate">{tituloContato}</p>
             <p className="text-xs text-muted-foreground flex items-center gap-1">
@@ -1102,9 +1139,14 @@ function PainelContexto({ conversa, sessaoNome, onClose }: { conversa: Conversa;
         </button>
       )}
       <div className="p-4 text-center border-b border-border">
-        <div className="w-14 h-14 rounded-full mx-auto mb-2 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 flex items-center justify-center text-lg font-bold">
-          {grupo ? <Users className="w-6 h-6" /> : getInitials(conversa.contatoNome, conversa.contatoPhone)}
-        </div>
+        <AvatarWA
+          fotoUrl={conversa.fotoUrl}
+          nome={conversa.contatoNome}
+          phone={conversa.contatoPhone}
+          grupo={grupo}
+          className="w-14 h-14 text-lg mx-auto mb-2"
+          iconClass="w-6 h-6"
+        />
         {editandoNome ? (
           <input
             autoFocus
@@ -1761,8 +1803,9 @@ function KanbanCard({ c, onAbrir }: { c: Conversa; onAbrir: (c: Conversa) => voi
       {...listeners}
       onClick={() => !isDragging && onAbrir(c)}
     >
-      <div className="flex items-start justify-between gap-2">
-        <p className="text-xs font-semibold leading-tight line-clamp-2">
+      <div className="flex items-start gap-2">
+        <AvatarWA fotoUrl={c.fotoUrl} nome={c.contatoNome} phone={c.contatoPhone} grupo={c.isGrupo} className="w-5 h-5 text-[8px]" iconClass="w-3 h-3" />
+        <p className="flex-1 min-w-0 text-xs font-semibold leading-tight line-clamp-2">
           {c.cliente?.nome ?? c.contatoNome ?? formatPhone(c.contatoPhone)}
         </p>
         {c.naoLidas > 0 && <span className="w-2 h-2 rounded-full bg-green-500 shrink-0 mt-1" />}
@@ -1840,8 +1883,9 @@ function ColunaSimples({
             onClick={() => onAbrir(c)}
             className="rounded-lg border border-border bg-card p-2.5 text-left"
           >
-            <div className="flex items-start justify-between gap-2">
-              <p className="text-xs font-semibold leading-tight line-clamp-2">
+            <div className="flex items-start gap-2">
+              <AvatarWA fotoUrl={c.fotoUrl} nome={c.contatoNome} phone={c.contatoPhone} grupo={c.isGrupo} className="w-5 h-5 text-[8px]" iconClass="w-3 h-3" />
+              <p className="flex-1 min-w-0 text-xs font-semibold leading-tight line-clamp-2">
                 {c.cliente?.nome ?? c.contatoNome ?? formatPhone(c.contatoPhone)}
               </p>
               {c.naoLidas > 0 && <span className="w-2 h-2 rounded-full bg-green-500 shrink-0 mt-1" />}

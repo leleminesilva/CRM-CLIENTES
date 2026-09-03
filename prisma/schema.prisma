@@ -686,6 +686,8 @@ model WhatsAppConversa {
   tags          String[]               @default([])
   notaInterna   String?
   isGrupo       Boolean                @default(false)
+  fotoUrl       String?                // URL da foto de perfil no WhatsApp (expira; re-sincronizada)
+  fotoSyncEm    DateTime?
   ultimaMsgEm   DateTime?
   naoLidas      Int                    @default(0)
   createdAt     DateTime               @default(now())

@@ -313,4 +313,19 @@ export class EvolutionProvider implements IWhatsAppProvider {
       return null;
     }
   }
+
+  async fotoPerfil(providerSessionId: string, numeroOuJid: string): Promise<string | null> {
+    try {
+      const res = await chamarComRetry(`/chat/fetchProfilePictureUrl/${providerSessionId}`, {
+        method: "POST",
+        body: JSON.stringify({ number: numeroOuJid }),
+      });
+      if (!res.ok) return null;
+      const data = (await res.json()) as Record<string, unknown>;
+      const url = (data.profilePictureUrl as string) ?? (data.url as string) ?? null;
+      return url && url.startsWith("http") ? url : null;
+    } catch {
+      return null;
+    }
+  }
 }

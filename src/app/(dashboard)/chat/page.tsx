@@ -192,8 +192,22 @@ function ListaConversas({
 function AreaMensagens({ selecionado }: { selecionado: { tipo: "geral" } | { tipo: "dm"; usuario: Usuario } | null }) {
   const { user } = useAuth();
   const [texto, setTexto] = useState("");
-  const bottomRef = useRef<HTMLDivElement>(null);
+  const viewportRef = useRef<HTMLDivElement>(null);
+  // Enquanto o usuário está no fim da conversa, novas mensagens rolam junto.
+  // Se ele subiu pra reler algo, o polling não força mais o scroll pra baixo.
+  const grudadoNoFim = useRef(true);
   const qc = useQueryClient();
+
+  function scrollParaOFim(behavior: ScrollBehavior = "auto") {
+    const el = viewportRef.current;
+    if (el) el.scrollTo({ top: el.scrollHeight, behavior });
+  }
+
+  function handleScroll() {
+    const el = viewportRef.current;
+    if (!el) return;
+    grudadoNoFim.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+  }
 
   const queryKey = selecionado?.tipo === "dm" ? ["chat-mensagens", "dm", selecionado.usuario.id] : ["chat-mensagens", "geral"];
   const url = selecionado?.tipo === "dm" ? `/api/chat/dm/${selecionado.usuario.id}` : "/api/chat/geral";
@@ -214,6 +228,8 @@ function AreaMensagens({ selecionado }: { selecionado: { tipo: "geral" } | { tip
       return data.data as Mensagem;
     },
     onSuccess: () => {
+      // Ao enviar, sempre acompanha a própria mensagem.
+      grudadoNoFim.current = true;
       qc.invalidateQueries({ queryKey });
       qc.invalidateQueries({ queryKey: ["chat-resumo"] });
       setTexto("");
@@ -221,7 +237,19 @@ function AreaMensagens({ selecionado }: { selecionado: { tipo: "geral" } | { tip
     onError: () => toast.error("Erro ao enviar mensagem"),
   });
 
-  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [data]);
+  // Troca de canal: cola no fim, sem animação.
+  useEffect(() => {
+    grudadoNoFim.current = true;
+    const id = requestAnimationFrame(() => scrollParaOFim("auto"));
+    return () => cancelAnimationFrame(id);
+  }, [url]);
+
+  // Mensagens novas (envio ou polling): só rola junto se o usuário já estava no fim.
+  useEffect(() => {
+    if (!grudadoNoFim.current) return;
+    const id = requestAnimationFrame(() => scrollParaOFim("auto"));
+    return () => cancelAnimationFrame(id);
+  }, [data]);
 
   function handleKeyDown(e: React.KeyboardEvent) {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -255,7 +283,7 @@ function AreaMensagens({ selecionado }: { selecionado: { tipo: "geral" } | { tip
   const subtitulo = selecionado.tipo === "geral" ? "Canal de toda a equipe" : undefined;
 
   return (
-    <div className="flex-1 flex flex-col min-w-0">
+    <div className="flex-1 flex flex-col min-w-0 min-h-0">
       <div className="h-14 flex items-center gap-3 px-4 border-b border-border bg-card shrink-0">
         <div className={cn("w-9 h-9 rounded-full flex items-center justify-center shrink-0", selecionado.tipo === "geral" ? "bg-indigo-600 text-white" : "bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400 text-xs font-bold")}>
           {selecionado.tipo === "geral" ? <Hash className="w-4 h-4" /> : getInitials(selecionado.usuario.nome)}
@@ -266,7 +294,7 @@ function AreaMensagens({ selecionado }: { selecionado: { tipo: "geral" } | { tip
         </div>
       </div>
 
-      <ScrollArea className="flex-1 px-4 py-4">
+      <ScrollArea className="flex-1 min-h-0 px-4 py-4" viewportRef={viewportRef} onViewportScroll={handleScroll}>
         {isLoading ? (
           <div className="flex justify-center py-8"><Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /></div>
         ) : mensagens.length === 0 ? (
@@ -305,7 +333,6 @@ function AreaMensagens({ selecionado }: { selecionado: { tipo: "geral" } | { tip
             ))}
           </div>
         )}
-        <div ref={bottomRef} />
       </ScrollArea>
 
       <div className="p-3 border-t border-border bg-card shrink-0">
@@ -361,7 +388,7 @@ export default function ChatPage() {
           onNovoDm={() => setNovoDmAberto(true)}
         />
       </div>
-      <div className={cn("flex-1 flex-col min-w-0", !painelMobileAberto ? "flex" : "hidden md:flex")}>
+      <div className={cn("flex-1 flex-col min-w-0 min-h-0", !painelMobileAberto ? "flex" : "hidden md:flex")}>
         <AreaMensagens selecionado={selecionado} />
       </div>
 

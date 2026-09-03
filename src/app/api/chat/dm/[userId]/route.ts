@@ -9,6 +9,7 @@ export async function GET(request: NextRequest, { params }: { params: { userId: 
   const payload = await getCurrentUser(request);
   if (!payload) return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
 
+  // 200 mensagens mais recentes (desc + take), reordenadas pra exibição (asc).
   const mensagens = await prisma.chatMensagem.findMany({
     where: {
       deletedAt: null,
@@ -17,10 +18,11 @@ export async function GET(request: NextRequest, { params }: { params: { userId: 
         { autorId: params.userId, destinatarioId: payload.userId },
       ],
     },
-    orderBy: { createdAt: "asc" },
+    orderBy: { createdAt: "desc" },
     take: 200,
     include: { autor: { select: { id: true, nome: true, avatar: true } } },
   });
+  mensagens.reverse();
 
   // Marca como lidas as mensagens que o outro usuário me mandou
   await prisma.chatMensagem.updateMany({

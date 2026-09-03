@@ -9,12 +9,15 @@ export async function GET(request: NextRequest) {
   const payload = await getCurrentUser(request);
   if (!payload) return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
 
+  // Pega as 200 mensagens MAIS RECENTES (desc + take) e reordena pra exibição (asc).
+  // Com "asc + take" o canal ficava preso nas 200 primeiras mensagens de sempre.
   const mensagens = await prisma.chatMensagem.findMany({
     where: { destinatarioId: null, deletedAt: null },
-    orderBy: { createdAt: "asc" },
+    orderBy: { createdAt: "desc" },
     take: 200,
     include: { autor: { select: { id: true, nome: true, avatar: true } } },
   });
+  mensagens.reverse();
 
   // Marca como lido até agora — usado só pra calcular o badge de não lidas do canal geral.
   await prisma.chatLeitura.upsert({

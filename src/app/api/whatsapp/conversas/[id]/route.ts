@@ -5,12 +5,11 @@ import prisma from "@/lib/prisma";
 import { signedUrlMedia } from "@/lib/whatsapp/media";
 import { waLogger } from "@/lib/whatsapp/logger";
 import { emit } from "@/lib/whatsapp/events";
-import type { WhatsAppConversaStatus, WhatsAppConversaEtapa } from "@prisma/client";
+import type { WhatsAppConversaStatus } from "@prisma/client";
 
 export const dynamic = "force-dynamic";
 
 const STATUS_VALIDOS = ["ABERTA", "PENDENTE", "RESOLVIDA"];
-const ETAPA_VALIDA = ["NOVA", "EM_ATENDIMENTO", "AGUARDANDO_CLIENTE", "ORCAMENTO_ENVIADO", "FECHADO", "SEM_RETORNO"];
 
 // Atualiza metadados da conversa: status, etapa do quadro, responsável.
 export async function PATCH(request: NextRequest, { params }: { params: { id: string } }) {
@@ -32,7 +31,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
   const body = await request.json().catch(() => ({}));
   const data: {
     status?: WhatsAppConversaStatus;
-    etapa?: WhatsAppConversaEtapa;
+    etapa?: string;
     responsavelId?: string | null;
     tags?: string[];
     notaInterna?: string | null;
@@ -56,8 +55,9 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
       data.notaInterna = body.notaInterna.slice(0, 2000);
     }
   }
-  if (typeof body.etapa === "string" && ETAPA_VALIDA.includes(body.etapa)) {
-    data.etapa = body.etapa as WhatsAppConversaEtapa;
+  if (typeof body.etapa === "string" && body.etapa) {
+    const existe = await prisma.whatsAppEtapa.findUnique({ where: { id: body.etapa }, select: { id: true } });
+    if (existe) data.etapa = body.etapa;
   }
   if (Array.isArray(body.tags)) {
     data.tags = Array.from(

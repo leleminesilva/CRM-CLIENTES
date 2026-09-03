@@ -583,13 +583,19 @@ enum WhatsAppConversaStatus {
   RESOLVIDA
 }
 
-enum WhatsAppConversaEtapa {
-  NOVA
-  EM_ATENDIMENTO
-  AGUARDANDO_CLIENTE
-  ORCAMENTO_ENVIADO
-  FECHADO
-  SEM_RETORNO
+// Coluna do quadro de atendimento. Configurável pelo Dev/Admin (nome, cor,
+// ordem, criar/excluir). WhatsAppConversa.etapa guarda o id desta linha
+// (junção manual por string, no mesmo padrão de clienteId).
+model WhatsAppEtapa {
+  id        String   @id @default(cuid())
+  nome      String
+  cor       String   @default("#6366f1")
+  ordem     Int
+  sistema   Boolean  @default(false) // as 6 originais: renomear/reordenar sim, excluir não
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("whatsapp_etapas")
 }
 
 enum WhatsAppGatilho {
@@ -675,7 +681,7 @@ model WhatsAppConversa {
   contatoNome   String?
   clienteId     String?
   status        WhatsAppConversaStatus @default(ABERTA)
-  etapa         WhatsAppConversaEtapa  @default(NOVA)
+  etapa         String                 @default("NOVA") // id de WhatsAppEtapa
   responsavelId String?
   tags          String[]               @default([])
   notaInterna   String?

@@ -12,12 +12,11 @@ import { waLogger } from "./logger";
 
 type ConversaComSessao = WhatsAppConversa & { sessao: WhatsAppSessao };
 
-const ETAPAS = ["NOVA", "EM_ATENDIMENTO", "AGUARDANDO_CLIENTE", "ORCAMENTO_ENVIADO", "FECHADO", "SEM_RETORNO"] as const;
 const STATUS = ["ABERTA", "PENDENTE", "RESOLVIDA"] as const;
 
 export type AcaoAutomacao =
   | { tipo: "ENVIAR_MENSAGEM"; texto: string }
-  | { tipo: "MOVER_ETAPA"; etapa: (typeof ETAPAS)[number] }
+  | { tipo: "MOVER_ETAPA"; etapa: string }
   | { tipo: "DEFINIR_STATUS"; status: (typeof STATUS)[number] }
   | { tipo: "ADICIONAR_ETIQUETA"; etiqueta: string }
   | { tipo: "NOTIFICAR_RESPONSAVEL"; texto?: string }
@@ -84,7 +83,8 @@ async function executarAcao(acao: AcaoAutomacao, conversa: ConversaComSessao): P
       break;
     }
     case "MOVER_ETAPA": {
-      if (!ETAPAS.includes(acao.etapa)) return;
+      const existe = await prisma.whatsAppEtapa.findUnique({ where: { id: acao.etapa }, select: { id: true } });
+      if (!existe) return;
       await prisma.whatsAppConversa.update({ where: { id: conversa.id }, data: { etapa: acao.etapa } });
       break;
     }
@@ -194,8 +194,8 @@ export function sanearAcoes(raw: unknown): Prisma.InputJsonValue | null {
       if (!texto) continue;
       out.push({ tipo, texto: texto.slice(0, 1000) });
     } else if (tipo === "MOVER_ETAPA") {
-      const etapa = String((a as { etapa?: unknown }).etapa ?? "");
-      if (!ETAPAS.includes(etapa as (typeof ETAPAS)[number])) continue;
+      const etapa = String((a as { etapa?: unknown }).etapa ?? "").trim();
+      if (!etapa) continue; // a existência do id é checada na hora de executar
       out.push({ tipo, etapa });
     } else if (tipo === "DEFINIR_STATUS") {
       const status = String((a as { status?: unknown }).status ?? "");

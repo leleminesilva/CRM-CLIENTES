@@ -18,7 +18,7 @@ import {
   Search, Smartphone, RefreshCw, PowerOff, History,
   Paperclip, FileText, X as XIcon, Download, UserRound, ExternalLink, Sparkles,
   Zap, Clock, ArrowRight, Activity, Inbox, CreditCard, StickyNote,
-  Users, PanelRightClose, PanelRight, Pencil,
+  Users, PanelRightClose, PanelRight, Pencil, Settings, ChevronUp, ChevronDown,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -131,9 +131,16 @@ const FILTROS_FILA: { id: FiltroFila; label: string }[] = [
   { id: "resolvidas", label: "Resolvidas" },
 ];
 
-type EtapaQuadro =
-  | "NOVA" | "EM_ATENDIMENTO" | "AGUARDANDO_CLIENTE"
-  | "ORCAMENTO_ENVIADO" | "FECHADO" | "SEM_RETORNO";
+// Etapa = id de uma coluna configurável do quadro (WhatsAppEtapa).
+type EtapaQuadro = string;
+
+interface EtapaCol {
+  id: string;
+  nome: string;
+  cor: string; // hex
+  ordem: number;
+  sistema: boolean;
+}
 
 function formatDuracao(ms: number): string {
   const s = Math.round(ms / 1000);
@@ -166,14 +173,26 @@ const RESPOSTAS_RAPIDAS = [
   "Consegue me mandar uma foto do local?",
 ];
 
-const ETAPAS_QUADRO: { id: EtapaQuadro; label: string; cor: string; resumo: string }[] = [
-  { id: "NOVA",               label: "Novas",              cor: "bg-slate-400",   resumo: "Sem responsável · aguardando triagem" },
-  { id: "EM_ATENDIMENTO",     label: "Em atendimento",     cor: "bg-blue-500",    resumo: "Responsável ativo na conversa" },
-  { id: "AGUARDANDO_CLIENTE", label: "Aguardando cliente", cor: "bg-amber-500",   resumo: "Bola com o cliente · lembrete em 24 h" },
-  { id: "ORCAMENTO_ENVIADO",  label: "Orçamento enviado",  cor: "bg-green-500",   resumo: "Aguardando decisão do cliente" },
-  { id: "FECHADO",            label: "Fechado",            cor: "bg-emerald-600", resumo: "Negócio ganho" },
-  { id: "SEM_RETORNO",        label: "Sem retorno",        cor: "bg-rose-500",    resumo: "Sem resposta há +3 dias" },
+// Fallback enquanto /api/whatsapp/etapas não carregou (mesmos ids semeados na migration).
+const ETAPAS_FALLBACK: EtapaCol[] = [
+  { id: "NOVA",               nome: "Novas",              cor: "#94a3b8", ordem: 0, sistema: true },
+  { id: "EM_ATENDIMENTO",     nome: "Em atendimento",     cor: "#3b82f6", ordem: 1, sistema: true },
+  { id: "AGUARDANDO_CLIENTE", nome: "Aguardando cliente", cor: "#f59e0b", ordem: 2, sistema: true },
+  { id: "ORCAMENTO_ENVIADO",  nome: "Orçamento enviado",  cor: "#22c55e", ordem: 3, sistema: true },
+  { id: "FECHADO",            nome: "Fechado",            cor: "#059669", ordem: 4, sistema: true },
+  { id: "SEM_RETORNO",        nome: "Sem retorno",        cor: "#ef4444", ordem: 5, sistema: true },
 ];
+
+function useEtapas() {
+  return useQuery({
+    queryKey: ["wa-etapas"],
+    queryFn: async () => {
+      const { data } = await axios.get("/api/whatsapp/etapas");
+      return data as { etapas: EtapaCol[]; podeEditar: boolean };
+    },
+    staleTime: 60000,
+  });
+}
 
 type AgrupamentoQuadro = "etapa" | "responsavel" | "canal" | "etiqueta";
 const AGRUPAMENTOS: { id: AgrupamentoQuadro; label: string }[] = [
@@ -1769,22 +1788,21 @@ function KanbanCard({ c, onAbrir }: { c: Conversa; onAbrir: (c: Conversa) => voi
 }
 
 function KanbanColuna({
-  etapa, label, cor, resumo, conversas, onAbrir,
+  etapa, label, cor, conversas, onAbrir,
 }: {
-  etapa: EtapaQuadro; label: string; cor: string; resumo?: string; conversas: Conversa[]; onAbrir: (c: Conversa) => void;
+  etapa: EtapaQuadro; label: string; cor: string; conversas: Conversa[]; onAbrir: (c: Conversa) => void;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: etapa, data: { etapa } });
   return (
     <div className="w-64 shrink-0 flex flex-col rounded-xl border border-border bg-muted/30 max-h-full">
       <div className="px-3 py-2.5 border-b border-border/60">
         <div className="flex items-center gap-2">
-          <span className={cn("w-2 h-2 rounded-full", cor)} />
-          <span className="text-xs font-bold">{label}</span>
-          <span className="ml-auto text-[11px] font-semibold text-muted-foreground bg-background rounded-full px-1.5">
+          <span className="w-2 h-2 rounded-full shrink-0" style={{ background: cor }} />
+          <span className="text-xs font-bold truncate">{label}</span>
+          <span className="ml-auto shrink-0 text-[11px] font-semibold text-muted-foreground bg-background rounded-full px-1.5">
             {conversas.length}
           </span>
         </div>
-        {resumo && <p className="text-[10px] text-muted-foreground mt-1">{resumo}</p>}
       </div>
       <div
         ref={setNodeRef}
@@ -1856,6 +1874,11 @@ function QuadroKanban({
   const queryClient = useQueryClient();
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
   const [agrupar, setAgrupar] = useState<AgrupamentoQuadro>("etapa");
+  const [modalEtapas, setModalEtapas] = useState(false);
+
+  const etapasQuery = useEtapas();
+  const etapas = etapasQuery.data?.etapas ?? ETAPAS_FALLBACK;
+  const podeEditarEtapas = etapasQuery.data?.podeEditar ?? false;
 
   const { data: conversas = [] } = useQuery({
     queryKey: ["wa-quadro", sessaoId],
@@ -1899,7 +1922,9 @@ function QuadroKanban({
     onError: () => toast.error("Erro ao mover a conversa"),
   });
 
-  const porEtapa = (e: EtapaQuadro) => conversas.filter((c) => (c.etapa ?? "NOVA") === e);
+  const idsEtapas = new Set(etapas.map((e) => e.id));
+  const etapaDe = (c: Conversa) => (c.etapa && idsEtapas.has(c.etapa) ? c.etapa : etapas[0]?.id ?? "NOVA");
+  const porEtapa = (e: EtapaQuadro) => conversas.filter((c) => etapaDe(c) === e);
   const naoAtribuidas = conversas.filter((c) => !c.responsavelId).length;
 
   // Colunas dinâmicas para agrupamentos que não são "etapa"
@@ -1940,7 +1965,7 @@ function QuadroKanban({
     if (!over) return;
     const de = (active.data.current as { etapa?: EtapaQuadro })?.etapa;
     const para = ((over.data.current as { etapa?: EtapaQuadro })?.etapa ?? over.id) as EtapaQuadro;
-    if (de !== para && ETAPAS_QUADRO.some((x) => x.id === para)) {
+    if (de !== para && idsEtapas.has(para)) {
       mover.mutate({ id: active.id as string, etapa: para });
     }
   }
@@ -1962,18 +1987,28 @@ function QuadroKanban({
         <span className="text-xs text-muted-foreground">
           {conversas.length} conversas · {naoAtribuidas} sem responsável
         </span>
-        <label className="ml-auto flex items-center gap-1.5 text-xs text-muted-foreground">
-          Agrupar por
-          <select
-            value={agrupar}
-            onChange={(e) => setAgrupar(e.target.value as AgrupamentoQuadro)}
-            className="text-xs font-semibold text-foreground bg-muted/40 border border-border rounded-md px-2 py-1 outline-none"
-          >
-            {AGRUPAMENTOS.map((a) => (
-              <option key={a.id} value={a.id}>{a.label}</option>
-            ))}
-          </select>
-        </label>
+        <div className="ml-auto flex items-center gap-3">
+          {agrupar === "etapa" && podeEditarEtapas && (
+            <button
+              onClick={() => setModalEtapas(true)}
+              className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground hover:text-foreground rounded-md border border-border bg-muted/40 px-2 py-1"
+            >
+              <Settings className="w-3.5 h-3.5" /> Editar colunas
+            </button>
+          )}
+          <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            Agrupar por
+            <select
+              value={agrupar}
+              onChange={(e) => setAgrupar(e.target.value as AgrupamentoQuadro)}
+              className="text-xs font-semibold text-foreground bg-muted/40 border border-border rounded-md px-2 py-1 outline-none"
+            >
+              {AGRUPAMENTOS.map((a) => (
+                <option key={a.id} value={a.id}>{a.label}</option>
+              ))}
+            </select>
+          </label>
+        </div>
       </div>
       {kpis.length > 0 && (
         <div className="flex gap-2 flex-wrap">
@@ -1988,13 +2023,12 @@ function QuadroKanban({
       {agrupar === "etapa" ? (
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
           <div className="flex-1 flex gap-3 overflow-x-auto pb-2">
-            {ETAPAS_QUADRO.map((col) => (
+            {etapas.map((col) => (
               <KanbanColuna
                 key={col.id}
                 etapa={col.id}
-                label={col.label}
+                label={col.nome}
                 cor={col.cor}
-                resumo={col.resumo}
                 conversas={porEtapa(col.id)}
                 onAbrir={onAbrir}
               />
@@ -2011,7 +2045,113 @@ function QuadroKanban({
           )}
         </div>
       )}
+
+      {modalEtapas && (
+        <ModalEtapas
+          etapas={etapas}
+          onClose={() => setModalEtapas(false)}
+          onChange={() => {
+            queryClient.invalidateQueries({ queryKey: ["wa-etapas"] });
+            queryClient.invalidateQueries({ queryKey: ["wa-quadro"] });
+          }}
+        />
+      )}
     </div>
+  );
+}
+
+// ── Editar colunas do quadro ──────────────────────────────────────────────
+
+function ModalEtapas({
+  etapas, onClose, onChange,
+}: {
+  etapas: EtapaCol[];
+  onClose: () => void;
+  onChange: () => void;
+}) {
+  const [busy, setBusy] = useState(false);
+  const call = async (fn: () => Promise<unknown>) => {
+    setBusy(true);
+    try {
+      await fn();
+      onChange();
+    } catch (e: unknown) {
+      const msg = (e as { response?: { data?: { error?: string } } })?.response?.data?.error;
+      toast.error(msg ?? "Erro ao salvar");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const renomear = (id: string, nome: string) => call(() => axios.patch(`/api/whatsapp/etapas/${id}`, { nome }));
+  const recolorir = (id: string, cor: string) => call(() => axios.patch(`/api/whatsapp/etapas/${id}`, { cor }));
+  const excluir = (e: EtapaCol) => {
+    if (!confirm(`Excluir a coluna "${e.nome}"? As conversas nela vão pra primeira coluna.`)) return;
+    call(() => axios.delete(`/api/whatsapp/etapas/${e.id}`));
+  };
+  const nova = () => call(() => axios.post("/api/whatsapp/etapas", { nome: "Nova coluna", cor: "#6366f1" }));
+  const mover = (idx: number, dir: -1 | 1) => {
+    const alvo = idx + dir;
+    if (alvo < 0 || alvo >= etapas.length) return;
+    const ids = etapas.map((e) => e.id);
+    [ids[idx], ids[alvo]] = [ids[alvo], ids[idx]];
+    call(() => axios.put("/api/whatsapp/etapas", { ids }));
+  };
+
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Colunas do quadro</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-2">
+          {etapas.map((e, i) => (
+            <div key={e.id} className="flex items-center gap-2 rounded-lg border border-border p-2">
+              <div className="flex flex-col">
+                <button onClick={() => mover(i, -1)} disabled={busy || i === 0} className="text-muted-foreground hover:text-foreground disabled:opacity-30">
+                  <ChevronUp className="w-3.5 h-3.5" />
+                </button>
+                <button onClick={() => mover(i, 1)} disabled={busy || i === etapas.length - 1} className="text-muted-foreground hover:text-foreground disabled:opacity-30">
+                  <ChevronDown className="w-3.5 h-3.5" />
+                </button>
+              </div>
+              <input
+                type="color"
+                defaultValue={e.cor}
+                onBlur={(ev) => ev.target.value.toLowerCase() !== e.cor.toLowerCase() && recolorir(e.id, ev.target.value)}
+                className="w-7 h-7 rounded border border-border bg-transparent cursor-pointer shrink-0"
+                title="Cor"
+              />
+              <input
+                defaultValue={e.nome}
+                onBlur={(ev) => ev.target.value.trim() && ev.target.value.trim() !== e.nome && renomear(e.id, ev.target.value.trim())}
+                className="flex-1 min-w-0 text-sm rounded-md border border-border bg-background px-2 py-1 outline-none"
+              />
+              {e.sistema ? (
+                <span className="text-[10px] text-muted-foreground shrink-0" title="Coluna padrão — não pode ser excluída">padrão</span>
+              ) : (
+                <button onClick={() => excluir(e)} disabled={busy} className="text-muted-foreground hover:text-destructive shrink-0">
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              )}
+            </div>
+          ))}
+          <button
+            onClick={nova}
+            disabled={busy}
+            className="w-full text-xs font-semibold text-green-600 dark:text-green-400 border border-dashed border-border rounded-lg py-2 hover:bg-green-500/5 flex items-center justify-center gap-1"
+          >
+            <Plus className="w-3.5 h-3.5" /> Nova coluna
+          </button>
+        </div>
+        <p className="text-[11px] text-muted-foreground">
+          Nome e cor salvam ao sair do campo. As 6 colunas padrão podem ser renomeadas e reordenadas, mas não excluídas.
+        </p>
+        <DialogFooter>
+          <Button onClick={onClose}>Fechar</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -2055,9 +2195,9 @@ const ACAO_LABEL: Record<AcaoTipo, string> = {
 };
 const DIAS_SEMANA = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
 
-function descreverAcao(a: AcaoAuto): string {
+function descreverAcao(a: AcaoAuto, etapaNome: Record<string, string>): string {
   if (a.tipo === "MOVER_ETAPA") {
-    return `Mover p/ "${ETAPAS_QUADRO.find((e) => e.id === a.etapa)?.label ?? a.etapa}"`;
+    return `Mover p/ "${etapaNome[a.etapa ?? ""] ?? a.etapa}"`;
   }
   if (a.tipo === "DEFINIR_STATUS") return `Status → ${a.status ? STATUS_LABEL[a.status] : "?"}`;
   if (a.tipo === "ADICIONAR_ETIQUETA") return `Etiqueta "${a.etiqueta}"`;
@@ -2093,10 +2233,11 @@ const EXEMPLOS_AUTO: Omit<Automacao, "id" | "disparos" | "ultimoDisparoEm">[] = 
 ];
 
 function CardAutomacao({
-  a, podeEditar, onToggle, onEditar, onExcluir,
+  a, podeEditar, etapaNome, onToggle, onEditar, onExcluir,
 }: {
   a: Automacao;
   podeEditar: boolean;
+  etapaNome: Record<string, string>;
   onToggle: () => void;
   onEditar: () => void;
   onExcluir: () => void;
@@ -2126,7 +2267,7 @@ function CardAutomacao({
             <span key={i} className="inline-flex items-center gap-1">
               <ArrowRight className="w-3 h-3 text-muted-foreground" />
               <span className="inline-flex items-center gap-1 rounded-md border border-green-500/35 bg-muted/60 px-2 py-0.5 text-xs font-semibold text-green-600 dark:text-green-400">
-                {descreverAcao(ac)}
+                {descreverAcao(ac, etapaNome)}
               </span>
             </span>
           ))}
@@ -2151,9 +2292,10 @@ function CardAutomacao({
 }
 
 function FormAutomacao({
-  inicial, onClose, onSaved,
+  inicial, etapas, onClose, onSaved,
 }: {
   inicial: Automacao | null;
+  etapas: EtapaCol[];
   onClose: () => void;
   onSaved: () => void;
 }) {
@@ -2287,12 +2429,12 @@ function FormAutomacao({
                 )}
                 {a.tipo === "MOVER_ETAPA" && (
                   <select
-                    value={a.etapa ?? "NOVA"}
-                    onChange={(e) => setAcao(i, { etapa: e.target.value as EtapaQuadro })}
+                    value={a.etapa ?? etapas[0]?.id ?? "NOVA"}
+                    onChange={(e) => setAcao(i, { etapa: e.target.value })}
                     className="w-full text-sm rounded-md border border-border bg-background px-2 py-1.5 outline-none"
                   >
-                    {ETAPAS_QUADRO.map((et) => (
-                      <option key={et.id} value={et.id}>{et.label}</option>
+                    {etapas.map((et) => (
+                      <option key={et.id} value={et.id}>{et.nome}</option>
                     ))}
                   </select>
                 )}
@@ -2349,6 +2491,9 @@ function PainelAutomacoes() {
   const automacoes = data?.automacoes ?? [];
   const podeEditar = data?.podeEditar ?? false;
   const invalidar = () => queryClient.invalidateQueries({ queryKey: ["wa-automacoes"] });
+
+  const etapas = useEtapas().data?.etapas ?? ETAPAS_FALLBACK;
+  const etapaNome: Record<string, string> = Object.fromEntries(etapas.map((e) => [e.id, e.nome]));
 
   const toggle = async (a: Automacao) => {
     try {
@@ -2431,6 +2576,7 @@ function PainelAutomacoes() {
                 key={a.id}
                 a={a}
                 podeEditar={podeEditar}
+                etapaNome={etapaNome}
                 onToggle={() => toggle(a)}
                 onEditar={() => setForm(a)}
                 onExcluir={() => excluir(a)}
@@ -2443,6 +2589,7 @@ function PainelAutomacoes() {
       {form && (
         <FormAutomacao
           inicial={form === "novo" ? null : form}
+          etapas={etapas}
           onClose={() => setForm(null)}
           onSaved={() => { setForm(null); invalidar(); }}
         />

@@ -256,8 +256,6 @@ export default function LeadsKanbanPage() {
   const [proximoContato, setProximoContato] = useState("");
 
   const MOTIVOS = ["Prazo", "Preço", "Distância", "Não Realizamos", "Cliente não responde", "Outros"];
-  const MOTIVOS_SEM_OBSERVACAO = ["Cliente não responde"];
-  const obsObrigatoria = !!motivoCategoria && !MOTIVOS_SEM_OBSERVACAO.includes(motivoCategoria);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
@@ -313,7 +311,7 @@ export default function LeadsKanbanPage() {
   }
 
   function confirmarCancelamentoKanban() {
-    if (!dataCancelamento || !motivoCategoria || (obsObrigatoria && !motivoCancelamento.trim())) return;
+    if (!dataCancelamento || !motivoCategoria) return;
     if (reengajar && !proximoContato) return;
     const motivoPerda = motivoCancelamento.trim()
       ? `${motivoCategoria} — ${motivoCancelamento.trim()}`
@@ -389,17 +387,13 @@ export default function LeadsKanbanPage() {
             {motivoCategoria && (
               <div className="space-y-2">
                 <p className="text-sm font-medium">
-                  Observação{" "}
-                  {obsObrigatoria
-                    ? <span className="text-red-500">*</span>
-                    : <span className="text-muted-foreground font-normal">(opcional)</span>}
+                  Observação <span className="text-muted-foreground font-normal">(opcional)</span>
                 </p>
                 <Textarea
                   placeholder="Descreva o motivo do cancelamento..."
                   value={motivoCancelamento}
                   onChange={(e) => setMotivoCancelamento(e.target.value)}
                   rows={2}
-                  className={obsObrigatoria && !motivoCancelamento.trim() ? "border-red-400" : ""}
                 />
               </div>
             )}
@@ -436,7 +430,7 @@ export default function LeadsKanbanPage() {
             </Button>
             <Button
               variant="destructive"
-              disabled={!dataCancelamento || !motivoCategoria || (obsObrigatoria && !motivoCancelamento.trim()) || (reengajar && !proximoContato) || moveMutation.isPending}
+              disabled={!dataCancelamento || !motivoCategoria || (reengajar && !proximoContato) || moveMutation.isPending}
               onClick={confirmarCancelamentoKanban}
             >
               Confirmar cancelamento

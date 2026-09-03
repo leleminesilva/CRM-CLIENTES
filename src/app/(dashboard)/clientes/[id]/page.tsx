@@ -97,7 +97,9 @@ function PipelineTracker({
   const [confValor, setConfValor] = useState("");
   const [confData, setConfData] = useState(hoje);
 
-  const MOTIVOS_CANCELAMENTO = ["Prazo", "Preço", "Distância", "Não Realizamos", "Outros"];
+  const MOTIVOS_CANCELAMENTO = ["Prazo", "Preço", "Distância", "Não Realizamos", "Cliente não responde", "Outros"];
+  const MOTIVOS_SEM_OBSERVACAO = ["Cliente não responde"];
+  const obsObrigatoria = !!motivoCategoria && !MOTIVOS_SEM_OBSERVACAO.includes(motivoCategoria);
 
   const mutation = useMutation({
     mutationFn: async ({ novoEstagio, motivoPerda, dataFechamento, proximoContato, clientePatch, venda }: {
@@ -147,7 +149,7 @@ function PipelineTracker({
       toast.error("Selecione o motivo do cancelamento");
       return;
     }
-    if (!motivoCancelamento.trim()) {
+    if (obsObrigatoria && !motivoCancelamento.trim()) {
       toast.error("A observação é obrigatória");
       return;
     }
@@ -295,13 +297,18 @@ function PipelineTracker({
               </div>
             </div>
             <div className="space-y-2">
-              <p className="text-sm font-medium">Observação <span className="text-red-500">*</span></p>
+              <p className="text-sm font-medium">
+                Observação{" "}
+                {obsObrigatoria
+                  ? <span className="text-red-500">*</span>
+                  : <span className="text-muted-foreground font-normal">(opcional)</span>}
+              </p>
               <Textarea
                 placeholder="Descreva o motivo do cancelamento..."
                 value={motivoCancelamento}
                 onChange={(e) => setMotivoCancelamento(e.target.value)}
                 rows={3}
-                className={motivoCategoria && !motivoCancelamento.trim() ? "border-red-400 focus-visible:ring-red-400" : ""}
+                className={obsObrigatoria && !motivoCancelamento.trim() ? "border-red-400 focus-visible:ring-red-400" : ""}
               />
             </div>
             <div className="space-y-2 border-t pt-3">
@@ -337,7 +344,7 @@ function PipelineTracker({
             </Button>
             <Button
               variant="destructive"
-              disabled={!dataCancelamento || !motivoCategoria || !motivoCancelamento.trim() || (reengajar && !proximoContato) || mutation.isPending}
+              disabled={!dataCancelamento || !motivoCategoria || (obsObrigatoria && !motivoCancelamento.trim()) || (reengajar && !proximoContato) || mutation.isPending}
               onClick={confirmarCancelamento}
             >
               Confirmar cancelamento

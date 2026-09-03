@@ -209,7 +209,11 @@ export async function POST(request: NextRequest) {
       }
 
       if (!fromMe) {
-        await emit("MessageReceived", { conversaId: conversa.id, sessaoId: sessao.id, fromPhone }, correlationId);
+        await emit(
+          "MessageReceived",
+          { conversaId: conversa.id, sessaoId: sessao.id, fromPhone, conteudo: msg.conteudo ?? "" },
+          correlationId,
+        );
       }
       await emit("ConversationUpdated", { conversaId: conversa.id }, correlationId);
     }

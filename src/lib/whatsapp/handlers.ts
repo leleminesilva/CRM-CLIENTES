@@ -3,6 +3,7 @@ import { on, emit } from "./events";
 import { publicarConversa } from "./realtime";
 import { findClienteByPhone } from "@/lib/utils/phone";
 import { processarAgenteWhatsApp } from "./agent";
+import { executarAutomacoes } from "./automacoes";
 import { waLogger } from "./logger";
 
 // Handlers do pipeline de eventos — substituem a lógica que antes ficava
@@ -13,6 +14,7 @@ export interface MessageReceivedPayload {
   conversaId: string;
   sessaoId: string;
   fromPhone: string;
+  conteudo?: string;
 }
 
 export interface ConversationUpdatedPayload {
@@ -64,6 +66,32 @@ export function registrarHandlersWhatsApp(): void {
     if (agentEstado?.estado === "HUMANO" || agentEstado?.estado === "CONCLUIDO") return;
 
     await processarAgenteWhatsApp(conversa);
+  });
+
+  // Motor de automações (gatilho -> ação). Roda independente do bot de
+  // triagem — vale pra conversa nova e pra conversa em andamento.
+  on<MessageReceivedPayload>("MessageReceived", async (event) => {
+    const { conversaId, conteudo } = event.payload;
+    const conversa = await prisma.whatsAppConversa.findUnique({
+      where: { id: conversaId },
+      include: { sessao: true },
+    });
+    if (!conversa || conversa.isGrupo) return;
+
+    const [totalMensagens, ultimaSaida] = await Promise.all([
+      prisma.whatsAppMensagem.count({ where: { conversaId } }),
+      prisma.whatsAppMensagem.findFirst({
+        where: { conversaId, direcao: "saida" },
+        orderBy: { enviadaEm: "desc" },
+        select: { enviadaEm: true },
+      }),
+    ]);
+
+    await executarAutomacoes(conversa, {
+      primeiraMensagem: totalMensagens <= 1,
+      conteudo: conteudo ?? "",
+      ultimaSaidaEm: ultimaSaida?.enviadaEm ?? null,
+    });
   });
 
   // Notifica o atendente da sessão sobre a nova mensagem — sem duplicar se já

@@ -592,6 +592,33 @@ enum WhatsAppConversaEtapa {
   SEM_RETORNO
 }
 
+enum WhatsAppGatilho {
+  CONTATO_NOVO       // primeira mensagem de um número desconhecido
+  MENSAGEM_RECEBIDA  // qualquer mensagem recebida (com filtro opcional de palavras)
+  FORA_DO_HORARIO    // mensagem recebida fora do horário de atendimento
+}
+
+// Regra de automação gatilho -> ações, executada pelo pipeline de eventos.
+model WhatsAppAutomacao {
+  id              String          @id @default(cuid())
+  nome            String
+  ativa           Boolean         @default(true)
+  gatilho         WhatsAppGatilho
+  // { palavras?: string[]; horario?: { inicio: string; fim: string; dias: number[] } }
+  gatilhoConfig   Json?
+  // [{ tipo: "ENVIAR_MENSAGEM"; texto: string } | { tipo: "MOVER_ETAPA"; etapa } | ...]
+  acoes           Json
+  sessaoId        String? // null = vale para todas as sessões
+  disparos        Int             @default(0)
+  ultimoDisparoEm DateTime?
+  criadoPorId     String?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  @@index([ativa])
+  @@map("whatsapp_automacoes")
+}
+
 model WhatsAppSessao {
   id                     String                @id @default(cuid())
   nome                   String

@@ -2017,128 +2017,436 @@ function QuadroKanban({
 
 // ── Automações (gatilho → ação) ────────────────────────────────────────────
 
-interface RegraAuto {
+type GatilhoTipo = "CONTATO_NOVO" | "MENSAGEM_RECEBIDA" | "FORA_DO_HORARIO";
+type AcaoTipo =
+  | "ENVIAR_MENSAGEM" | "MOVER_ETAPA" | "DEFINIR_STATUS"
+  | "ADICIONAR_ETIQUETA" | "NOTIFICAR_RESPONSAVEL" | "ATRIBUIR_RODIZIO";
+
+interface AcaoAuto {
+  tipo: AcaoTipo;
+  texto?: string;
+  etapa?: EtapaQuadro;
+  status?: ConversaStatus;
+  etiqueta?: string;
+}
+interface Automacao {
+  id: string;
+  nome: string;
   ativa: boolean;
-  gatilho: string;
-  acoes: string[];
-  meta: string[];
+  gatilho: GatilhoTipo;
+  gatilhoConfig?: { palavras?: string[]; horario?: { inicio: string; fim: string; dias: number[] } } | null;
+  acoes: AcaoAuto[];
+  disparos: number;
+  ultimoDisparoEm?: string | null;
 }
 
-const REGRAS_AUTO: RegraAuto[] = [
+const GATILHO_LABEL: Record<GatilhoTipo, string> = {
+  CONTATO_NOVO: "Primeiro contato de um número novo",
+  MENSAGEM_RECEBIDA: "Cliente manda mensagem",
+  FORA_DO_HORARIO: "Mensagem fora do horário de atendimento",
+};
+const ACAO_LABEL: Record<AcaoTipo, string> = {
+  ENVIAR_MENSAGEM: "Enviar mensagem",
+  MOVER_ETAPA: "Mover no quadro",
+  DEFINIR_STATUS: "Definir status",
+  ADICIONAR_ETIQUETA: "Adicionar etiqueta",
+  NOTIFICAR_RESPONSAVEL: "Notificar responsável",
+  ATRIBUIR_RODIZIO: "Atribuir por rodízio",
+};
+const DIAS_SEMANA = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
+
+function descreverAcao(a: AcaoAuto): string {
+  if (a.tipo === "MOVER_ETAPA") {
+    return `Mover p/ "${ETAPAS_QUADRO.find((e) => e.id === a.etapa)?.label ?? a.etapa}"`;
+  }
+  if (a.tipo === "DEFINIR_STATUS") return `Status → ${a.status ? STATUS_LABEL[a.status] : "?"}`;
+  if (a.tipo === "ADICIONAR_ETIQUETA") return `Etiqueta "${a.etiqueta}"`;
+  return ACAO_LABEL[a.tipo];
+}
+
+const EXEMPLOS_AUTO: Omit<Automacao, "id" | "disparos" | "ultimoDisparoEm">[] = [
   {
+    nome: "Saudação no primeiro contato",
     ativa: true,
-    gatilho: "Contato novo (número desconhecido)",
-    acoes: ["cria conversa em “Novas”", "envia saudação", "atribui por rodízio"],
-    meta: ["Disparou 47× esta semana", "Última: há 6 min"],
+    gatilho: "CONTATO_NOVO",
+    acoes: [{
+      tipo: "ENVIAR_MENSAGEM",
+      texto: "Olá! Aqui é da Infinity Glass 👋 Já recebemos sua mensagem e um atendente vai te responder rapidinho. Pra adiantar, pode me dizer o que você precisa e a cidade?",
+    }],
   },
   {
+    nome: "Distribuir no primeiro contato",
     ativa: true,
-    gatilho: "Cliente envia áudio",
-    acoes: ["transcreve", "atualiza o resumo da IA"],
-    meta: ["Disparou 31× esta semana", "Custo médio: R$ 0,04 / áudio"],
+    gatilho: "CONTATO_NOVO",
+    acoes: [{ tipo: "ATRIBUIR_RODIZIO" }],
   },
   {
+    nome: "Fora do horário",
     ativa: true,
-    gatilho: "Sem resposta há 24 h em “Orçamento enviado”",
-    acoes: ["notifica o responsável", "move p/ “Aguardando cliente”"],
-    meta: ["Disparou 12× esta semana", "7 retomaram a conversa depois"],
-  },
-  {
-    ativa: true,
-    gatilho: "Cliente responde “fechado / aprovado / pode fazer”",
-    acoes: ["move p/ “Fechado”", "gera link de pagamento", "converte oportunidade em ganho"],
-    meta: ["Disparou 5× esta semana", "R$ 8.140 em pagamentos gerados"],
-  },
-  {
-    ativa: false,
-    gatilho: "Mensagem fora do horário (18h–8h e fins de semana)",
-    acoes: ["responde “retornamos no próximo dia útil”", "marca como “Pendente”"],
-    meta: ["Pausada"],
+    gatilho: "FORA_DO_HORARIO",
+    gatilhoConfig: { horario: { inicio: "08:00", fim: "18:00", dias: [1, 2, 3, 4, 5] } },
+    acoes: [
+      { tipo: "ENVIAR_MENSAGEM", texto: "Recebemos sua mensagem! Nosso atendimento é de segunda a sexta, das 8h às 18h. Retornamos assim que abrirmos. 🙏" },
+      { tipo: "DEFINIR_STATUS", status: "PENDENTE" },
+    ],
   },
 ];
 
+function CardAutomacao({
+  a, podeEditar, onToggle, onEditar, onExcluir,
+}: {
+  a: Automacao;
+  podeEditar: boolean;
+  onToggle: () => void;
+  onEditar: () => void;
+  onExcluir: () => void;
+}) {
+  return (
+    <div className={cn("rounded-xl border border-border bg-background shadow-sm p-3.5 flex gap-3.5 items-start", !a.ativa && "opacity-60")}>
+      <button
+        onClick={onToggle}
+        disabled={!podeEditar}
+        title={a.ativa ? "Pausar" : "Ativar"}
+        className={cn(
+          "mt-0.5 w-9 h-5 rounded-full shrink-0 relative transition-colors disabled:cursor-not-allowed",
+          a.ativa ? "bg-green-500" : "bg-muted-foreground/30"
+        )}
+      >
+        <span className={cn("absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all", a.ativa ? "left-[18px]" : "left-0.5")} />
+      </button>
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-semibold">{a.nome}</p>
+        <div className="flex flex-wrap items-center gap-1.5 text-[13px] mt-1.5">
+          <span className="inline-flex items-center gap-1 rounded-md border border-blue-500/35 bg-muted/60 px-2 py-0.5 text-xs font-semibold text-blue-600 dark:text-blue-400">
+            <Zap className="w-3 h-3" />
+            {GATILHO_LABEL[a.gatilho]}
+            {a.gatilho === "MENSAGEM_RECEBIDA" && a.gatilhoConfig?.palavras?.length ? ` (${a.gatilhoConfig.palavras.join(", ")})` : ""}
+          </span>
+          {a.acoes.map((ac, i) => (
+            <span key={i} className="inline-flex items-center gap-1">
+              <ArrowRight className="w-3 h-3 text-muted-foreground" />
+              <span className="inline-flex items-center gap-1 rounded-md border border-green-500/35 bg-muted/60 px-2 py-0.5 text-xs font-semibold text-green-600 dark:text-green-400">
+                {descreverAcao(ac)}
+              </span>
+            </span>
+          ))}
+        </div>
+        <div className="flex flex-wrap gap-x-3 gap-y-1 mt-2 text-[11px] text-muted-foreground">
+          <span>Disparou {a.disparos}×</span>
+          {a.ultimoDisparoEm && <span>Última: {formatTime(a.ultimoDisparoEm)}</span>}
+        </div>
+      </div>
+      {podeEditar && (
+        <div className="flex flex-col gap-1 shrink-0">
+          <button onClick={onEditar} className="text-[11px] font-semibold rounded-md border border-border bg-muted/50 px-2.5 py-1 text-muted-foreground hover:text-foreground">
+            Editar
+          </button>
+          <button onClick={onExcluir} className="text-[11px] font-semibold rounded-md border border-border bg-muted/50 px-2.5 py-1 text-destructive hover:bg-destructive/10">
+            Excluir
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function FormAutomacao({
+  inicial, onClose, onSaved,
+}: {
+  inicial: Automacao | null;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [nome, setNome] = useState(inicial?.nome ?? "");
+  const [gatilho, setGatilho] = useState<GatilhoTipo>(inicial?.gatilho ?? "CONTATO_NOVO");
+  const [palavras, setPalavras] = useState((inicial?.gatilhoConfig?.palavras ?? []).join(", "));
+  const [inicio, setInicio] = useState(inicial?.gatilhoConfig?.horario?.inicio ?? "08:00");
+  const [fim, setFim] = useState(inicial?.gatilhoConfig?.horario?.fim ?? "18:00");
+  const [dias, setDias] = useState<number[]>(inicial?.gatilhoConfig?.horario?.dias ?? [1, 2, 3, 4, 5]);
+  const [acoes, setAcoes] = useState<AcaoAuto[]>(inicial?.acoes?.length ? inicial.acoes : [{ tipo: "ENVIAR_MENSAGEM", texto: "" }]);
+  const [salvando, setSalvando] = useState(false);
+
+  const setAcao = (i: number, patch: Partial<AcaoAuto>) =>
+    setAcoes((as) => as.map((a, j) => (j === i ? { ...a, ...patch } : a)));
+
+  async function salvar() {
+    if (!nome.trim()) { toast.error("Dê um nome à regra"); return; }
+    const gatilhoConfig: Automacao["gatilhoConfig"] = {};
+    if (gatilho === "MENSAGEM_RECEBIDA" && palavras.trim()) {
+      gatilhoConfig.palavras = palavras.split(",").map((p) => p.trim()).filter(Boolean);
+    }
+    if (gatilho === "FORA_DO_HORARIO") {
+      gatilhoConfig.horario = { inicio, fim, dias };
+    }
+    const body = { nome: nome.trim(), gatilho, gatilhoConfig, acoes };
+    setSalvando(true);
+    try {
+      if (inicial) await axios.patch(`/api/whatsapp/automacoes/${inicial.id}`, body);
+      else await axios.post("/api/whatsapp/automacoes", body);
+      toast.success(inicial ? "Regra atualizada" : "Regra criada");
+      onSaved();
+    } catch (e: unknown) {
+      const msg = (e as { response?: { data?: { error?: string } } })?.response?.data?.error;
+      toast.error(msg ?? "Erro ao salvar");
+    } finally {
+      setSalvando(false);
+    }
+  }
+
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>{inicial ? "Editar regra" : "Nova regra"}</DialogTitle>
+        </DialogHeader>
+
+        <div className="space-y-4">
+          <div className="space-y-1.5">
+            <Label className="text-xs">Nome</Label>
+            <Input value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Ex: Saudação no primeiro contato" />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label className="text-xs">Quando (gatilho)</Label>
+            <select
+              value={gatilho}
+              onChange={(e) => setGatilho(e.target.value as GatilhoTipo)}
+              className="w-full text-sm rounded-md border border-border bg-background px-3 py-2 outline-none"
+            >
+              {(Object.keys(GATILHO_LABEL) as GatilhoTipo[]).map((g) => (
+                <option key={g} value={g}>{GATILHO_LABEL[g]}</option>
+              ))}
+            </select>
+          </div>
+
+          {gatilho === "MENSAGEM_RECEBIDA" && (
+            <div className="space-y-1.5">
+              <Label className="text-xs">Palavras-chave (opcional, separadas por vírgula)</Label>
+              <Input value={palavras} onChange={(e) => setPalavras(e.target.value)} placeholder="fechado, aprovado, pode fazer" />
+              <p className="text-[11px] text-muted-foreground">Vazio = qualquer mensagem dispara a regra.</p>
+            </div>
+          )}
+
+          {gatilho === "FORA_DO_HORARIO" && (
+            <div className="space-y-2">
+              <Label className="text-xs">Horário de atendimento</Label>
+              <div className="flex items-center gap-2 text-sm">
+                <input type="time" value={inicio} onChange={(e) => setInicio(e.target.value)} className="rounded-md border border-border bg-background px-2 py-1" />
+                <span className="text-muted-foreground">até</span>
+                <input type="time" value={fim} onChange={(e) => setFim(e.target.value)} className="rounded-md border border-border bg-background px-2 py-1" />
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {DIAS_SEMANA.map((d, i) => (
+                  <button
+                    key={i}
+                    onClick={() => setDias((ds) => (ds.includes(i) ? ds.filter((x) => x !== i) : [...ds, i]))}
+                    className={cn(
+                      "text-xs font-semibold rounded-md border px-2 py-1",
+                      dias.includes(i) ? "bg-green-600 text-white border-transparent" : "border-border text-muted-foreground"
+                    )}
+                  >
+                    {d}
+                  </button>
+                ))}
+              </div>
+              <p className="text-[11px] text-muted-foreground">A regra dispara quando a mensagem chega FORA desse horário.</p>
+            </div>
+          )}
+
+          <div className="space-y-2">
+            <Label className="text-xs">Fazer o quê (ações, em ordem)</Label>
+            {acoes.map((a, i) => (
+              <div key={i} className="rounded-lg border border-border p-2.5 space-y-2">
+                <div className="flex items-center gap-2">
+                  <select
+                    value={a.tipo}
+                    onChange={(e) => setAcao(i, { tipo: e.target.value as AcaoTipo })}
+                    className="flex-1 text-sm rounded-md border border-border bg-background px-2 py-1.5 outline-none"
+                  >
+                    {(Object.keys(ACAO_LABEL) as AcaoTipo[]).map((t) => (
+                      <option key={t} value={t}>{ACAO_LABEL[t]}</option>
+                    ))}
+                  </select>
+                  {acoes.length > 1 && (
+                    <button onClick={() => setAcoes((as) => as.filter((_, j) => j !== i))} className="text-muted-foreground hover:text-destructive">
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+                {a.tipo === "ENVIAR_MENSAGEM" && (
+                  <>
+                    <textarea
+                      value={a.texto ?? ""}
+                      onChange={(e) => setAcao(i, { texto: e.target.value })}
+                      rows={3}
+                      placeholder="Texto da mensagem…"
+                      className="w-full text-sm rounded-md border border-border bg-background px-2.5 py-2 outline-none resize-none"
+                    />
+                    <p className="text-[11px] text-muted-foreground">Use {"{{nome}}"} ou {"{{primeiro_nome}}"} pra personalizar.</p>
+                  </>
+                )}
+                {a.tipo === "MOVER_ETAPA" && (
+                  <select
+                    value={a.etapa ?? "NOVA"}
+                    onChange={(e) => setAcao(i, { etapa: e.target.value as EtapaQuadro })}
+                    className="w-full text-sm rounded-md border border-border bg-background px-2 py-1.5 outline-none"
+                  >
+                    {ETAPAS_QUADRO.map((et) => (
+                      <option key={et.id} value={et.id}>{et.label}</option>
+                    ))}
+                  </select>
+                )}
+                {a.tipo === "DEFINIR_STATUS" && (
+                  <select
+                    value={a.status ?? "PENDENTE"}
+                    onChange={(e) => setAcao(i, { status: e.target.value as ConversaStatus })}
+                    className="w-full text-sm rounded-md border border-border bg-background px-2 py-1.5 outline-none"
+                  >
+                    {(["ABERTA", "PENDENTE", "RESOLVIDA"] as ConversaStatus[]).map((s) => (
+                      <option key={s} value={s}>{STATUS_LABEL[s]}</option>
+                    ))}
+                  </select>
+                )}
+                {a.tipo === "ADICIONAR_ETIQUETA" && (
+                  <Input value={a.etiqueta ?? ""} onChange={(e) => setAcao(i, { etiqueta: e.target.value })} placeholder="Nome da etiqueta" />
+                )}
+                {a.tipo === "NOTIFICAR_RESPONSAVEL" && (
+                  <Input value={a.texto ?? ""} onChange={(e) => setAcao(i, { texto: e.target.value })} placeholder="Texto da notificação (opcional)" />
+                )}
+              </div>
+            ))}
+            <button
+              onClick={() => setAcoes((as) => [...as, { tipo: "ENVIAR_MENSAGEM", texto: "" }])}
+              className="text-xs font-semibold text-green-600 dark:text-green-400 hover:underline flex items-center gap-1"
+            >
+              <Plus className="w-3.5 h-3.5" /> Adicionar ação
+            </button>
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button variant="ghost" onClick={onClose}>Cancelar</Button>
+          <Button onClick={salvar} disabled={salvando} className="bg-green-600 hover:bg-green-700 text-white">
+            {salvando ? <Loader2 className="w-4 h-4 animate-spin" /> : inicial ? "Salvar" : "Criar regra"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function PainelAutomacoes() {
-  const ativas = REGRAS_AUTO.filter((r) => r.ativa).length;
+  const queryClient = useQueryClient();
+  const [form, setForm] = useState<Automacao | null | "novo">(null);
+
+  const { data, isLoading } = useQuery({
+    queryKey: ["wa-automacoes"],
+    queryFn: async () => {
+      const { data } = await axios.get("/api/whatsapp/automacoes");
+      return data as { automacoes: Automacao[]; podeEditar: boolean };
+    },
+  });
+  const automacoes = data?.automacoes ?? [];
+  const podeEditar = data?.podeEditar ?? false;
+  const invalidar = () => queryClient.invalidateQueries({ queryKey: ["wa-automacoes"] });
+
+  const toggle = async (a: Automacao) => {
+    try {
+      await axios.patch(`/api/whatsapp/automacoes/${a.id}`, { ativa: !a.ativa });
+      invalidar();
+    } catch {
+      toast.error("Erro ao alterar");
+    }
+  };
+  const excluir = async (a: Automacao) => {
+    if (!confirm(`Excluir a regra "${a.nome}"?`)) return;
+    try {
+      await axios.delete(`/api/whatsapp/automacoes/${a.id}`);
+      invalidar();
+    } catch {
+      toast.error("Erro ao excluir");
+    }
+  };
+  const criarExemplos = async () => {
+    try {
+      await Promise.all(EXEMPLOS_AUTO.map((e) => axios.post("/api/whatsapp/automacoes", e)));
+      toast.success("Exemplos criados");
+      invalidar();
+    } catch {
+      toast.error("Erro ao criar exemplos");
+    }
+  };
+
+  const ativas = automacoes.filter((a) => a.ativa).length;
+
   return (
     <div className="flex-1 min-w-0 overflow-y-auto">
       <div className="max-w-3xl mx-auto px-6 py-7 pb-16">
         <h2 className="text-xl font-bold tracking-tight">Automações</h2>
         <p className="text-sm text-muted-foreground mt-1 max-w-[60ch]">
           Regras de <b className="text-foreground">gatilho → ação</b> que rodam sozinhas sobre cada
-          conversa, no mesmo motor de eventos do módulo — sem robô paralelo.
+          conversa, no mesmo motor de eventos do módulo. Não valem para grupos.
         </p>
 
-        <div className="mt-4 rounded-lg border border-blue-500/30 bg-blue-500/5 px-3 py-2 text-xs text-blue-700 dark:text-blue-300 flex items-start gap-2">
-          <Sparkles className="w-3.5 h-3.5 mt-0.5 shrink-0" />
-          <span>
-            <b>Prévia.</b> As regras abaixo mostram como o painel vai funcionar. O motor que liga e
-            desliga cada uma entra na próxima fase — por enquanto elas são só ilustrativas.
-          </span>
-        </div>
+        {!podeEditar && (
+          <div className="mt-4 rounded-lg border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+            Só Administrador e Desenvolvedor criam ou editam regras. Você vê as que estão ativas.
+          </div>
+        )}
 
-        <div className="flex items-center mt-5 mb-3">
+        <div className="flex items-center gap-3 mt-5 mb-3">
           <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-            {ativas} ativas · {REGRAS_AUTO.length - ativas} pausada
+            {ativas} ativa{ativas === 1 ? "" : "s"} · {automacoes.length - ativas} pausada{automacoes.length - ativas === 1 ? "" : "s"}
           </span>
           <span className="flex-1" />
-          <Button size="sm" disabled className="h-8 text-xs bg-green-600 text-white opacity-60">
-            <Plus className="w-3.5 h-3.5 mr-1" /> Nova regra
-          </Button>
+          {podeEditar && (
+            <Button size="sm" className="h-8 text-xs bg-green-600 hover:bg-green-700 text-white" onClick={() => setForm("novo")}>
+              <Plus className="w-3.5 h-3.5 mr-1" /> Nova regra
+            </Button>
+          )}
         </div>
 
-        <div className="flex flex-col gap-2.5">
-          {REGRAS_AUTO.map((r, i) => (
-            <div
-              key={i}
-              className={cn(
-                "rounded-xl border border-border bg-background shadow-sm p-3.5 flex gap-3.5 items-start",
-                !r.ativa && "opacity-60"
-              )}
-            >
-              <span
-                className={cn(
-                  "mt-0.5 w-9 h-5 rounded-full shrink-0 relative transition-colors",
-                  r.ativa ? "bg-green-500" : "bg-muted-foreground/30"
-                )}
-              >
-                <span
-                  className={cn(
-                    "absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all",
-                    r.ativa ? "left-[18px]" : "left-0.5"
-                  )}
-                />
-              </span>
-              <div className="flex-1 min-w-0">
-                <div className="flex flex-wrap items-center gap-1.5 text-[13px]">
-                  <span className="inline-flex items-center gap-1 rounded-md border border-blue-500/35 bg-muted/60 px-2 py-0.5 text-xs font-semibold text-blue-600 dark:text-blue-400">
-                    <Zap className="w-3 h-3" />
-                    {r.gatilho}
-                  </span>
-                  {r.acoes.map((a, j) => (
-                    <span key={j} className="inline-flex items-center gap-1">
-                      <ArrowRight className="w-3 h-3 text-muted-foreground" />
-                      <span className="inline-flex items-center gap-1 rounded-md border border-green-500/35 bg-muted/60 px-2 py-0.5 text-xs font-semibold text-green-600 dark:text-green-400">
-                        {a}
-                      </span>
-                    </span>
-                  ))}
-                </div>
-                <div className="flex flex-wrap gap-x-3 gap-y-1 mt-2 text-[11px] text-muted-foreground">
-                  {r.meta.map((m, j) => (
-                    <span key={j}>{m}</span>
-                  ))}
-                </div>
+        {isLoading ? (
+          <div className="flex items-center gap-2 text-sm text-muted-foreground py-8">
+            <Loader2 className="w-4 h-4 animate-spin" /> Carregando…
+          </div>
+        ) : automacoes.length === 0 ? (
+          <div className="rounded-xl border border-dashed border-border p-6 text-center">
+            <p className="text-sm text-muted-foreground">Nenhuma regra ainda.</p>
+            {podeEditar && (
+              <div className="flex gap-2 justify-center mt-3">
+                <Button size="sm" variant="outline" className="h-8 text-xs" onClick={criarExemplos}>
+                  <Sparkles className="w-3.5 h-3.5 mr-1" /> Adicionar exemplos
+                </Button>
+                <Button size="sm" className="h-8 text-xs bg-green-600 hover:bg-green-700 text-white" onClick={() => setForm("novo")}>
+                  <Plus className="w-3.5 h-3.5 mr-1" /> Nova regra
+                </Button>
               </div>
-              <button
-                disabled
-                className="text-[11px] font-semibold rounded-md border border-border bg-muted/50 px-2.5 py-1 text-muted-foreground opacity-60 shrink-0"
-              >
-                Editar
-              </button>
-            </div>
-          ))}
-        </div>
+            )}
+          </div>
+        ) : (
+          <div className="flex flex-col gap-2.5">
+            {automacoes.map((a) => (
+              <CardAutomacao
+                key={a.id}
+                a={a}
+                podeEditar={podeEditar}
+                onToggle={() => toggle(a)}
+                onEditar={() => setForm(a)}
+                onExcluir={() => excluir(a)}
+              />
+            ))}
+          </div>
+        )}
       </div>
+
+      {form && (
+        <FormAutomacao
+          inicial={form === "novo" ? null : form}
+          onClose={() => setForm(null)}
+          onSaved={() => { setForm(null); invalidar(); }}
+        />
+      )}
     </div>
   );
 }

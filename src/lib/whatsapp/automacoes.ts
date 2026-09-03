@@ -3,6 +3,7 @@ import type { WhatsAppConversa, WhatsAppSessao, Prisma } from "@prisma/client";
 import { sendWhatsAppMessage } from "./send";
 import { emit } from "./events";
 import { hasPermission } from "@/lib/rbac";
+import { paraJidNumero } from "@/lib/utils/phone";
 import { waLogger } from "./logger";
 
 // Motor de automações: gatilho -> ações. Roda dentro do pipeline de eventos
@@ -121,6 +122,65 @@ async function executarAcao(acao: AcaoAutomacao, conversa: ConversaComSessao): P
         },
       });
       break;
+    }
+  }
+}
+
+// Gatilho CLIENTE_CADASTRADO: um Cliente foi criado no CRM com WhatsApp.
+// Abre (ou reaproveita) a conversa naquele número e roda as ações. Só manda
+// mensagem se a conversa ainda não tem nenhuma — pra não "dar boas-vindas"
+// em cima de um papo que já existe.
+export async function executarAutomacoesClienteCadastrado(cliente: {
+  id: string;
+  nome: string;
+  whatsapp?: string | null;
+}): Promise<void> {
+  const numero = paraJidNumero(cliente.whatsapp);
+  if (!numero) return;
+
+  const regras = await prisma.whatsAppAutomacao.findMany({
+    where: { ativa: true, gatilho: "CLIENTE_CADASTRADO" },
+  });
+  if (regras.length === 0) return;
+
+  const online = await prisma.whatsAppSessao.findMany({
+    where: { ativo: true, status: "ONLINE" },
+    select: { id: true },
+    orderBy: { createdAt: "asc" },
+  });
+  if (online.length === 0) {
+    waLogger.error("automação CLIENTE_CADASTRADO: nenhuma sessão online", {});
+    return;
+  }
+  const onlineIds = new Set(online.map((s) => s.id));
+
+  for (const regra of regras) {
+    const acoes = (Array.isArray(regra.acoes) ? regra.acoes : []) as AcaoAutomacao[];
+    if (acoes.length === 0) continue;
+
+    const sessaoId = regra.sessaoId && onlineIds.has(regra.sessaoId) ? regra.sessaoId : online[0].id;
+
+    try {
+      const conversa = await prisma.whatsAppConversa.upsert({
+        where: { sessaoId_contatoPhone: { sessaoId, contatoPhone: numero } },
+        create: { sessaoId, contatoPhone: numero, contatoNome: cliente.nome, clienteId: cliente.id },
+        update: { clienteId: cliente.id, contatoNome: cliente.nome },
+        include: { sessao: true },
+      });
+
+      const jaTemMensagem = await prisma.whatsAppMensagem.count({ where: { conversaId: conversa.id } });
+      if (jaTemMensagem > 0) continue; // conversa já existente: não manda boas-vindas
+
+      for (const acao of acoes) {
+        await executarAcao(acao, conversa);
+      }
+      await prisma.whatsAppAutomacao.update({
+        where: { id: regra.id },
+        data: { disparos: { increment: 1 }, ultimoDisparoEm: new Date() },
+      });
+      await emit("ConversationUpdated", { conversaId: conversa.id }, conversa.id);
+    } catch (err) {
+      waLogger.error(`falha na automação CLIENTE_CADASTRADO ${regra.id}`, { erro: err });
     }
   }
 }

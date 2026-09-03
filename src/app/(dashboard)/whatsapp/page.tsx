@@ -2237,7 +2237,7 @@ function ModalEtapas({
 
 // ── Automações (gatilho → ação) ────────────────────────────────────────────
 
-type GatilhoTipo = "CONTATO_NOVO" | "MENSAGEM_RECEBIDA" | "FORA_DO_HORARIO";
+type GatilhoTipo = "CONTATO_NOVO" | "MENSAGEM_RECEBIDA" | "FORA_DO_HORARIO" | "CLIENTE_CADASTRADO";
 type AcaoTipo =
   | "ENVIAR_MENSAGEM" | "MOVER_ETAPA" | "DEFINIR_STATUS"
   | "ADICIONAR_ETIQUETA" | "NOTIFICAR_RESPONSAVEL" | "ATRIBUIR_RODIZIO";
@@ -2256,6 +2256,7 @@ interface Automacao {
   gatilho: GatilhoTipo;
   gatilhoConfig?: { palavras?: string[]; horario?: { inicio: string; fim: string; dias: number[] } } | null;
   acoes: AcaoAuto[];
+  sessaoId?: string | null;
   disparos: number;
   ultimoDisparoEm?: string | null;
 }
@@ -2264,6 +2265,7 @@ const GATILHO_LABEL: Record<GatilhoTipo, string> = {
   CONTATO_NOVO: "Primeiro contato de um número novo",
   MENSAGEM_RECEBIDA: "Cliente manda mensagem",
   FORA_DO_HORARIO: "Mensagem fora do horário de atendimento",
+  CLIENTE_CADASTRADO: "Cliente cadastrado no CRM com WhatsApp",
 };
 const ACAO_LABEL: Record<AcaoTipo, string> = {
   ENVIAR_MENSAGEM: "Enviar mensagem",
@@ -2386,7 +2388,17 @@ function FormAutomacao({
   const [fim, setFim] = useState(inicial?.gatilhoConfig?.horario?.fim ?? "18:00");
   const [dias, setDias] = useState<number[]>(inicial?.gatilhoConfig?.horario?.dias ?? [1, 2, 3, 4, 5]);
   const [acoes, setAcoes] = useState<AcaoAuto[]>(inicial?.acoes?.length ? inicial.acoes : [{ tipo: "ENVIAR_MENSAGEM", texto: "" }]);
+  const [sessaoId, setSessaoId] = useState<string>(inicial?.sessaoId ?? "");
   const [salvando, setSalvando] = useState(false);
+
+  const { data: sessoes = [] } = useQuery({
+    queryKey: ["wa-sessoes", "todas"],
+    queryFn: async () => {
+      const { data } = await axios.get("/api/whatsapp/sessoes?escopo=todas");
+      return data as Sessao[];
+    },
+    enabled: gatilho === "CLIENTE_CADASTRADO",
+  });
 
   const setAcao = (i: number, patch: Partial<AcaoAuto>) =>
     setAcoes((as) => as.map((a, j) => (j === i ? { ...a, ...patch } : a)));
@@ -2400,7 +2412,13 @@ function FormAutomacao({
     if (gatilho === "FORA_DO_HORARIO") {
       gatilhoConfig.horario = { inicio, fim, dias };
     }
-    const body = { nome: nome.trim(), gatilho, gatilhoConfig, acoes };
+    const body = {
+      nome: nome.trim(),
+      gatilho,
+      gatilhoConfig,
+      acoes,
+      sessaoId: gatilho === "CLIENTE_CADASTRADO" ? (sessaoId || null) : null,
+    };
     setSalvando(true);
     try {
       if (inicial) await axios.patch(`/api/whatsapp/automacoes/${inicial.id}`, body);
@@ -2446,6 +2464,26 @@ function FormAutomacao({
               <Label className="text-xs">Palavras-chave (opcional, separadas por vírgula)</Label>
               <Input value={palavras} onChange={(e) => setPalavras(e.target.value)} placeholder="fechado, aprovado, pode fazer" />
               <p className="text-[11px] text-muted-foreground">Vazio = qualquer mensagem dispara a regra.</p>
+            </div>
+          )}
+
+          {gatilho === "CLIENTE_CADASTRADO" && (
+            <div className="space-y-1.5">
+              <Label className="text-xs">Enviar pelo canal</Label>
+              <select
+                value={sessaoId}
+                onChange={(e) => setSessaoId(e.target.value)}
+                className="w-full text-sm rounded-md border border-border bg-background px-3 py-2 outline-none"
+              >
+                <option value="">Primeiro canal online</option>
+                {sessoes.map((s) => (
+                  <option key={s.id} value={s.id}>{s.nome}</option>
+                ))}
+              </select>
+              <p className="text-[11px] text-amber-600 dark:text-amber-500">
+                ⚠️ Mandar mensagem pra quem nunca te chamou aumenta o risco de bloqueio no WhatsApp.
+                Use só quando o cliente já espera o contato. Só dispara se ainda não existe conversa com esse número.
+              </p>
             </div>
           )}
 

@@ -602,6 +602,7 @@ enum WhatsAppGatilho {
   CONTATO_NOVO       // primeira mensagem de um número desconhecido
   MENSAGEM_RECEBIDA  // qualquer mensagem recebida (com filtro opcional de palavras)
   FORA_DO_HORARIO    // mensagem recebida fora do horário de atendimento
+  CLIENTE_CADASTRADO // cliente criado no CRM com número de WhatsApp
 }
 
 // Regra de automação gatilho -> ações, executada pelo pipeline de eventos.

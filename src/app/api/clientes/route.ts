@@ -161,6 +161,14 @@ export async function POST(request: NextRequest) {
       data: { tipo: "CRIACAO", descricao: `Cliente ${cliente.nome} criado`, userId: payload.userId, clienteId: cliente.id },
     });
 
+    // Automação: cliente cadastrado com WhatsApp → abre a conversa e roda as
+    // regras (ex: mensagem de boas-vindas). Não bloqueia a resposta.
+    if (cliente.whatsapp) {
+      import("@/lib/whatsapp/automacoes")
+        .then((m) => m.executarAutomacoesClienteCadastrado({ id: cliente.id, nome: cliente.nome, whatsapp: cliente.whatsapp }))
+        .catch((err) => console.error("automação cliente cadastrado:", err));
+    }
+
     return NextResponse.json({ data: cliente }, { status: 201 });
   } catch (error) {
     if (error instanceof z.ZodError) {

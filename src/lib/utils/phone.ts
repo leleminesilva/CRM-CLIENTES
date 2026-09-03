@@ -22,6 +22,20 @@ export function normalizeWhatsAppPhone(raw: string): string {
 }
 
 /**
+ * Converte um telefone digitado no CRM ("(47) 99999-8888", "47999998888",
+ * "+55 47 99999-8888"…) para o número no formato que o gateway espera:
+ * só dígitos, com DDI 55. Retorna null se não parecer um celular BR válido.
+ */
+export function paraJidNumero(raw: string | null | undefined): string | null {
+  if (!raw) return null;
+  let d = normalizePhone(raw);
+  if (d.startsWith("55") && (d.length === 12 || d.length === 13)) return d;
+  if (d.length === 10 || d.length === 11) d = `55${d}`;
+  else return null;
+  return d.length === 12 || d.length === 13 ? d : null;
+}
+
+/**
  * Formats a raw WhatsApp phone number (which includes the "55" country code,
  * e.g. "5547999998888") into the same "(47) 99999-8888" shape used
  * everywhere else in the app, so bot-created clients look consistent.

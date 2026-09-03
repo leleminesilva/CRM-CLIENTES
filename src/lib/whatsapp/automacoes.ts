@@ -158,7 +158,19 @@ export async function executarAutomacoesClienteCadastrado(cliente: {
     const acoes = (Array.isArray(regra.acoes) ? regra.acoes : []) as AcaoAutomacao[];
     if (acoes.length === 0) continue;
 
-    const sessaoId = regra.sessaoId && onlineIds.has(regra.sessaoId) ? regra.sessaoId : online[0].id;
+    // Canal fixo na regra: respeita à risca — se estiver offline, NÃO manda
+    // por outro número (seria confuso pro cliente). Sem canal fixo: usa o
+    // primeiro que estiver online.
+    let sessaoId: string;
+    if (regra.sessaoId) {
+      if (!onlineIds.has(regra.sessaoId)) {
+        waLogger.error(`automação CLIENTE_CADASTRADO ${regra.id}: canal escolhido está offline`, {});
+        continue;
+      }
+      sessaoId = regra.sessaoId;
+    } else {
+      sessaoId = online[0].id;
+    }
 
     try {
       const conversa = await prisma.whatsAppConversa.upsert({

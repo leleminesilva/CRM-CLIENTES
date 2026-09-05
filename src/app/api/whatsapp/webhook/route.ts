@@ -6,6 +6,7 @@ import { registrarHandlersWhatsApp } from "@/lib/whatsapp/handlers";
 import { waLogger } from "@/lib/whatsapp/logger";
 import { publicarSessao } from "@/lib/whatsapp/realtime";
 import { ingerirMensagem } from "@/lib/whatsapp/ingest";
+import { processarEnviosAgendados } from "@/lib/whatsapp/envios-agendados";
 import { WHATSAPP_STANDBY } from "@/lib/rbac";
 import type { WhatsAppSessaoEvento, WhatsAppSessaoStatus } from "@prisma/client";
 
@@ -34,6 +35,10 @@ export async function POST(request: NextRequest) {
   // Módulo em standby (ver src/lib/rbac.ts): não processa nem grava nada,
   // só responde 200 pro gateway não ficar reentregando o evento.
   if (WHATSAPP_STANDBY) return NextResponse.json({ ok: true });
+
+  // Sem cron no projeto: aproveita o tráfego do webhook pra processar os
+  // envios agendados (ex: boas-vindas com atraso) que já venceram.
+  void processarEnviosAgendados().catch(() => {});
 
   try {
     const body = await request.json();

@@ -2365,6 +2365,7 @@ type AcaoTipo =
 interface AcaoAuto {
   tipo: AcaoTipo;
   texto?: string;
+  textos?: string[];
   etapa?: EtapaQuadro;
   status?: ConversaStatus;
   etiqueta?: string;
@@ -2374,7 +2375,7 @@ interface Automacao {
   nome: string;
   ativa: boolean;
   gatilho: GatilhoTipo;
-  gatilhoConfig?: { palavras?: string[]; horario?: { inicio: string; fim: string; dias: number[] } } | null;
+  gatilhoConfig?: { palavras?: string[]; horario?: { inicio: string; fim: string; dias: number[] }; delayMin?: number } | null;
   acoes: AcaoAuto[];
   sessaoId?: string | null;
   disparos: number;
@@ -2403,6 +2404,10 @@ function descreverAcao(a: AcaoAuto, etapaNome: Record<string, string>): string {
   }
   if (a.tipo === "DEFINIR_STATUS") return `Status → ${a.status ? STATUS_LABEL[a.status] : "?"}`;
   if (a.tipo === "ADICIONAR_ETIQUETA") return `Etiqueta "${a.etiqueta}"`;
+  if (a.tipo === "ENVIAR_MENSAGEM") {
+    const n = (a.textos ?? []).filter(Boolean).length || (a.texto ? 1 : 0);
+    return n > 1 ? `Enviar mensagem (${n} variações)` : "Enviar mensagem";
+  }
   return ACAO_LABEL[a.tipo];
 }
 
@@ -2507,8 +2512,17 @@ function FormAutomacao({
   const [inicio, setInicio] = useState(inicial?.gatilhoConfig?.horario?.inicio ?? "08:00");
   const [fim, setFim] = useState(inicial?.gatilhoConfig?.horario?.fim ?? "18:00");
   const [dias, setDias] = useState<number[]>(inicial?.gatilhoConfig?.horario?.dias ?? [1, 2, 3, 4, 5]);
-  const [acoes, setAcoes] = useState<AcaoAuto[]>(inicial?.acoes?.length ? inicial.acoes : [{ tipo: "ENVIAR_MENSAGEM", texto: "" }]);
+  const [acoes, setAcoes] = useState<AcaoAuto[]>(
+    inicial?.acoes?.length
+      ? inicial.acoes.map((a) =>
+          a.tipo === "ENVIAR_MENSAGEM"
+            ? { ...a, textos: a.textos?.length ? a.textos : a.texto ? [a.texto] : [""] }
+            : a,
+        )
+      : [{ tipo: "ENVIAR_MENSAGEM", textos: [""] }],
+  );
   const [sessaoId, setSessaoId] = useState<string>(inicial?.sessaoId ?? "");
+  const [delayMin, setDelayMin] = useState<number>(inicial?.gatilhoConfig?.delayMin ?? 0);
   const [salvando, setSalvando] = useState(false);
 
   const { data: sessoes = [] } = useQuery({
@@ -2532,11 +2546,20 @@ function FormAutomacao({
     if (gatilho === "FORA_DO_HORARIO") {
       gatilhoConfig.horario = { inicio, fim, dias };
     }
+    if (gatilho === "CLIENTE_CADASTRADO" && delayMin > 0) {
+      gatilhoConfig.delayMin = delayMin;
+    }
+    // Normaliza ações: ENVIAR_MENSAGEM leva "textos" (variações não-vazias).
+    const acoesOut = acoes.map((a) =>
+      a.tipo === "ENVIAR_MENSAGEM"
+        ? { tipo: a.tipo, textos: (a.textos ?? []).map((t) => t.trim()).filter(Boolean) }
+        : a,
+    );
     const body = {
       nome: nome.trim(),
       gatilho,
       gatilhoConfig,
-      acoes,
+      acoes: acoesOut,
       sessaoId: gatilho === "CLIENTE_CADASTRADO" ? (sessaoId || null) : null,
     };
     setSalvando(true);
@@ -2600,6 +2623,18 @@ function FormAutomacao({
                   <option key={s.id} value={s.id}>{s.nome}</option>
                 ))}
               </select>
+              <div className="flex items-center gap-2 pt-1">
+                <Label className="text-xs shrink-0">Enviar depois de</Label>
+                <input
+                  type="number"
+                  min={0}
+                  max={1440}
+                  value={delayMin}
+                  onChange={(e) => setDelayMin(Math.max(0, Math.min(1440, parseInt(e.target.value) || 0)))}
+                  className="w-16 text-sm rounded-md border border-border bg-background px-2 py-1 outline-none"
+                />
+                <span className="text-xs text-muted-foreground">minutos (0 = na hora)</span>
+              </div>
               <p className="text-[11px] text-amber-600 dark:text-amber-500">
                 ⚠️ Mandar mensagem pra quem nunca te chamou aumenta o risco de bloqueio no WhatsApp.
                 Use só quando o cliente já espera o contato. Só dispara se ainda não existe conversa com esse número.
@@ -2655,14 +2690,38 @@ function FormAutomacao({
                 </div>
                 {a.tipo === "ENVIAR_MENSAGEM" && (
                   <>
-                    <textarea
-                      value={a.texto ?? ""}
-                      onChange={(e) => setAcao(i, { texto: e.target.value })}
-                      rows={3}
-                      placeholder="Texto da mensagem…"
-                      className="w-full text-sm rounded-md border border-border bg-background px-2.5 py-2 outline-none resize-none"
-                    />
-                    <p className="text-[11px] text-muted-foreground">Use {"{{nome}}"} ou {"{{primeiro_nome}}"} pra personalizar.</p>
+                    {(a.textos ?? [""]).map((t, vi) => (
+                      <div key={vi} className="flex items-start gap-1.5">
+                        <textarea
+                          value={t}
+                          onChange={(e) => {
+                            const arr = [...(a.textos ?? [""])];
+                            arr[vi] = e.target.value;
+                            setAcao(i, { textos: arr });
+                          }}
+                          rows={2}
+                          placeholder={vi === 0 ? "Texto da mensagem…" : `Variação ${vi + 1}…`}
+                          className="flex-1 text-sm rounded-md border border-border bg-background px-2.5 py-2 outline-none resize-none"
+                        />
+                        {(a.textos ?? []).length > 1 && (
+                          <button
+                            onClick={() => setAcao(i, { textos: (a.textos ?? []).filter((_, j) => j !== vi) })}
+                            className="text-muted-foreground hover:text-destructive mt-1.5"
+                          >
+                            <XIcon className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                    <div className="flex items-center justify-between">
+                      <button
+                        onClick={() => setAcao(i, { textos: [...(a.textos ?? [""]), ""] })}
+                        className="text-[11px] font-semibold text-green-600 dark:text-green-400 hover:underline flex items-center gap-1"
+                      >
+                        <Plus className="w-3 h-3" /> Adicionar variação
+                      </button>
+                      <span className="text-[11px] text-muted-foreground">Vai alternando entre elas · {"{{primeiro_nome}}"}</span>
+                    </div>
                   </>
                 )}
                 {a.tipo === "MOVER_ETAPA" && (

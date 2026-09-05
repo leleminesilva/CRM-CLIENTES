@@ -16,7 +16,7 @@ type ConversaComSessao = WhatsAppConversa & { sessao: WhatsAppSessao };
 const STATUS = ["ABERTA", "PENDENTE", "RESOLVIDA"] as const;
 
 export type AcaoAutomacao =
-  | { tipo: "ENVIAR_MENSAGEM"; texto: string }
+  | { tipo: "ENVIAR_MENSAGEM"; texto?: string; textos?: string[] }
   | { tipo: "MOVER_ETAPA"; etapa: string }
   | { tipo: "DEFINIR_STATUS"; status: (typeof STATUS)[number] }
   | { tipo: "ADICIONAR_ETIQUETA"; etiqueta: string }
@@ -26,6 +26,15 @@ export type AcaoAutomacao =
 interface GatilhoConfig {
   palavras?: string[];
   horario?: { inicio: string; fim: string; dias: number[] };
+  delayMin?: number; // atraso do envio (só CLIENTE_CADASTRADO)
+}
+
+// Escolhe uma das variações de texto (alternância) — random pra não virar padrão.
+function escolherTexto(acao: { texto?: string; textos?: string[] }): string | null {
+  const opcoes = (acao.textos ?? []).map((t) => t.trim()).filter(Boolean);
+  if (acao.texto?.trim()) opcoes.unshift(acao.texto.trim());
+  if (opcoes.length === 0) return null;
+  return opcoes[Math.floor(Math.random() * opcoes.length)];
 }
 
 const semAcento = (s: string) =>
@@ -75,12 +84,14 @@ async function proximoAtendente(sessaoId: string): Promise<string | null> {
 async function executarAcao(acao: AcaoAutomacao, conversa: ConversaComSessao): Promise<void> {
   switch (acao.tipo) {
     case "ENVIAR_MENSAGEM": {
+      const escolhido = escolherTexto(acao);
+      if (!escolhido) return;
       let clienteNome: string | null = null;
       if (conversa.clienteId) {
         const c = await prisma.cliente.findUnique({ where: { id: conversa.clienteId }, select: { nome: true } });
         clienteNome = c?.nome ?? null;
       }
-      await sendWhatsAppMessage(conversa, interpolar(acao.texto, conversa, clienteNome));
+      await sendWhatsAppMessage(conversa, interpolar(escolhido, conversa, clienteNome));
       break;
     }
     case "MOVER_ETAPA": {
@@ -183,8 +194,34 @@ export async function executarAutomacoesClienteCadastrado(cliente: {
       const jaTemMensagem = await prisma.whatsAppMensagem.count({ where: { conversaId: conversa.id } });
       if (jaTemMensagem > 0) continue; // conversa já existente: não manda boas-vindas
 
+      const cfg = (regra.gatilhoConfig ?? {}) as GatilhoConfig;
+      const delayMin = Math.min(1440, Math.max(0, Number(cfg.delayMin) || 0));
+      let clienteNome: string | null = null;
+      if (conversa.clienteId) {
+        const c = await prisma.cliente.findUnique({ where: { id: conversa.clienteId }, select: { nome: true } });
+        clienteNome = c?.nome ?? null;
+      }
+
       for (const acao of acoes) {
-        await executarAcao(acao, conversa);
+        if (acao.tipo === "ENVIAR_MENSAGEM" && delayMin > 0) {
+          // Agenda: a mensagem sai depois de delayMin (a conversa já aparece
+          // no quadro; as outras ações rodam na hora).
+          const escolhido = escolherTexto(acao);
+          if (!escolhido) continue;
+          const jaAgendado = await prisma.whatsAppEnvioAgendado.findFirst({
+            where: { conversaId: conversa.id, enviadoEm: null, canceladoEm: null },
+          });
+          if (jaAgendado) continue;
+          await prisma.whatsAppEnvioAgendado.create({
+            data: {
+              conversaId: conversa.id,
+              texto: interpolar(escolhido, conversa, clienteNome),
+              enviarEm: new Date(Date.now() + delayMin * 60_000),
+            },
+          });
+        } else {
+          await executarAcao(acao, conversa);
+        }
       }
       await prisma.whatsAppAutomacao.update({
         where: { id: regra.id },
@@ -262,9 +299,17 @@ export function sanearAcoes(raw: unknown): Prisma.InputJsonValue | null {
     const tipo = (a as { tipo?: string }).tipo;
     if (!tipo || !TIPOS_ACAO.includes(tipo as (typeof TIPOS_ACAO)[number])) continue;
     if (tipo === "ENVIAR_MENSAGEM") {
-      const texto = String((a as { texto?: unknown }).texto ?? "").trim();
-      if (!texto) continue;
-      out.push({ tipo, texto: texto.slice(0, 1000) });
+      const rawTextos = (a as { textos?: unknown }).textos;
+      const textos = (Array.isArray(rawTextos) ? rawTextos : [])
+        .filter((t): t is string => typeof t === "string")
+        .map((t) => t.trim())
+        .filter(Boolean)
+        .slice(0, 10)
+        .map((t) => t.slice(0, 1000));
+      const legado = String((a as { texto?: unknown }).texto ?? "").trim();
+      if (legado && textos.length === 0) textos.push(legado.slice(0, 1000));
+      if (textos.length === 0) continue;
+      out.push({ tipo, textos });
     } else if (tipo === "MOVER_ETAPA") {
       const etapa = String((a as { etapa?: unknown }).etapa ?? "").trim();
       if (!etapa) continue; // a existência do id é checada na hora de executar
@@ -305,6 +350,10 @@ export function sanearGatilhoConfig(raw: unknown): Prisma.InputJsonValue | null 
       ? h.dias.filter((d): d is number => typeof d === "number" && d >= 0 && d <= 6)
       : [1, 2, 3, 4, 5];
     out.horario = { inicio: hm(h.inicio) ?? "08:00", fim: hm(h.fim) ?? "18:00", dias };
+  }
+  const delayMin = Number((cfg as { delayMin?: unknown }).delayMin);
+  if (Number.isFinite(delayMin) && delayMin > 0) {
+    out.delayMin = Math.min(1440, Math.round(delayMin));
   }
   return Object.keys(out).length ? (out as Prisma.InputJsonValue) : null;
 }

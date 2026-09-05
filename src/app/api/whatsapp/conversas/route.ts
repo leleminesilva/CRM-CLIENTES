@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
 import { hasPermission, isAdmin } from "@/lib/rbac";
 import prisma from "@/lib/prisma";
+import { processarEnviosAgendados } from "@/lib/whatsapp/envios-agendados";
 import type { Prisma } from "@prisma/client";
 
 export const dynamic = "force-dynamic";
@@ -12,6 +13,9 @@ export async function GET(request: NextRequest) {
   if (!hasPermission(payload.role, "whatsapp:use")) {
     return NextResponse.json({ error: "Sem permissão" }, { status: 403 });
   }
+
+  // Polling da lista (a cada ~5s) também processa envios agendados vencidos.
+  void processarEnviosAgendados().catch(() => {});
 
   const { searchParams } = new URL(request.url);
   const sessaoId = searchParams.get("sessaoId");

@@ -598,6 +598,25 @@ model WhatsAppEtapa {
   @@map("whatsapp_etapas")
 }
 
+// Envio agendado (ex: mensagem de boas-vindas com atraso de X minutos).
+// Sem cron no projeto — processado de forma oportunista (webhook + polling
+// da lista de conversas). Ver src/lib/whatsapp/envios-agendados.ts.
+model WhatsAppEnvioAgendado {
+  id                 String    @id @default(cuid())
+  conversaId         String
+  texto              String
+  enviarEm           DateTime
+  enviadoEm          DateTime?
+  canceladoEm        DateTime?
+  motivoCancelamento String?
+  tentativas         Int       @default(0)
+  processandoEm      DateTime?
+  createdAt          DateTime  @default(now())
+
+  @@index([enviadoEm, canceladoEm, enviarEm])
+  @@map("whatsapp_envios_agendados")
+}
+
 // Mensagem pré-definida (chip de resposta rápida no composer da conversa).
 // Compartilhada por todos os atendentes; editável por Admin/Dev.
 model WhatsAppRespostaRapida {

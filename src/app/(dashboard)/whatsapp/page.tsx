@@ -165,14 +165,22 @@ const ORC_STATUS: Record<string, { label: string; cor: string }> = {
   NAO_APROVADO: { label: "Não aprovado", cor: "text-rose-600 dark:text-rose-400" },
 };
 
-const RESPOSTAS_RAPIDAS = [
-  "Bom dia! Como posso ajudar?",
-  "Pode me passar as medidas (largura × altura)?",
-  "Qual o tipo de vidro? (temperado, comum, laminado…)",
-  "Você é de qual cidade?",
-  "Vou confirmar o valor com a equipe e já te retorno 👍",
-  "Consegue me mandar uma foto do local?",
-];
+interface RespostaRapida {
+  id: string;
+  texto: string;
+  ordem: number;
+}
+
+function useRespostasRapidas() {
+  return useQuery({
+    queryKey: ["wa-respostas-rapidas"],
+    queryFn: async () => {
+      const { data } = await axios.get("/api/whatsapp/respostas-rapidas");
+      return data as { respostas: RespostaRapida[]; podeEditar: boolean };
+    },
+    staleTime: 60000,
+  });
+}
 
 // Fallback enquanto /api/whatsapp/etapas não carregou (mesmos ids semeados na migration).
 const ETAPAS_FALLBACK: EtapaCol[] = [
@@ -655,6 +663,10 @@ function AreaChat({
   const [texto, setTexto] = useState("");
   const [arquivo, setArquivo] = useState<File | null>(null);
   const [ctxAberto, setCtxAberto] = useState(true);
+  const [gerenciarRespostas, setGerenciarRespostas] = useState(false);
+  const respostasQuery = useRespostasRapidas();
+  const respostasRapidas = respostasQuery.data?.respostas ?? [];
+  const podeEditarRespostas = respostasQuery.data?.podeEditar ?? false;
   const [leiturasFoto, setLeiturasFoto] = useState<Record<string, { loading?: boolean; texto?: string; erro?: boolean }>>({});
   const [transcricoes, setTranscricoes] = useState<Record<string, { loading?: boolean; texto?: string; erro?: boolean }>>({});
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -962,16 +974,28 @@ function AreaChat({
             {sugerir.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
             Sugerir resposta
           </button>
-          {RESPOSTAS_RAPIDAS.map((r) => (
+          {respostasRapidas.map((r) => (
             <button
-              key={r}
-              onClick={() => setTexto((t) => (t.trim() ? `${t} ${r}` : r))}
+              key={r.id}
+              onClick={() => setTexto((t) => (t.trim() ? `${t} ${r.texto}` : r.texto))}
               className="shrink-0 text-xs font-medium rounded-full bg-white/70 dark:bg-white/5 text-muted-foreground hover:text-foreground px-2.5 py-1"
             >
-              {r.length > 32 ? r.slice(0, 30) + "…" : r}
+              {r.texto.length > 32 ? r.texto.slice(0, 30) + "…" : r.texto}
             </button>
           ))}
+          {podeEditarRespostas && (
+            <button
+              onClick={() => setGerenciarRespostas(true)}
+              title="Editar mensagens pré-definidas"
+              className="shrink-0 w-6 h-6 flex items-center justify-center rounded-full text-muted-foreground hover:text-foreground hover:bg-black/5 dark:hover:bg-white/10"
+            >
+              <Pencil className="w-3.5 h-3.5" />
+            </button>
+          )}
         </div>
+        {gerenciarRespostas && (
+          <ModalRespostasRapidas respostas={respostasRapidas} onClose={() => setGerenciarRespostas(false)} />
+        )}
         <div className="flex items-end gap-2">
           <input
             ref={fileInputRef}
@@ -1025,6 +1049,102 @@ function AreaChat({
       <PainelContexto conversa={conversa} sessaoNome={sessaoNome} onClose={() => setCtxAberto(false)} />
     )}
     </div>
+  );
+}
+
+// ── Editar mensagens pré-definidas (respostas rápidas) ─────────────────────
+
+function ModalRespostasRapidas({
+  respostas, onClose,
+}: {
+  respostas: RespostaRapida[];
+  onClose: () => void;
+}) {
+  const queryClient = useQueryClient();
+  const [busy, setBusy] = useState(false);
+  const [nova, setNova] = useState("");
+
+  const invalidar = () => queryClient.invalidateQueries({ queryKey: ["wa-respostas-rapidas"] });
+  const call = async (fn: () => Promise<unknown>) => {
+    setBusy(true);
+    try {
+      await fn();
+      invalidar();
+    } catch (e: unknown) {
+      const msg = (e as { response?: { data?: { error?: string } } })?.response?.data?.error;
+      toast.error(msg ?? "Erro ao salvar");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const editar = (id: string, texto: string) => call(() => axios.patch(`/api/whatsapp/respostas-rapidas/${id}`, { texto }));
+  const excluir = (r: RespostaRapida) => {
+    if (!confirm(`Excluir a resposta "${r.texto}"?`)) return;
+    call(() => axios.delete(`/api/whatsapp/respostas-rapidas/${r.id}`));
+  };
+  const mover = (idx: number, dir: -1 | 1) => {
+    const alvo = idx + dir;
+    if (alvo < 0 || alvo >= respostas.length) return;
+    const ids = respostas.map((r) => r.id);
+    [ids[idx], ids[alvo]] = [ids[alvo], ids[idx]];
+    call(() => axios.put("/api/whatsapp/respostas-rapidas", { ids }));
+  };
+  const adicionar = () => {
+    if (!nova.trim()) return;
+    call(() => axios.post("/api/whatsapp/respostas-rapidas", { texto: nova.trim() })).then(() => setNova(""));
+  };
+
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Mensagens pré-definidas</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-2">
+          {respostas.map((r, i) => (
+            <div key={r.id} className="flex items-start gap-2 rounded-lg border border-border p-2">
+              <div className="flex flex-col mt-1">
+                <button onClick={() => mover(i, -1)} disabled={busy || i === 0} className="text-muted-foreground hover:text-foreground disabled:opacity-30">
+                  <ChevronUp className="w-3.5 h-3.5" />
+                </button>
+                <button onClick={() => mover(i, 1)} disabled={busy || i === respostas.length - 1} className="text-muted-foreground hover:text-foreground disabled:opacity-30">
+                  <ChevronDown className="w-3.5 h-3.5" />
+                </button>
+              </div>
+              <textarea
+                defaultValue={r.texto}
+                rows={2}
+                onBlur={(ev) => ev.target.value.trim() && ev.target.value.trim() !== r.texto && editar(r.id, ev.target.value.trim())}
+                className="flex-1 min-w-0 text-sm rounded-md border border-border bg-background px-2 py-1.5 outline-none resize-none"
+              />
+              <button onClick={() => excluir(r)} disabled={busy} className="text-muted-foreground hover:text-destructive shrink-0 mt-1">
+                <Trash2 className="w-4 h-4" />
+              </button>
+            </div>
+          ))}
+          {respostas.length === 0 && (
+            <p className="text-sm text-muted-foreground text-center py-4">Nenhuma mensagem pré-definida ainda.</p>
+          )}
+          <div className="flex items-start gap-2 pt-1">
+            <textarea
+              value={nova}
+              onChange={(e) => setNova(e.target.value)}
+              rows={2}
+              placeholder="Nova mensagem pré-definida…"
+              className="flex-1 min-w-0 text-sm rounded-md border border-dashed border-border bg-background px-2 py-1.5 outline-none resize-none"
+            />
+            <Button size="sm" className="h-8 text-xs bg-green-600 hover:bg-green-700 text-white shrink-0" onClick={adicionar} disabled={busy || !nova.trim()}>
+              <Plus className="w-3.5 h-3.5 mr-1" /> Adicionar
+            </Button>
+          </div>
+        </div>
+        <p className="text-[11px] text-muted-foreground">Texto salva ao sair do campo. Essas mensagens aparecem como atalho pra todos os atendentes.</p>
+        <DialogFooter>
+          <Button onClick={onClose}>Fechar</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 

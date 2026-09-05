@@ -598,6 +598,18 @@ model WhatsAppEtapa {
   @@map("whatsapp_etapas")
 }
 
+// Mensagem pré-definida (chip de resposta rápida no composer da conversa).
+// Compartilhada por todos os atendentes; editável por Admin/Dev.
+model WhatsAppRespostaRapida {
+  id        String   @id @default(cuid())
+  texto     String
+  ordem     Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("whatsapp_respostas_rapidas")
+}
+
 enum WhatsAppGatilho {
   CONTATO_NOVO       // primeira mensagem de um número desconhecido
   MENSAGEM_RECEBIDA  // qualquer mensagem recebida (com filtro opcional de palavras)

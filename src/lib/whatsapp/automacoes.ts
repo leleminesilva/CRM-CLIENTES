@@ -27,6 +27,7 @@ interface GatilhoConfig {
   palavras?: string[];
   horario?: { inicio: string; fim: string; dias: number[] };
   delayMin?: number; // atraso do envio (só CLIENTE_CADASTRADO)
+  canalPorResponsavel?: boolean; // manda pelo WhatsApp do vendedor responsável (só CLIENTE_CADASTRADO)
 }
 
 // Escolhe uma das variações de texto (alternância) — random pra não virar padrão.
@@ -145,6 +146,7 @@ export async function executarAutomacoesClienteCadastrado(cliente: {
   id: string;
   nome: string;
   whatsapp?: string | null;
+  responsavelId?: string | null;
 }): Promise<void> {
   const numero = paraJidNumero(cliente.whatsapp);
   if (!numero) return;
@@ -154,9 +156,11 @@ export async function executarAutomacoesClienteCadastrado(cliente: {
   });
   if (regras.length === 0) return;
 
+  // Cada atendente tem sua própria sessão (autoatendimento — ver rbac.ts),
+  // então dá pra achar "o WhatsApp do vendedor" direto pelo atendenteId.
   const online = await prisma.whatsAppSessao.findMany({
     where: { ativo: true, status: "ONLINE" },
-    select: { id: true },
+    select: { id: true, atendenteId: true },
     orderBy: { createdAt: "asc" },
   });
   if (online.length === 0) {
@@ -164,16 +168,31 @@ export async function executarAutomacoesClienteCadastrado(cliente: {
     return;
   }
   const onlineIds = new Set(online.map((s) => s.id));
+  const porAtendente = new Map(
+    online.filter((s): s is typeof s & { atendenteId: string } => !!s.atendenteId).map((s) => [s.atendenteId, s.id]),
+  );
 
   for (const regra of regras) {
     const acoes = (Array.isArray(regra.acoes) ? regra.acoes : []) as AcaoAutomacao[];
     if (acoes.length === 0) continue;
 
-    // Canal fixo na regra: respeita à risca — se estiver offline, NÃO manda
-    // por outro número (seria confuso pro cliente). Sem canal fixo: usa o
-    // primeiro que estiver online.
+    const cfgCanal = (regra.gatilhoConfig ?? {}) as GatilhoConfig;
+
+    // Três modos de escolher o canal de envio:
+    // 1) canalPorResponsavel: usa o WhatsApp do vendedor responsável pelo
+    //    cliente — cada um manda pelo próprio número. Se ele não tiver
+    //    WhatsApp conectado (ou estiver offline), NÃO cai pra outro número.
+    // 2) canal fixo (regra.sessaoId): idem, respeita à risca.
+    // 3) sem nada configurado: primeiro canal online.
     let sessaoId: string;
-    if (regra.sessaoId) {
+    if (cfgCanal.canalPorResponsavel) {
+      const alvo = cliente.responsavelId ? porAtendente.get(cliente.responsavelId) : undefined;
+      if (!alvo) {
+        waLogger.error(`automação CLIENTE_CADASTRADO ${regra.id}: vendedor responsável sem WhatsApp conectado/online`, {});
+        continue;
+      }
+      sessaoId = alvo;
+    } else if (regra.sessaoId) {
       if (!onlineIds.has(regra.sessaoId)) {
         waLogger.error(`automação CLIENTE_CADASTRADO ${regra.id}: canal escolhido está offline`, {});
         continue;
@@ -194,8 +213,7 @@ export async function executarAutomacoesClienteCadastrado(cliente: {
       const jaTemMensagem = await prisma.whatsAppMensagem.count({ where: { conversaId: conversa.id } });
       if (jaTemMensagem > 0) continue; // conversa já existente: não manda boas-vindas
 
-      const cfg = (regra.gatilhoConfig ?? {}) as GatilhoConfig;
-      const delayMin = Math.min(1440, Math.max(0, Number(cfg.delayMin) || 0));
+      const delayMin = Math.min(1440, Math.max(0, Number(cfgCanal.delayMin) || 0));
       let clienteNome: string | null = null;
       if (conversa.clienteId) {
         const c = await prisma.cliente.findUnique({ where: { id: conversa.clienteId }, select: { nome: true } });
@@ -354,6 +372,9 @@ export function sanearGatilhoConfig(raw: unknown): Prisma.InputJsonValue | null 
   const delayMin = Number((cfg as { delayMin?: unknown }).delayMin);
   if (Number.isFinite(delayMin) && delayMin > 0) {
     out.delayMin = Math.min(1440, Math.round(delayMin));
+  }
+  if ((cfg as { canalPorResponsavel?: unknown }).canalPorResponsavel === true) {
+    out.canalPorResponsavel = true;
   }
   return Object.keys(out).length ? (out as Prisma.InputJsonValue) : null;
 }

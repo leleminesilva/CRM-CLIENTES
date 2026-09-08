@@ -2375,7 +2375,12 @@ interface Automacao {
   nome: string;
   ativa: boolean;
   gatilho: GatilhoTipo;
-  gatilhoConfig?: { palavras?: string[]; horario?: { inicio: string; fim: string; dias: number[] }; delayMin?: number } | null;
+  gatilhoConfig?: {
+    palavras?: string[];
+    horario?: { inicio: string; fim: string; dias: number[] };
+    delayMin?: number;
+    canalPorResponsavel?: boolean;
+  } | null;
   acoes: AcaoAuto[];
   sessaoId?: string | null;
   disparos: number;
@@ -2521,7 +2526,11 @@ function FormAutomacao({
         )
       : [{ tipo: "ENVIAR_MENSAGEM", textos: [""] }],
   );
-  const [sessaoId, setSessaoId] = useState<string>(inicial?.sessaoId ?? "");
+  // "responsavel" = WhatsApp do vendedor responsável pelo cliente; "" = primeiro
+  // canal online; qualquer outro valor = id de uma sessão específica.
+  const [sessaoId, setSessaoId] = useState<string>(
+    inicial ? (inicial.gatilhoConfig?.canalPorResponsavel ? "responsavel" : (inicial.sessaoId ?? "")) : "responsavel",
+  );
   const [delayMin, setDelayMin] = useState<number>(inicial?.gatilhoConfig?.delayMin ?? 0);
   const [salvando, setSalvando] = useState(false);
 
@@ -2549,6 +2558,9 @@ function FormAutomacao({
     if (gatilho === "CLIENTE_CADASTRADO" && delayMin > 0) {
       gatilhoConfig.delayMin = delayMin;
     }
+    if (gatilho === "CLIENTE_CADASTRADO" && sessaoId === "responsavel") {
+      gatilhoConfig.canalPorResponsavel = true;
+    }
     // Normaliza ações: ENVIAR_MENSAGEM leva "textos" (variações não-vazias).
     const acoesOut = acoes.map((a) =>
       a.tipo === "ENVIAR_MENSAGEM"
@@ -2560,7 +2572,7 @@ function FormAutomacao({
       gatilho,
       gatilhoConfig,
       acoes: acoesOut,
-      sessaoId: gatilho === "CLIENTE_CADASTRADO" ? (sessaoId || null) : null,
+      sessaoId: gatilho === "CLIENTE_CADASTRADO" && sessaoId !== "responsavel" ? (sessaoId || null) : null,
     };
     setSalvando(true);
     try {
@@ -2618,11 +2630,20 @@ function FormAutomacao({
                 onChange={(e) => setSessaoId(e.target.value)}
                 className="w-full text-sm rounded-md border border-border bg-background px-3 py-2 outline-none"
               >
+                <option value="responsavel">WhatsApp do vendedor responsável pelo cliente (recomendado)</option>
                 <option value="">Primeiro canal online</option>
                 {sessoes.map((s) => (
-                  <option key={s.id} value={s.id}>{s.nome}</option>
+                  <option key={s.id} value={s.id}>
+                    {s.nome}{s.atendente ? ` — ${s.atendente.nome}` : ""}
+                  </option>
                 ))}
               </select>
+              {sessaoId === "responsavel" && (
+                <p className="text-[11px] text-muted-foreground">
+                  Cada vendedor manda pelo próprio número (o WhatsApp que ele conectou em Canais). Se o vendedor
+                  responsável não tiver um WhatsApp conectado e online, a regra não dispara pra esse cliente.
+                </p>
+              )}
               <div className="flex items-center gap-2 pt-1">
                 <Label className="text-xs shrink-0">Enviar depois de</Label>
                 <input

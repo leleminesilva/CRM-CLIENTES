@@ -165,7 +165,14 @@ export async function POST(request: NextRequest) {
     // regras (ex: mensagem de boas-vindas). Não bloqueia a resposta.
     if (cliente.whatsapp) {
       import("@/lib/whatsapp/automacoes")
-        .then((m) => m.executarAutomacoesClienteCadastrado({ id: cliente.id, nome: cliente.nome, whatsapp: cliente.whatsapp }))
+        .then((m) =>
+          m.executarAutomacoesClienteCadastrado({
+            id: cliente.id,
+            nome: cliente.nome,
+            whatsapp: cliente.whatsapp,
+            responsavelId: cliente.responsavelId,
+          }),
+        )
         .catch((err) => console.error("automação cliente cadastrado:", err));
     }
 

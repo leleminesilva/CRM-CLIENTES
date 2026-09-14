@@ -3019,23 +3019,6 @@ function WhatsAppContent() {
     );
   }
 
-  // Módulo liberado só para o Desenvolvedor por enquanto. Some da sidebar para
-  // os demais cargos (inclusive Administrador); aqui bloqueia o acesso direto
-  // pela URL.
-  if (user && user.role !== "DESENVOLVEDOR") {
-    return (
-      <div className="flex flex-col items-center justify-center h-full gap-4 text-center">
-        <MessageCircle className="w-16 h-16 text-muted-foreground opacity-30" />
-        <div>
-          <h2 className="text-xl font-semibold">Acesso restrito</h2>
-          <p className="text-muted-foreground mt-1 text-sm max-w-sm">
-            O módulo WhatsApp está disponível apenas para o Desenvolvedor por enquanto.
-          </p>
-        </div>
-      </div>
-    );
-  }
-
   const abaBtn = (
     id: "conversas" | "quadro" | "automacoes" | "canais",
     label: string,

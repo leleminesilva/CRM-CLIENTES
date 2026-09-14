@@ -16,7 +16,7 @@ type ConversaComSessao = WhatsAppConversa & { sessao: WhatsAppSessao };
 const STATUS = ["ABERTA", "PENDENTE", "RESOLVIDA"] as const;
 
 export type AcaoAutomacao =
-  | { tipo: "ENVIAR_MENSAGEM"; texto?: string; textos?: string[] }
+  | { tipo: "ENVIAR_MENSAGEM"; texto?: string; textos?: string[]; textosPorSessao?: Record<string, string[]> }
   | { tipo: "MOVER_ETAPA"; etapa: string }
   | { tipo: "DEFINIR_STATUS"; status: (typeof STATUS)[number] }
   | { tipo: "ADICIONAR_ETIQUETA"; etiqueta: string }
@@ -31,9 +31,17 @@ interface GatilhoConfig {
 }
 
 // Escolhe uma das variações de texto (alternância) — random pra não virar padrão.
-function escolherTexto(acao: { texto?: string; textos?: string[] }): string | null {
-  const opcoes = (acao.textos ?? []).map((t) => t.trim()).filter(Boolean);
-  if (acao.texto?.trim()) opcoes.unshift(acao.texto.trim());
+// Se a ação tiver mensagem específica pra essa sessão (cada atendente edita a
+// própria, vendo o canal dele selecionado no módulo), usa essa lista; senão
+// cai pra mensagem padrão/compartilhada da regra.
+function escolherTexto(
+  acao: { texto?: string; textos?: string[]; textosPorSessao?: Record<string, string[]> },
+  sessaoId?: string | null,
+): string | null {
+  const doSessao = (sessaoId && acao.textosPorSessao?.[sessaoId]) || [];
+  const base = doSessao.length > 0 ? doSessao : acao.textos ?? [];
+  const opcoes = base.map((t) => t.trim()).filter(Boolean);
+  if (opcoes.length === 0 && acao.texto?.trim()) opcoes.push(acao.texto.trim());
   if (opcoes.length === 0) return null;
   return opcoes[Math.floor(Math.random() * opcoes.length)];
 }
@@ -85,7 +93,7 @@ async function proximoAtendente(sessaoId: string): Promise<string | null> {
 async function executarAcao(acao: AcaoAutomacao, conversa: ConversaComSessao): Promise<void> {
   switch (acao.tipo) {
     case "ENVIAR_MENSAGEM": {
-      const escolhido = escolherTexto(acao);
+      const escolhido = escolherTexto(acao, conversa.sessaoId);
       if (!escolhido) return;
       let clienteNome: string | null = null;
       if (conversa.clienteId) {
@@ -224,7 +232,7 @@ export async function executarAutomacoesClienteCadastrado(cliente: {
         if (acao.tipo === "ENVIAR_MENSAGEM" && delayMin > 0) {
           // Agenda: a mensagem sai depois de delayMin (a conversa já aparece
           // no quadro; as outras ações rodam na hora).
-          const escolhido = escolherTexto(acao);
+          const escolhido = escolherTexto(acao, conversa.sessaoId);
           if (!escolhido) continue;
           const jaAgendado = await prisma.whatsAppEnvioAgendado.findFirst({
             where: { conversaId: conversa.id, enviadoEm: null, canceladoEm: null },
@@ -317,17 +325,36 @@ export function sanearAcoes(raw: unknown): Prisma.InputJsonValue | null {
     const tipo = (a as { tipo?: string }).tipo;
     if (!tipo || !TIPOS_ACAO.includes(tipo as (typeof TIPOS_ACAO)[number])) continue;
     if (tipo === "ENVIAR_MENSAGEM") {
-      const rawTextos = (a as { textos?: unknown }).textos;
-      const textos = (Array.isArray(rawTextos) ? rawTextos : [])
-        .filter((t): t is string => typeof t === "string")
-        .map((t) => t.trim())
-        .filter(Boolean)
-        .slice(0, 10)
-        .map((t) => t.slice(0, 1000));
+      const limparLista = (lista: unknown): string[] =>
+        (Array.isArray(lista) ? lista : [])
+          .filter((t): t is string => typeof t === "string")
+          .map((t) => t.trim())
+          .filter(Boolean)
+          .slice(0, 10)
+          .map((t) => t.slice(0, 1000));
+
+      const textos = limparLista((a as { textos?: unknown }).textos);
       const legado = String((a as { texto?: unknown }).texto ?? "").trim();
       if (legado && textos.length === 0) textos.push(legado.slice(0, 1000));
-      if (textos.length === 0) continue;
-      out.push({ tipo, textos });
+
+      // textosPorSessao: mensagem específica por canal/atendente — cada um
+      // edita a própria vendo o canal dele selecionado no módulo.
+      const rawPorSessao = (a as { textosPorSessao?: unknown }).textosPorSessao;
+      const textosPorSessao: Record<string, string[]> = {};
+      if (rawPorSessao && typeof rawPorSessao === "object") {
+        for (const [sessaoId, lista] of Object.entries(rawPorSessao as Record<string, unknown>)) {
+          if (typeof sessaoId !== "string" || !sessaoId.trim() || sessaoId.length > 60) continue;
+          const limpa = limparLista(lista);
+          if (limpa.length > 0) textosPorSessao[sessaoId] = limpa;
+        }
+      }
+
+      if (textos.length === 0 && Object.keys(textosPorSessao).length === 0) continue;
+      out.push({
+        tipo,
+        ...(textos.length > 0 ? { textos } : {}),
+        ...(Object.keys(textosPorSessao).length > 0 ? { textosPorSessao } : {}),
+      });
     } else if (tipo === "MOVER_ETAPA") {
       const etapa = String((a as { etapa?: unknown }).etapa ?? "").trim();
       if (!etapa) continue; // a existência do id é checada na hora de executar

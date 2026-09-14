@@ -28,6 +28,15 @@ interface GatilhoConfig {
   horario?: { inicio: string; fim: string; dias: number[] };
   delayMin?: number; // atraso do envio (só CLIENTE_CADASTRADO)
   canalPorResponsavel?: boolean; // manda pelo WhatsApp do vendedor responsável (só CLIENTE_CADASTRADO)
+  ativaPorSessao?: Record<string, boolean>; // liga/desliga independente por canal — sem entrada, usa `ativa` da regra
+}
+
+// Se ligada/desligada pra um canal específico, essa vale; senão cai pro
+// interruptor geral da regra. Mesma lógica de herança do textosPorSessao.
+function ativaPara(regra: { ativa: boolean; gatilhoConfig: unknown }, sessaoId: string | null | undefined): boolean {
+  if (!sessaoId) return regra.ativa;
+  const cfg = (regra.gatilhoConfig ?? {}) as GatilhoConfig;
+  return cfg.ativaPorSessao?.[sessaoId] ?? regra.ativa;
 }
 
 // Escolhe uma das variações de texto (alternância) — random pra não virar padrão.
@@ -159,8 +168,10 @@ export async function executarAutomacoesClienteCadastrado(cliente: {
   const numero = paraJidNumero(cliente.whatsapp);
   if (!numero) return;
 
+  // Não filtra por `ativa` aqui: liga/desliga é resolvido por canal (ver
+  // ativaPara) depois de saber qual canal vai enviar.
   const regras = await prisma.whatsAppAutomacao.findMany({
-    where: { ativa: true, gatilho: "CLIENTE_CADASTRADO" },
+    where: { gatilho: "CLIENTE_CADASTRADO" },
   });
   if (regras.length === 0) return;
 
@@ -209,6 +220,8 @@ export async function executarAutomacoesClienteCadastrado(cliente: {
     } else {
       sessaoId = online[0].id;
     }
+
+    if (!ativaPara(regra, sessaoId)) continue; // esse canal desligou a própria participação nessa regra
 
     try {
       const conversa = await prisma.whatsAppConversa.upsert({
@@ -266,8 +279,10 @@ export async function executarAutomacoes(
 ): Promise<void> {
   if (conversa.isGrupo) return;
 
+  // Não filtra por `ativa`: liga/desliga é por canal (ver ativaPara),
+  // resolvido abaixo com conversa.sessaoId (o canal que recebeu a mensagem).
   const regras = await prisma.whatsAppAutomacao.findMany({
-    where: { ativa: true, OR: [{ sessaoId: null }, { sessaoId: conversa.sessaoId }] },
+    where: { OR: [{ sessaoId: null }, { sessaoId: conversa.sessaoId }] },
   });
   if (regras.length === 0) return;
 
@@ -289,6 +304,7 @@ export async function executarAutomacoes(
       bate = foraDoHorario(cfg.horario);
     }
     if (!bate) continue;
+    if (!ativaPara(regra, conversa.sessaoId)) continue; // esse canal desligou a própria participação nessa regra
 
     // Anti-spam: se a regra manda mensagem e já respondemos nos últimos 30 min,
     // pula (evita responder a cada mensagem de uma rajada).
@@ -402,6 +418,16 @@ export function sanearGatilhoConfig(raw: unknown): Prisma.InputJsonValue | null 
   }
   if ((cfg as { canalPorResponsavel?: unknown }).canalPorResponsavel === true) {
     out.canalPorResponsavel = true;
+  }
+  const rawAtivaPorSessao = (cfg as { ativaPorSessao?: unknown }).ativaPorSessao;
+  if (rawAtivaPorSessao && typeof rawAtivaPorSessao === "object") {
+    const ativaPorSessao: Record<string, boolean> = {};
+    for (const [sessaoId, v] of Object.entries(rawAtivaPorSessao as Record<string, unknown>)) {
+      if (typeof sessaoId === "string" && sessaoId.trim() && sessaoId.length <= 60 && typeof v === "boolean") {
+        ativaPorSessao[sessaoId] = v;
+      }
+    }
+    if (Object.keys(ativaPorSessao).length > 0) out.ativaPorSessao = ativaPorSessao;
   }
   return Object.keys(out).length ? (out as Prisma.InputJsonValue) : null;
 }

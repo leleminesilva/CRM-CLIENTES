@@ -2381,6 +2381,7 @@ interface Automacao {
     horario?: { inicio: string; fim: string; dias: number[] };
     delayMin?: number;
     canalPorResponsavel?: boolean;
+    ativaPorSessao?: Record<string, boolean>;
   } | null;
   acoes: AcaoAuto[];
   sessaoId?: string | null;
@@ -2403,6 +2404,13 @@ const ACAO_LABEL: Record<AcaoTipo, string> = {
   ATRIBUIR_RODIZIO: "Atribuir por rodízio",
 };
 const DIAS_SEMANA = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
+
+// Liga/desliga independente por canal: sem entrada específica, cai pro
+// interruptor geral da regra (mesma herança do texto padrão/personalizado).
+function ativaAqui(a: Automacao, sessaoId: string | null): boolean {
+  if (!sessaoId) return a.ativa;
+  return a.gatilhoConfig?.ativaPorSessao?.[sessaoId] ?? a.ativa;
+}
 
 function descreverAcao(a: AcaoAuto, etapaNome: Record<string, string>): string {
   if (a.tipo === "MOVER_ETAPA") {
@@ -2456,18 +2464,19 @@ function CardAutomacao({
   onEditar: () => void;
   onExcluir: () => void;
 }) {
+  const ligadaAqui = ativaAqui(a, viewSessaoId ?? null);
   return (
-    <div className={cn("rounded-xl border border-border bg-background shadow-sm p-3.5 flex gap-3.5 items-start", !a.ativa && "opacity-60")}>
+    <div className={cn("rounded-xl border border-border bg-background shadow-sm p-3.5 flex gap-3.5 items-start", !ligadaAqui && "opacity-60")}>
       <button
         onClick={onToggle}
         disabled={!podeEditar}
-        title={a.ativa ? "Pausar" : "Ativar"}
+        title={viewSessaoId ? `${ligadaAqui ? "Pausar" : "Ativar"} só pro canal selecionado` : ligadaAqui ? "Pausar" : "Ativar"}
         className={cn(
           "mt-0.5 w-9 h-5 rounded-full shrink-0 relative transition-colors disabled:cursor-not-allowed",
-          a.ativa ? "bg-green-500" : "bg-muted-foreground/30"
+          ligadaAqui ? "bg-green-500" : "bg-muted-foreground/30"
         )}
       >
-        <span className={cn("absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all", a.ativa ? "left-[18px]" : "left-0.5")} />
+        <span className={cn("absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all", ligadaAqui ? "left-[18px]" : "left-0.5")} />
       </button>
       <div className="flex-1 min-w-0">
         <p className="text-sm font-semibold">{a.nome}</p>
@@ -2895,7 +2904,18 @@ function PainelAutomacoes({ sessaoId, sessoes }: { sessaoId: string | null; sess
 
   const toggle = async (a: Automacao) => {
     try {
-      await axios.patch(`/api/whatsapp/automacoes/${a.id}`, { ativa: !a.ativa });
+      // Com um canal selecionado, liga/desliga só ELE (não a regra inteira) —
+      // grava em gatilhoConfig.ativaPorSessao. Sem canal (raro), mexe no
+      // interruptor geral.
+      if (sessaoId) {
+        const gatilhoConfig = {
+          ...a.gatilhoConfig,
+          ativaPorSessao: { ...(a.gatilhoConfig?.ativaPorSessao ?? {}), [sessaoId]: !ativaAqui(a, sessaoId) },
+        };
+        await axios.patch(`/api/whatsapp/automacoes/${a.id}`, { gatilhoConfig });
+      } else {
+        await axios.patch(`/api/whatsapp/automacoes/${a.id}`, { ativa: !a.ativa });
+      }
       invalidar();
     } catch {
       toast.error("Erro ao alterar");
@@ -2920,7 +2940,7 @@ function PainelAutomacoes({ sessaoId, sessoes }: { sessaoId: string | null; sess
     }
   };
 
-  const ativas = automacoes.filter((a) => a.ativa).length;
+  const ativas = automacoes.filter((a) => ativaAqui(a, sessaoId)).length;
 
   return (
     <div className="flex-1 min-w-0 overflow-y-auto">

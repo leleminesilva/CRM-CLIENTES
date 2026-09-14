@@ -2922,7 +2922,21 @@ function PainelAutomacoes({ sessaoId, sessoes }: { sessaoId: string | null; sess
     }
   };
   const excluir = async (a: Automacao) => {
-    if (!confirm(`Excluir a regra "${a.nome}"?`)) return;
+    // "Excluir" apaga a regra INTEIRA — pra TODOS os canais, incluindo a
+    // mensagem/toggle que cada um personalizou. Pra tirar só o canal que
+    // você está vendo, é a chavinha de ativar/desligar, não isso aqui.
+    const canaisEnvolvidos = sessoes
+      .filter(
+        (s) =>
+          a.gatilhoConfig?.ativaPorSessao?.[s.id] !== undefined ||
+          a.acoes.some((ac) => ac.tipo === "ENVIAR_MENSAGEM" && ac.textosPorSessao?.[s.id]?.length),
+      )
+      .map((s) => s.nome);
+    const aviso =
+      canaisEnvolvidos.length > 0
+        ? `Excluir "${a.nome}" apaga a regra pra TODOS os canais, incluindo o que ${canaisEnvolvidos.join(", ")} personalizou.\n\nSe é só pra ESTE canal parar de participar, cancele e use a chavinha de ativar/desligar em vez disso.\n\nExcluir mesmo assim?`
+        : `Excluir "${a.nome}" pra todos os canais? Se é só pra este canal parar de participar, cancele e use a chavinha de ativar/desligar em vez disso.`;
+    if (!confirm(aviso)) return;
     try {
       await axios.delete(`/api/whatsapp/automacoes/${a.id}`);
       invalidar();

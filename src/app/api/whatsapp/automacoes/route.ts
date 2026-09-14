@@ -6,7 +6,7 @@ import { sanearAcoes, sanearGatilhoConfig } from "@/lib/whatsapp/automacoes";
 
 export const dynamic = "force-dynamic";
 
-const GATILHOS = ["CONTATO_NOVO", "MENSAGEM_RECEBIDA", "FORA_DO_HORARIO"] as const;
+const GATILHOS = ["CONTATO_NOVO", "MENSAGEM_RECEBIDA", "FORA_DO_HORARIO", "CLIENTE_CADASTRADO"] as const;
 
 export async function GET(request: NextRequest) {
   const payload = await getCurrentUser(request);

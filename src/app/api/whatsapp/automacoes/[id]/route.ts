@@ -7,7 +7,7 @@ import { sanearAcoes, sanearGatilhoConfig } from "@/lib/whatsapp/automacoes";
 
 export const dynamic = "force-dynamic";
 
-const GATILHOS = ["CONTATO_NOVO", "MENSAGEM_RECEBIDA", "FORA_DO_HORARIO"];
+const GATILHOS = ["CONTATO_NOVO", "MENSAGEM_RECEBIDA", "FORA_DO_HORARIO", "CLIENTE_CADASTRADO"];
 
 export async function PATCH(request: NextRequest, { params }: { params: { id: string } }) {
   const payload = await getCurrentUser(request);
@@ -23,7 +23,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
   if (typeof body.ativa === "boolean") data.ativa = body.ativa;
   if (typeof body.nome === "string" && body.nome.trim()) data.nome = body.nome.trim().slice(0, 80);
   if (typeof body.gatilho === "string" && GATILHOS.includes(body.gatilho)) {
-    data.gatilho = body.gatilho as "CONTATO_NOVO" | "MENSAGEM_RECEBIDA" | "FORA_DO_HORARIO";
+    data.gatilho = body.gatilho as "CONTATO_NOVO" | "MENSAGEM_RECEBIDA" | "FORA_DO_HORARIO" | "CLIENTE_CADASTRADO";
   }
   if ("gatilhoConfig" in body) data.gatilhoConfig = sanearGatilhoConfig(body.gatilhoConfig) ?? Prisma.JsonNull;
   if ("acoes" in body) {

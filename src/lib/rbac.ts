@@ -1,15 +1,17 @@
 import type { Role } from "@/types";
 
-// Módulo WhatsApp em standby: Fase 5 (VPS/Evolution real) ainda não
-// provisionada — pausado até a instância existir. (O drift de schema que
-// também motivou o standby já foi reconciliado: `prisma migrate diff` contra
-// produção e local dá vazio.)
+// Kill-switch do módulo WhatsApp (Fase 5, VPS/Evolution, já provisionada e em
+// produção — ver docs/architecture/whatsapp.md). Existe pra poder pausar o
+// módulo inteiro pra TODOS os cargos num aperto (ex: gateway com problema),
+// sem depender de deploy.
 //
 // Destravado só onde NEXT_PUBLIC_WHATSAPP_STANDBY estiver explicitamente em
-// "false"; a ausência da env mantém o standby LIGADO (seguro por padrão), então
-// produção continua congelada até setarmos a env na Vercel. É NEXT_PUBLIC_
-// porque a página client (src/app/(dashboard)/whatsapp/page.tsx) também lê
-// essa flag — e "o módulo está no ar?" não é segredo. Ver docs/architecture/whatsapp.md.
+// "false" na Vercel; a ausência da env mantém o standby LIGADO (seguro por
+// padrão). É NEXT_PUBLIC_ porque a página client
+// (src/app/(dashboard)/whatsapp/page.tsx) também lê essa flag — e "o módulo
+// está no ar?" não é segredo. Por ser NEXT_PUBLIC_, o valor é gravado no
+// bundle NO BUILD: mudar a env na Vercel exige um redeploy pra valer (salvar
+// sozinho não move o ponteiro de produção).
 export const WHATSAPP_STANDBY = process.env.NEXT_PUBLIC_WHATSAPP_STANDBY !== "false";
 
 type Permission =

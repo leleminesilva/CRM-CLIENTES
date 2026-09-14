@@ -4,6 +4,10 @@ import { hasPermission } from "@/lib/rbac";
 import { WhatsAppService, LimiteSessaoError } from "@/lib/whatsapp/service";
 
 export const dynamic = "force-dynamic";
+// Criar sessão espera a Evolution responder ao /instance/create (pode levar
+// alguns segundos gerando o QR) — com folga pro timeout/retry do provider
+// (até ~45s no pior caso, ver chamarComRetry em providers/evolution.ts).
+export const maxDuration = 60;
 
 // Rotas de sessão — Fase 1 traz o mínimo pra compilar e ter um fluxo
 // funcional; QR ao vivo/Realtime/reconectar/log de auditoria são Fase 2.

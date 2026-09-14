@@ -72,18 +72,48 @@ export const SessionManager = {
   calcularHealthStatus,
 
   async criar(nome: string, atendenteId?: string | null): Promise<WhatsAppSessao> {
+    // providerSessionId é único no banco e, na prática, igual a `nome` (é o
+    // nome da instância na Evolution). Um nome já usado antes e depois
+    // removido (soft-delete: ativo=false) continua ocupando essa unicidade —
+    // sem checar antes, o create() abaixo falharia DEPOIS de já ter criado
+    // uma instância de verdade na Evolution, deixando ela órfã (sem registro
+    // no CRM) e fazendo a próxima tentativa esbarrar num 403 real da
+    // Evolution (nome duplicado lá). Ver docs/architecture/whatsapp.md.
+    const existente = await prisma.whatsAppSessao.findFirst({ where: { nome } });
+    if (existente?.ativo) {
+      throw new Error(`Já existe uma sessão ativa chamada "${nome}". Escolha outro nome.`);
+    }
+
     const provider = getProvider("EVOLUTION");
     const { providerSessionId, providerVersion } = await provider.createSession(nome);
-    const sessao = await prisma.whatsAppSessao.create({
-      data: {
-        nome,
-        provider: "EVOLUTION",
-        providerVersion,
-        providerSessionId,
-        status: "WAITING_QR",
-        atendenteId: atendenteId ?? null,
-      },
-    });
+
+    // Nome já usado antes (soft-deletado): reaproveita a linha em vez de
+    // tentar inserir outra com o mesmo providerSessionId — preserva o
+    // histórico (logs, conversas já vinculadas a essa sessão).
+    const sessao = existente
+      ? await prisma.whatsAppSessao.update({
+          where: { id: existente.id },
+          data: {
+            ativo: true,
+            provider: "EVOLUTION",
+            providerVersion,
+            providerSessionId,
+            status: "WAITING_QR",
+            atendenteId: atendenteId ?? null,
+            lastError: null,
+            lastErrorAt: null,
+          },
+        })
+      : await prisma.whatsAppSessao.create({
+          data: {
+            nome,
+            provider: "EVOLUTION",
+            providerVersion,
+            providerSessionId,
+            status: "WAITING_QR",
+            atendenteId: atendenteId ?? null,
+          },
+        });
     await registrarLog(sessao.id, "QR_GERADO");
     return sessao;
   },

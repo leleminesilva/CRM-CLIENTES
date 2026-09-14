@@ -9,7 +9,7 @@ import type { AuthUser } from "@/types";
 interface AuthContextType {
   user: AuthUser | null;
   loading: boolean;
-  login: (email: string, senha: string) => Promise<void>;
+  login: (email: string, senha: string, destino?: string) => Promise<void>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
 }
@@ -63,11 +63,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
-  async function login(email: string, senha: string) {
+  async function login(email: string, senha: string, destino?: string) {
     const { data } = await axios.post("/api/auth/login", { email, senha });
     sessaoExpiradaTratada.current = false;
     setUser(data.data);
-    router.push("/");
+    router.push(destino || "/");
   }
 
   async function logout() {

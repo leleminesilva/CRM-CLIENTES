@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
-import { Eye, EyeOff } from "lucide-react";
+import { Eye, EyeOff, Building2, Wallet } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Logo } from "@/components/Logo";
 import { loginSchema, type LoginInput } from "@/lib/validators/usuario";
@@ -12,10 +12,18 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
+type Sistema = "crm" | "financeiro";
+
+const SISTEMAS: { id: Sistema; label: string; icon: typeof Building2; destino: string; accent: string; glow: string }[] = [
+  { id: "crm", label: "CRM", icon: Building2, destino: "/", accent: "linear-gradient(135deg, #2563eb, #3b82f6)", glow: "rgba(59,130,246,0.35)" },
+  { id: "financeiro", label: "Financeiro", icon: Wallet, destino: "/financeiro", accent: "linear-gradient(135deg, #059669, #10b981)", glow: "rgba(16,185,129,0.35)" },
+];
+
 export default function LoginPage() {
   const { login } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [sistema, setSistema] = useState<Sistema>("crm");
 
   const {
     register,
@@ -23,10 +31,12 @@ export default function LoginPage() {
     formState: { errors },
   } = useForm<LoginInput>({ resolver: zodResolver(loginSchema) });
 
+  const atual = SISTEMAS.find((s) => s.id === sistema)!;
+
   async function onSubmit(data: LoginInput) {
     setLoading(true);
     try {
-      await login(data.email, data.senha);
+      await login(data.email, data.senha, atual.destino);
       toast.success("Login realizado com sucesso!");
     } catch {
       toast.error("E-mail ou senha inválidos");
@@ -109,7 +119,36 @@ export default function LoginPage() {
           </div>
 
           <h2 className="text-xl font-semibold text-white/90">Bem-vindo de volta</h2>
-          <p className="text-sm text-white/40 mt-1">Entre com suas credenciais para continuar</p>
+          <p className="text-sm text-white/40 mt-1">
+            Entre com suas credenciais para acessar {sistema === "crm" ? "o CRM" : "o Financeiro"}
+          </p>
+        </div>
+
+        {/* Seletor de sistema */}
+        <div
+          className="grid grid-cols-2 gap-1 p-1 rounded-xl mb-6"
+          style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)" }}
+        >
+          {SISTEMAS.map((s) => {
+            const ativo = s.id === sistema;
+            const Icon = s.icon;
+            return (
+              <button
+                key={s.id}
+                type="button"
+                onClick={() => setSistema(s.id)}
+                className="flex items-center justify-center gap-2 h-10 rounded-lg text-sm font-semibold transition-all duration-200"
+                style={
+                  ativo
+                    ? { background: s.accent, color: "#fff", boxShadow: `0 4px 14px ${s.glow}` }
+                    : { color: "rgba(255,255,255,0.45)" }
+                }
+              >
+                <Icon className="w-4 h-4" />
+                {s.label}
+              </button>
+            );
+          })}
         </div>
 
         {/* Form */}
@@ -177,11 +216,11 @@ export default function LoginPage() {
             className="w-full h-11 rounded-xl text-sm font-semibold tracking-wide transition-all duration-200"
             disabled={loading}
             style={{
-              background: "linear-gradient(135deg, #2563eb, #3b82f6)",
-              boxShadow: "0 4px 20px rgba(59,130,246,0.35)",
+              background: atual.accent,
+              boxShadow: `0 4px 20px ${atual.glow}`,
             }}
           >
-            {loading ? "Entrando..." : "Entrar"}
+            {loading ? "Entrando..." : `Entrar no ${atual.label}`}
           </Button>
         </form>
 

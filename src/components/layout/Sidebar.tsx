@@ -32,7 +32,6 @@ const navItems: { href: string; label: string; icon: React.ElementType; roles?: 
   { href: "/chat",       label: "Chat",       icon: MessageSquare },
   { href: "/whatsapp",   label: "WhatsApp",   icon: MessageCircle },
   { href: "/pesquisa",   label: "Pesquisa",   icon: Search },
-  { href: "/financeiro", label: "Financeiro", icon: Wallet },
 ];
 
 const bottomNavItems: { href: string; label: string; icon: React.ElementType; roles?: Role[] }[] = [
@@ -258,6 +257,22 @@ function SidebarContent({
   );
 }
 
+function IrParaFinanceiro({ collapsed }: { collapsed: boolean }) {
+  return (
+    <Link
+      href="/financeiro"
+      className={cn(
+        "flex items-center gap-3 mx-2 mb-3 px-3 py-2.5 rounded-lg text-sm font-medium border border-sidebar-border text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-foreground/10 transition-colors",
+        collapsed && "justify-center px-2"
+      )}
+      title={collapsed ? "Ir para o Financeiro" : undefined}
+    >
+      <Wallet className="w-4 h-4 shrink-0" />
+      {!collapsed && <span>Ir para o Financeiro</span>}
+    </Link>
+  );
+}
+
 export function Sidebar() {
   const [collapsed, setCollapsed] = useState(false);
   const { mobileOpen, closeMobile } = useSidebar();
@@ -306,6 +321,7 @@ export function Sidebar() {
         )}
         {logo}
         <SidebarContent collapsed={collapsed} newClientesCount={newClientesCount} chatNaoLidas={chatNaoLidas} theme={activeTheme} />
+        <IrParaFinanceiro collapsed={collapsed} />
 
         <button
           onClick={() => setCollapsed(!collapsed)}
@@ -353,6 +369,7 @@ export function Sidebar() {
           </button>
         </div>
         <SidebarContent collapsed={false} onLinkClick={closeMobile} newClientesCount={newClientesCount} chatNaoLidas={chatNaoLidas} theme={activeTheme} />
+        <IrParaFinanceiro collapsed={false} />
       </aside>
     </TooltipProvider>
   );

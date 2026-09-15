@@ -38,6 +38,7 @@ export async function GET(request: NextRequest) {
       where,
       select: {
         id: true, nome: true, email: true, role: true, avatar: true, ativo: true,
+        acessoFinanceiro: true,
         createdAt: true, updatedAt: true,
         _count: { select: { clientes: true, leads: true, oportunidades: true } },
       },

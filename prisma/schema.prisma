@@ -137,6 +137,10 @@ model User {
   role         Role      @default(COMERCIAL)
   avatar       String?
   ativo        Boolean   @default(true)
+  // Acesso ao módulo Financeiro é controlado por pessoa, não por cargo — Admin/Dev
+  // sempre têm acesso (ver canAccessFinanceiro em src/lib/rbac.ts); os demais só se
+  // esse campo estiver true. Liberado manualmente na tela de Usuários.
+  acessoFinanceiro Boolean @default(false)
   deletedAt    DateTime?
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt

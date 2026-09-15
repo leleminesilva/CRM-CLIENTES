@@ -63,6 +63,7 @@ export interface User {
   role: Role;
   avatar?: string | null;
   ativo: boolean;
+  acessoFinanceiro?: boolean;
   createdAt: string;
   updatedAt: string;
 }

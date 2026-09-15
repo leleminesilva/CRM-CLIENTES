@@ -1,7 +1,27 @@
-import { Wallet, Hammer } from "lucide-react";
+"use client";
+
+import { Wallet, Hammer, Lock } from "lucide-react";
 import { Card } from "@/components/ui/card";
+import { useAuth } from "@/contexts/AuthContext";
+import { canAccessFinanceiro } from "@/lib/rbac";
 
 export default function FinanceiroPage() {
+  const { user, loading } = useAuth();
+
+  if (loading) return null;
+
+  if (!canAccessFinanceiro(user)) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[400px] text-center gap-2">
+        <Lock className="w-8 h-8 text-muted-foreground/40 mb-1" />
+        <p className="text-lg font-medium text-red-500">Acesso negado</p>
+        <p className="text-muted-foreground text-sm max-w-sm">
+          Você não tem acesso ao Financeiro. Peça a um administrador para liberar em Usuários.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6 animate-fade-in">
       <div>

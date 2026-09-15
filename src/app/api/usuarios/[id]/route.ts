@@ -13,6 +13,7 @@ const updateSchema = z.object({
   email: z.string().email().optional(),
   role: z.enum(["ADMINISTRADOR", "DESENVOLVEDOR", "GESTOR", "COMERCIAL", "OPERACIONAL"]).optional(),
   ativo: z.boolean().optional(),
+  acessoFinanceiro: z.boolean().optional(),
   senha: z.string().min(6).optional(),
 });
 
@@ -27,6 +28,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
       where: { id: params.id, deletedAt: null },
       select: {
         id: true, nome: true, email: true, role: true, avatar: true, ativo: true,
+        acessoFinanceiro: true,
         createdAt: true, updatedAt: true,
         _count: { select: { clientes: true, leads: true, oportunidades: true, tarefas: true } },
       },
@@ -52,6 +54,9 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
     if (data.role && !isAdmin(payload.role)) {
       return NextResponse.json({ error: "Apenas administradores podem alterar roles" }, { status: 403 });
     }
+    if (data.acessoFinanceiro !== undefined && !isAdmin(payload.role)) {
+      return NextResponse.json({ error: "Apenas administradores podem liberar o Financeiro" }, { status: 403 });
+    }
 
     const updateData: Record<string, unknown> = { ...data };
     if (data.senha) {
@@ -63,7 +68,7 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
     const user = await prisma.user.update({
       where: { id: params.id },
       data: updateData,
-      select: { id: true, nome: true, email: true, role: true, ativo: true },
+      select: { id: true, nome: true, email: true, role: true, ativo: true, acessoFinanceiro: true },
     });
 
     await createAuditLog({ userId: payload.userId, entidade: "User", entidadeId: params.id, acao: "UPDATE" });

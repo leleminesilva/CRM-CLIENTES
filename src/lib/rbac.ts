@@ -205,6 +205,14 @@ export function isAdmin(role: Role): boolean {
   return role === "ADMINISTRADOR" || role === "DESENVOLVEDOR";
 }
 
+// Financeiro não segue a matriz de cargos: é liberado pessoa a pessoa (campo
+// `acessoFinanceiro` do usuário), gerenciado na tela de Usuários. Admin/Dev
+// sempre têm acesso, como em qualquer outro módulo administrativo.
+export function canAccessFinanceiro(user: { role: Role; acessoFinanceiro?: boolean } | null | undefined): boolean {
+  if (!user) return false;
+  return isAdmin(user.role) || user.acessoFinanceiro === true;
+}
+
 export function buildWhereClause(
   role: Role,
   userId: string,

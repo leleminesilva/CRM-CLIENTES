@@ -20,6 +20,7 @@ export async function GET(request: NextRequest) {
         role: true,
         avatar: true,
         ativo: true,
+        acessoFinanceiro: true,
         createdAt: true,
         updatedAt: true,
       },

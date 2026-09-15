@@ -7,7 +7,7 @@ import axios from "axios";
 import { toast } from "sonner";
 import {
   Plus, Shield, Pencil, Trash2, MoreVertical,
-  Users, UserCheck, UserX, Search, Camera,
+  Users, UserCheck, UserX, Search, Camera, Wallet,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -231,7 +231,7 @@ export default function UsuariosPage() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, ...body }: { id: string } & Partial<typeof emptyForm & { ativo: boolean }>) =>
+    mutationFn: ({ id, ...body }: { id: string } & Partial<typeof emptyForm & { ativo: boolean; acessoFinanceiro: boolean }>) =>
       axios.put(`/api/usuarios/${id}`, body),
     onSuccess: () => {
       toast.success("Usuário atualizado");
@@ -415,6 +415,27 @@ export default function UsuariosPage() {
                     onCheckedChange={v => updateMutation.mutate({ id: u.id, ativo: v })}
                   />
                 </div>
+              </div>
+
+              {/* Acesso ao Financeiro — liberado pessoa a pessoa, não por cargo */}
+              <div className="mt-2 flex items-center justify-between">
+                <span className="text-xs text-muted-foreground flex items-center gap-1.5">
+                  <Wallet className="w-3.5 h-3.5" />
+                  Financeiro
+                </span>
+                {u.role === "ADMINISTRADOR" || u.role === "DESENVOLVEDOR" ? (
+                  <span
+                    className="text-xs text-emerald-600 dark:text-emerald-400 font-medium"
+                    title="Administradores e desenvolvedores sempre têm acesso"
+                  >
+                    Sempre
+                  </span>
+                ) : (
+                  <Switch
+                    checked={!!u.acessoFinanceiro}
+                    onCheckedChange={v => updateMutation.mutate({ id: u.id, acessoFinanceiro: v })}
+                  />
+                )}
               </div>
 
               {/* Stats */}

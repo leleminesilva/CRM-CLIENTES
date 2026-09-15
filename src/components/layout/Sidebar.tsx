@@ -11,6 +11,7 @@ import {
 import { cn } from "@/lib/utils/cn";
 import { Logo } from "@/components/Logo";
 import { useAuth } from "@/contexts/AuthContext";
+import { canAccessFinanceiro } from "@/lib/rbac";
 import { useSidebar } from "@/contexts/SidebarContext";
 import { useDevTheme } from "@/contexts/DevThemeContext";
 import type { DevTheme } from "@/lib/devThemes";
@@ -258,6 +259,9 @@ function SidebarContent({
 }
 
 function IrParaFinanceiro({ collapsed }: { collapsed: boolean }) {
+  const { user } = useAuth();
+  if (!canAccessFinanceiro(user)) return null;
+
   return (
     <Link
       href="/financeiro"

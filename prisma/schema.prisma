@@ -166,6 +166,7 @@ model User {
   whatsappSessoes        WhatsAppSessao[]    @relation("WhatsAppAtendente")
   whatsappConversas      WhatsAppConversa[]  @relation("WhatsAppResponsavel")
   financeiroLancamentos  FinanceiroLancamento[]
+  financeiroCarroUsos    FinanceiroCarroUso[]
 
   @@map("users")
 }
@@ -912,5 +913,59 @@ model FinanceiroLancamento {
   @@index([contaId, data])
   @@index([categoriaId])
   @@map("financeiro_lancamentos")
+}
+
+// ── Carros (frota) ──────────────────────────────────────────────────────
+// "Status" do carro (disponível/em uso) não fica salvo em coluna própria —
+// é derivado em runtime pela existência de um FinanceiroCarroUso em aberto
+// (chegadaEm null), evitando os dois ficarem dessincronizados.
+model FinanceiroCarro {
+  id        String   @id @default(cuid())
+  numero    String
+  modelo    String
+  ano       Int
+  placa     String   @unique
+  cor       String?
+  ativo     Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  usos FinanceiroCarroUso[]
+
+  @@map("financeiro_carros")
+}
+
+model FinanceiroMotorista {
+  id        String   @id @default(cuid())
+  nome      String
+  telefone  String?
+  ativo     Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  usos FinanceiroCarroUso[]
+
+  @@map("financeiro_motoristas")
+}
+
+model FinanceiroCarroUso {
+  id              String               @id @default(cuid())
+  carroId         String
+  carro           FinanceiroCarro      @relation(fields: [carroId], references: [id], onDelete: Restrict)
+  motoristaId     String
+  motorista       FinanceiroMotorista  @relation(fields: [motoristaId], references: [id], onDelete: Restrict)
+  kmSaida         Int
+  saidaEm         DateTime             @default(now())
+  kmChegada       Int?
+  chegadaEm       DateTime?
+  observacoes     String?
+  registradoPorId String?
+  registradoPor   User?                @relation(fields: [registradoPorId], references: [id], onDelete: SetNull)
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+
+  @@index([carroId, saidaEm])
+  @@index([motoristaId])
+  @@map("financeiro_carro_usos")
 }
 

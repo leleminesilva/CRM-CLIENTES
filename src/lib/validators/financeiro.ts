@@ -33,3 +33,37 @@ export const lancamentoSchema = z.object({
 });
 
 export const lancamentoUpdateSchema = lancamentoSchema.partial();
+
+// ── Carros (frota) ──
+export const carroSchema = z.object({
+  numero: z.string().min(1, "Informe o número/identificação").max(20),
+  modelo: z.string().min(2, "Informe o modelo").max(60),
+  ano: z.number().int("Ano inválido").min(1950).max(new Date().getFullYear() + 1),
+  placa: z.string().min(6, "Placa inválida").max(10),
+  cor: z.string().max(30).optional().nullable(),
+});
+
+export const carroUpdateSchema = carroSchema.partial().extend({
+  ativo: z.boolean().optional(),
+});
+
+export const motoristaSchema = z.object({
+  nome: z.string().min(2, "Informe o nome").max(80),
+  telefone: z.string().max(20).optional().nullable(),
+});
+
+export const motoristaUpdateSchema = motoristaSchema.partial().extend({
+  ativo: z.boolean().optional(),
+});
+
+export const carroUsoSaidaSchema = z.object({
+  carroId: z.string().min(1, "Selecione o carro"),
+  motoristaId: z.string().min(1, "Selecione o motorista"),
+  kmSaida: z.number().int("Quilometragem inválida").nonnegative(),
+  observacoes: z.string().max(300).optional().nullable(),
+});
+
+export const carroUsoChegadaSchema = z.object({
+  kmChegada: z.number().int("Quilometragem inválida").nonnegative(),
+  observacoes: z.string().max(300).optional().nullable(),
+});

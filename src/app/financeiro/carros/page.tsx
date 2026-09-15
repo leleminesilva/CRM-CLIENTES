@@ -1,28 +1,457 @@
-import { Car, Hammer } from "lucide-react";
-import { Card } from "@/components/ui/card";
+"use client";
 
-// Conteúdo ainda não definido — aguardando o usuário dizer o que precisa
-// controlar aqui (cadastro dos carros, gastos por carro, manutenção, etc.).
-export default function CarrosPage() {
+import { useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import axios from "axios";
+import { toast } from "sonner";
+import {
+  Car, Settings, Users, Pencil, Trash2, ArchiveRestore,
+  LogOut, LogIn, Clock, Gauge,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger,
+} from "@/components/ui/dialog";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
+import { formatDateTime } from "@/lib/utils/formatters";
+
+interface Carro {
+  id: string; numero: string; modelo: string; ano: number; placa: string; cor: string | null;
+  ativo: boolean; totalUsos: number; kmAtual: number | null;
+  usoAtual: { id: string; motorista: { id: string; nome: string }; kmSaida: number; saidaEm: string } | null;
+}
+interface Motorista { id: string; nome: string; telefone: string | null; ativo: boolean; _count: { usos: number } }
+interface Uso {
+  id: string; kmSaida: number; saidaEm: string; kmChegada: number | null; chegadaEm: string | null; observacoes: string | null;
+  carro: { id: string; numero: string; modelo: string; placa: string };
+  motorista: { id: string; nome: string };
+  registradoPor: { id: string; nome: string } | null;
+}
+
+function useCarros() {
+  return useQuery({
+    queryKey: ["financeiro-carros"],
+    queryFn: async () => (await axios.get("/api/financeiro/carros")).data.data as Carro[],
+  });
+}
+function useMotoristas() {
+  return useQuery({
+    queryKey: ["financeiro-motoristas"],
+    queryFn: async () => (await axios.get("/api/financeiro/motoristas")).data.data as Motorista[],
+  });
+}
+
+// ── Cadastro de carros (ícone no canto) ─────────────────────────────────
+const emptyCarroForm = { numero: "", modelo: "", ano: String(new Date().getFullYear()), placa: "", cor: "#10b981" };
+const CORES = ["#10b981", "#3b82f6", "#f59e0b", "#ef4444", "#8b5cf6", "#6b7280", "#111827", "#ffffff"];
+
+function GerenciarCarrosDialog() {
+  const qc = useQueryClient();
+  const { data: carros } = useCarros();
+  const [form, setForm] = useState(emptyCarroForm);
+  const [editId, setEditId] = useState<string | null>(null);
+
+  function invalidar() { qc.invalidateQueries({ queryKey: ["financeiro-carros"] }); }
+
+  const createMutation = useMutation({
+    mutationFn: (body: typeof emptyCarroForm) => axios.post("/api/financeiro/carros", { ...body, ano: Number(body.ano) }),
+    onSuccess: () => { toast.success("Carro cadastrado"); invalidar(); setForm(emptyCarroForm); },
+    onError: (e: unknown) => toast.error((e as { response?: { data?: { error?: string } } })?.response?.data?.error || "Erro ao cadastrar"),
+  });
+  const updateMutation = useMutation({
+    mutationFn: ({ id, ...body }: { id: string } & Partial<typeof emptyCarroForm & { ativo: boolean }>) =>
+      axios.put(`/api/financeiro/carros/${id}`, "ano" in body && body.ano ? { ...body, ano: Number(body.ano) } : body),
+    onSuccess: () => { toast.success("Carro atualizado"); invalidar(); setEditId(null); setForm(emptyCarroForm); },
+    onError: (e: unknown) => toast.error((e as { response?: { data?: { error?: string } } })?.response?.data?.error || "Erro ao atualizar"),
+  });
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => axios.delete(`/api/financeiro/carros/${id}`),
+    onSuccess: (res) => { toast.success(res.data?.arquivado ? "Carro arquivado (já tinha uso registrado)" : "Carro excluído"); invalidar(); },
+    onError: () => toast.error("Erro ao excluir"),
+  });
+
+  const valido = form.numero.trim() && form.modelo.trim().length >= 2 && form.placa.trim().length >= 6 && Number(form.ano) > 1950;
+
+  function iniciarEdicao(c: Carro) {
+    setEditId(c.id);
+    setForm({ numero: c.numero, modelo: c.modelo, ano: String(c.ano), placa: c.placa, cor: c.cor || CORES[0] });
+  }
+  function cancelarEdicao() { setEditId(null); setForm(emptyCarroForm); }
+
   return (
-    <div className="space-y-6 animate-fade-in">
-      <div>
-        <h2 className="text-2xl font-bold flex items-center gap-2">
-          <Car className="w-6 h-6" />
-          Carros
-        </h2>
-        <p className="text-muted-foreground">Controle dos veículos da Infinity Glass</p>
+    <Dialog onOpenChange={(v) => !v && cancelarEdicao()}>
+      <DialogTrigger asChild>
+        <Button variant="outline" size="icon" title="Cadastrar carros"><Car className="w-4 h-4" /></Button>
+      </DialogTrigger>
+      <DialogContent className="max-w-lg">
+        <DialogHeader><DialogTitle>Carros da empresa</DialogTitle></DialogHeader>
+        <div className="space-y-4 pt-2">
+          <div className="grid grid-cols-2 gap-2">
+            <div className="space-y-1"><Label className="text-xs">Número *</Label><Input value={form.numero} onChange={(e) => setForm((f) => ({ ...f, numero: e.target.value }))} placeholder="Ex: 01" /></div>
+            <div className="space-y-1"><Label className="text-xs">Ano *</Label><Input inputMode="numeric" value={form.ano} onChange={(e) => setForm((f) => ({ ...f, ano: e.target.value }))} /></div>
+            <div className="space-y-1"><Label className="text-xs">Modelo *</Label><Input value={form.modelo} onChange={(e) => setForm((f) => ({ ...f, modelo: e.target.value }))} placeholder="Ex: Fiat Fiorino" /></div>
+            <div className="space-y-1"><Label className="text-xs">Placa *</Label><Input value={form.placa} onChange={(e) => setForm((f) => ({ ...f, placa: e.target.value.toUpperCase() }))} placeholder="ABC1D23" /></div>
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs">Cor</Label>
+            <div className="flex gap-2 flex-wrap">
+              {CORES.map((cor) => (
+                <button key={cor} type="button" onClick={() => setForm((f) => ({ ...f, cor }))}
+                  className={`w-6 h-6 rounded-full border ${form.cor === cor ? "ring-2 ring-offset-1 ring-foreground" : ""}`}
+                  style={{ background: cor }} />
+              ))}
+            </div>
+          </div>
+          <div className="flex justify-end gap-2">
+            {editId && <Button variant="ghost" size="sm" onClick={cancelarEdicao}>Cancelar edição</Button>}
+            <Button
+              size="sm" className="bg-emerald-600 hover:bg-emerald-700" disabled={!valido || createMutation.isPending || updateMutation.isPending}
+              onClick={() => editId ? updateMutation.mutate({ id: editId, ...form }) : createMutation.mutate(form)}
+            >
+              {editId ? "Salvar alterações" : "Adicionar carro"}
+            </Button>
+          </div>
+
+          <div className="border-t pt-3 space-y-2 max-h-72 overflow-y-auto">
+            {(carros ?? []).map((c) => (
+              <div key={c.id} className={`flex items-center justify-between gap-2 p-2 rounded-lg ${!c.ativo ? "opacity-50" : ""}`}>
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="w-2.5 h-2.5 rounded-full shrink-0 border" style={{ background: c.cor || "#10b981" }} />
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium truncate">{c.numero} · {c.modelo} ({c.ano})</p>
+                    <p className="text-xs text-muted-foreground">{c.placa}{!c.ativo ? " · arquivado" : ""}</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-1 shrink-0">
+                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => iniciarEdicao(c)}><Pencil className="w-3.5 h-3.5" /></Button>
+                  {c.ativo ? (
+                    <Button variant="ghost" size="icon" className="h-7 w-7 text-red-500" onClick={() => deleteMutation.mutate(c.id)}>
+                      {c.totalUsos > 0 ? <ArchiveRestore className="w-3.5 h-3.5 rotate-180" /> : <Trash2 className="w-3.5 h-3.5" />}
+                    </Button>
+                  ) : (
+                    <Button variant="ghost" size="icon" className="h-7 w-7" title="Reativar" onClick={() => updateMutation.mutate({ id: c.id, ativo: true })}>
+                      <ArchiveRestore className="w-3.5 h-3.5" />
+                    </Button>
+                  )}
+                </div>
+              </div>
+            ))}
+            {(carros ?? []).length === 0 && <p className="text-sm text-muted-foreground text-center py-4">Nenhum carro cadastrado ainda</p>}
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ── Cadastro de motoristas (ícone no canto) ─────────────────────────────
+const emptyMotoristaForm = { nome: "", telefone: "" };
+
+function GerenciarMotoristasDialog() {
+  const qc = useQueryClient();
+  const { data: motoristas } = useMotoristas();
+  const [form, setForm] = useState(emptyMotoristaForm);
+  const [editId, setEditId] = useState<string | null>(null);
+
+  function invalidar() { qc.invalidateQueries({ queryKey: ["financeiro-motoristas"] }); }
+
+  const createMutation = useMutation({
+    mutationFn: (body: typeof emptyMotoristaForm) => axios.post("/api/financeiro/motoristas", body),
+    onSuccess: () => { toast.success("Motorista cadastrado"); invalidar(); setForm(emptyMotoristaForm); },
+    onError: () => toast.error("Erro ao cadastrar"),
+  });
+  const updateMutation = useMutation({
+    mutationFn: ({ id, ...body }: { id: string } & Partial<typeof emptyMotoristaForm & { ativo: boolean }>) =>
+      axios.put(`/api/financeiro/motoristas/${id}`, body),
+    onSuccess: () => { toast.success("Motorista atualizado"); invalidar(); setEditId(null); setForm(emptyMotoristaForm); },
+    onError: () => toast.error("Erro ao atualizar"),
+  });
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => axios.delete(`/api/financeiro/motoristas/${id}`),
+    onSuccess: (res) => { toast.success(res.data?.arquivado ? "Motorista arquivado (já tinha uso registrado)" : "Motorista excluído"); invalidar(); },
+    onError: () => toast.error("Erro ao excluir"),
+  });
+
+  const valido = form.nome.trim().length >= 2;
+
+  function iniciarEdicao(m: Motorista) { setEditId(m.id); setForm({ nome: m.nome, telefone: m.telefone ?? "" }); }
+  function cancelarEdicao() { setEditId(null); setForm(emptyMotoristaForm); }
+
+  return (
+    <Dialog onOpenChange={(v) => !v && cancelarEdicao()}>
+      <DialogTrigger asChild>
+        <Button variant="outline" size="icon" title="Cadastrar motoristas"><Users className="w-4 h-4" /></Button>
+      </DialogTrigger>
+      <DialogContent className="max-w-md">
+        <DialogHeader><DialogTitle>Motoristas</DialogTitle></DialogHeader>
+        <div className="space-y-4 pt-2">
+          <div className="grid grid-cols-2 gap-2">
+            <div className="space-y-1"><Label className="text-xs">Nome *</Label><Input value={form.nome} onChange={(e) => setForm((f) => ({ ...f, nome: e.target.value }))} placeholder="Ex: João Silva" /></div>
+            <div className="space-y-1"><Label className="text-xs">Telefone</Label><Input value={form.telefone} onChange={(e) => setForm((f) => ({ ...f, telefone: e.target.value }))} placeholder="(00) 00000-0000" /></div>
+          </div>
+          <div className="flex justify-end gap-2">
+            {editId && <Button variant="ghost" size="sm" onClick={cancelarEdicao}>Cancelar edição</Button>}
+            <Button
+              size="sm" className="bg-emerald-600 hover:bg-emerald-700" disabled={!valido || createMutation.isPending || updateMutation.isPending}
+              onClick={() => editId ? updateMutation.mutate({ id: editId, ...form }) : createMutation.mutate(form)}
+            >
+              {editId ? "Salvar alterações" : "Adicionar motorista"}
+            </Button>
+          </div>
+
+          <div className="border-t pt-3 space-y-2 max-h-72 overflow-y-auto">
+            {(motoristas ?? []).map((m) => (
+              <div key={m.id} className={`flex items-center justify-between gap-2 p-2 rounded-lg ${!m.ativo ? "opacity-50" : ""}`}>
+                <div className="min-w-0">
+                  <p className="text-sm font-medium truncate">{m.nome}</p>
+                  <p className="text-xs text-muted-foreground">{m.telefone || "sem telefone"}{!m.ativo ? " · arquivado" : ""}</p>
+                </div>
+                <div className="flex items-center gap-1 shrink-0">
+                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => iniciarEdicao(m)}><Pencil className="w-3.5 h-3.5" /></Button>
+                  {m.ativo ? (
+                    <Button variant="ghost" size="icon" className="h-7 w-7 text-red-500" onClick={() => deleteMutation.mutate(m.id)}>
+                      {m._count.usos > 0 ? <ArchiveRestore className="w-3.5 h-3.5 rotate-180" /> : <Trash2 className="w-3.5 h-3.5" />}
+                    </Button>
+                  ) : (
+                    <Button variant="ghost" size="icon" className="h-7 w-7" title="Reativar" onClick={() => updateMutation.mutate({ id: m.id, ativo: true })}>
+                      <ArchiveRestore className="w-3.5 h-3.5" />
+                    </Button>
+                  )}
+                </div>
+              </div>
+            ))}
+            {(motoristas ?? []).length === 0 && <p className="text-sm text-muted-foreground text-center py-4">Nenhum motorista cadastrado ainda</p>}
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ── Registrar saída ──────────────────────────────────────────────────────
+function SaidaDialog({ carro }: { carro: Carro }) {
+  const qc = useQueryClient();
+  const { data: motoristas } = useMotoristas();
+  const [open, setOpen] = useState(false);
+  const [motoristaId, setMotoristaId] = useState("");
+  const [km, setKm] = useState("");
+  const [obs, setObs] = useState("");
+
+  const mutation = useMutation({
+    mutationFn: () => axios.post("/api/financeiro/carros/usos", { carroId: carro.id, motoristaId, kmSaida: Number(km), observacoes: obs || undefined }),
+    onSuccess: () => {
+      toast.success(`Saída registrada — ${carro.numero} com ${motoristas?.find((m) => m.id === motoristaId)?.nome}`);
+      qc.invalidateQueries({ queryKey: ["financeiro-carros"] });
+      qc.invalidateQueries({ queryKey: ["financeiro-carro-usos"] });
+      setOpen(false); setMotoristaId(""); setKm(""); setObs("");
+    },
+    onError: (e: unknown) => toast.error((e as { response?: { data?: { error?: string } } })?.response?.data?.error || "Erro ao registrar saída"),
+  });
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 w-full"><LogOut className="w-3.5 h-3.5 mr-1.5" /> Registrar saída</Button>
+      </DialogTrigger>
+      <DialogContent className="max-w-sm">
+        <DialogHeader><DialogTitle>Saída — {carro.numero} · {carro.modelo}</DialogTitle></DialogHeader>
+        <div className="space-y-3 pt-2">
+          <div className="space-y-1.5">
+            <Label className="text-xs">Motorista *</Label>
+            <Select value={motoristaId} onValueChange={setMotoristaId}>
+              <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+              <SelectContent>
+                {(motoristas ?? []).filter((m) => m.ativo).map((m) => <SelectItem key={m.id} value={m.id}>{m.nome}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs">Quilometragem de saída *</Label>
+            <Input inputMode="numeric" value={km} onChange={(e) => setKm(e.target.value)} placeholder={carro.kmAtual != null ? `Última: ${carro.kmAtual} km` : "Ex: 45000"} />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs">Observações</Label>
+            <Textarea value={obs} onChange={(e) => setObs(e.target.value)} rows={2} placeholder="Opcional" />
+          </div>
+          <Button
+            className="w-full bg-emerald-600 hover:bg-emerald-700" disabled={!motoristaId || !km || mutation.isPending}
+            onClick={() => mutation.mutate()}
+          >
+            {mutation.isPending ? "Registrando..." : "Confirmar saída"}
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ── Registrar chegada ────────────────────────────────────────────────────
+function ChegadaDialog({ carro }: { carro: Carro }) {
+  const qc = useQueryClient();
+  const [open, setOpen] = useState(false);
+  const [km, setKm] = useState("");
+  const [obs, setObs] = useState("");
+  const uso = carro.usoAtual!;
+
+  const mutation = useMutation({
+    mutationFn: () => axios.put(`/api/financeiro/carros/usos/${uso.id}`, { kmChegada: Number(km), observacoes: obs || undefined }),
+    onSuccess: () => {
+      const rodados = Number(km) - uso.kmSaida;
+      toast.success(`Chegada registrada — ${rodados} km rodados`);
+      qc.invalidateQueries({ queryKey: ["financeiro-carros"] });
+      qc.invalidateQueries({ queryKey: ["financeiro-carro-usos"] });
+      setOpen(false); setKm(""); setObs("");
+    },
+    onError: (e: unknown) => toast.error((e as { response?: { data?: { error?: string } } })?.response?.data?.error || "Erro ao registrar chegada"),
+  });
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button size="sm" variant="outline" className="w-full"><LogIn className="w-3.5 h-3.5 mr-1.5" /> Registrar chegada</Button>
+      </DialogTrigger>
+      <DialogContent className="max-w-sm">
+        <DialogHeader><DialogTitle>Chegada — {carro.numero} · {carro.modelo}</DialogTitle></DialogHeader>
+        <div className="space-y-3 pt-2">
+          <p className="text-sm text-muted-foreground">
+            Saiu com <strong>{uso.motorista.nome}</strong> às {formatDateTime(uso.saidaEm)}, km {uso.kmSaida}.
+          </p>
+          <div className="space-y-1.5">
+            <Label className="text-xs">Quilometragem de chegada *</Label>
+            <Input inputMode="numeric" value={km} onChange={(e) => setKm(e.target.value)} placeholder={`Mín. ${uso.kmSaida} km`} />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs">Observações</Label>
+            <Textarea value={obs} onChange={(e) => setObs(e.target.value)} rows={2} placeholder="Opcional" />
+          </div>
+          <Button className="w-full" disabled={!km || mutation.isPending} onClick={() => mutation.mutate()}>
+            {mutation.isPending ? "Registrando..." : "Confirmar chegada"}
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function CarroCard({ carro }: { carro: Carro }) {
+  const emUso = !!carro.usoAtual;
+  return (
+    <Card className="p-4">
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex items-center gap-2 min-w-0">
+          <span className="w-3 h-3 rounded-full shrink-0 border" style={{ background: carro.cor || "#10b981" }} />
+          <div className="min-w-0">
+            <p className="font-semibold text-sm truncate">{carro.numero} · {carro.modelo}</p>
+            <p className="text-xs text-muted-foreground">{carro.placa} · {carro.ano}</p>
+          </div>
+        </div>
+        <Badge variant={emUso ? "warning" : "success"} className="shrink-0 text-xs">{emUso ? "Em uso" : "Disponível"}</Badge>
       </div>
 
-      <Card className="p-12 flex flex-col items-center justify-center text-center gap-3">
-        <div className="w-12 h-12 rounded-full bg-emerald-500/10 flex items-center justify-center">
-          <Hammer className="w-6 h-6 text-emerald-500" />
+      {emUso ? (
+        <div className="mt-3 text-xs text-muted-foreground space-y-1 bg-amber-500/5 rounded-lg p-2.5">
+          <p className="flex items-center gap-1.5 text-foreground font-medium"><Users className="w-3 h-3" /> {carro.usoAtual!.motorista.nome}</p>
+          <p className="flex items-center gap-1.5"><Clock className="w-3 h-3" /> Saiu às {formatDateTime(carro.usoAtual!.saidaEm)}</p>
+          <p className="flex items-center gap-1.5"><Gauge className="w-3 h-3" /> {carro.usoAtual!.kmSaida} km na saída</p>
         </div>
-        <h3 className="text-lg font-semibold">Aba em construção</h3>
-        <p className="text-sm text-muted-foreground max-w-sm">
-          Me diga o que precisa controlar aqui — cadastro dos carros, gastos por veículo
-          (combustível, manutenção, seguro), quilometragem — que eu monto em cima.
-        </p>
+      ) : (
+        <p className="mt-3 text-xs text-muted-foreground">{carro.kmAtual != null ? `${carro.kmAtual} km na última chegada` : "Sem histórico de uso ainda"}</p>
+      )}
+
+      <div className="mt-3">
+        {emUso ? <ChegadaDialog carro={carro} /> : <SaidaDialog carro={carro} />}
+      </div>
+    </Card>
+  );
+}
+
+export default function CarrosPage() {
+  const { data: carros, isLoading } = useCarros();
+  const { data: historico } = useQuery({
+    queryKey: ["financeiro-carro-usos"],
+    queryFn: async () => (await axios.get("/api/financeiro/carros/usos?limit=15")).data.data as Uso[],
+  });
+
+  const ativos = (carros ?? []).filter((c) => c.ativo);
+  const emUsoCount = ativos.filter((c) => c.usoAtual).length;
+
+  return (
+    <div className="space-y-6 animate-fade-in">
+      <div className="flex items-center justify-between gap-4 flex-wrap">
+        <div>
+          <h2 className="text-2xl font-bold flex items-center gap-2">
+            <Car className="w-6 h-6" />
+            Carros
+          </h2>
+          <p className="text-muted-foreground">
+            {ativos.length} carro{ativos.length !== 1 ? "s" : ""} · {emUsoCount} em uso agora
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <GerenciarMotoristasDialog />
+          <GerenciarCarrosDialog />
+        </div>
+      </div>
+
+      {isLoading ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {[...Array(3)].map((_, i) => <div key={i} className="h-40 bg-muted animate-pulse rounded-xl" />)}
+        </div>
+      ) : ativos.length === 0 ? (
+        <Card className="p-12 text-center">
+          <Car className="w-10 h-10 mx-auto mb-3 text-muted-foreground/40" />
+          <p className="font-medium text-muted-foreground">Nenhum carro cadastrado</p>
+          <p className="text-sm text-muted-foreground mt-1">Use o ícone <Settings className="w-3.5 h-3.5 inline" /> no canto acima pra cadastrar o primeiro.</p>
+        </Card>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {ativos.map((c) => <CarroCard key={c.id} carro={c} />)}
+        </div>
+      )}
+
+      <Card>
+        <div className="p-4 border-b">
+          <h3 className="font-semibold text-sm">Histórico de uso</h3>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b bg-muted/50">
+                <th className="text-left p-3 font-medium">Carro</th>
+                <th className="text-left p-3 font-medium">Motorista</th>
+                <th className="text-left p-3 font-medium">Saída</th>
+                <th className="text-left p-3 font-medium">Chegada</th>
+                <th className="text-right p-3 font-medium">Km rodados</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(historico ?? []).length === 0 ? (
+                <tr><td colSpan={5} className="p-8 text-center text-muted-foreground">Nenhum registro ainda</td></tr>
+              ) : (
+                (historico ?? []).map((u) => (
+                  <tr key={u.id} className="border-b last:border-0 hover:bg-muted/30">
+                    <td className="p-3">{u.carro.numero} · {u.carro.modelo}</td>
+                    <td className="p-3">{u.motorista.nome}</td>
+                    <td className="p-3 whitespace-nowrap">{formatDateTime(u.saidaEm)} <span className="text-muted-foreground">· {u.kmSaida} km</span></td>
+                    <td className="p-3 whitespace-nowrap">
+                      {u.chegadaEm ? <>{formatDateTime(u.chegadaEm)} <span className="text-muted-foreground">· {u.kmChegada} km</span></> : <Badge variant="warning" className="text-xs">Em andamento</Badge>}
+                    </td>
+                    <td className="p-3 text-right font-semibold tabular-nums">
+                      {u.kmChegada != null ? `${u.kmChegada - u.kmSaida} km` : "—"}
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
       </Card>
     </div>
   );

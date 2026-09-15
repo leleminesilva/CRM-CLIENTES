@@ -36,6 +36,7 @@ export async function POST(request: NextRequest) {
         role: user.role,
         avatar: user.avatar,
         ativo: user.ativo,
+        acessoFinanceiro: user.acessoFinanceiro,
         token,
       },
     });

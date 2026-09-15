@@ -5,11 +5,14 @@ import { useRouter } from "next/navigation";
 import axios from "axios";
 import { toast } from "sonner";
 import type { AuthUser } from "@/types";
+import { canAccessFinanceiro } from "@/lib/rbac";
 
 interface AuthContextType {
   user: AuthUser | null;
   loading: boolean;
-  login: (email: string, senha: string, destino?: string) => Promise<void>;
+  // Retorna pra onde o login realmente mandou o usuário — pode não ser o
+  // `destino` pedido (ex: pediu /financeiro mas não tem acesso).
+  login: (email: string, senha: string, destino?: string) => Promise<{ redirecionadoPara: string }>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
 }
@@ -67,7 +70,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const { data } = await axios.post("/api/auth/login", { email, senha });
     sessaoExpiradaTratada.current = false;
     setUser(data.data);
+
+    // Pediu pra entrar no Financeiro mas não tem acesso: não leva pra lá — fica
+    // na área inicial do CRM mesmo, quem chamou decide como avisar.
+    if (destino === "/financeiro" && !canAccessFinanceiro(data.data)) {
+      router.push("/");
+      return { redirecionadoPara: "/" };
+    }
+
     router.push(destino || "/");
+    return { redirecionadoPara: destino || "/" };
   }
 
   async function logout() {

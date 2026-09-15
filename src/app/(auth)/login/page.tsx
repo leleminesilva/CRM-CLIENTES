@@ -36,8 +36,12 @@ export default function LoginPage() {
   async function onSubmit(data: LoginInput) {
     setLoading(true);
     try {
-      await login(data.email, data.senha, atual.destino);
-      toast.success("Login realizado com sucesso!");
+      const { redirecionadoPara } = await login(data.email, data.senha, atual.destino);
+      if (atual.destino === "/financeiro" && redirecionadoPara !== "/financeiro") {
+        toast.error("Você não tem acesso ao Financeiro. Peça a um administrador para liberar em Usuários.");
+      } else {
+        toast.success("Login realizado com sucesso!");
+      }
     } catch {
       toast.error("E-mail ou senha inválidos");
     } finally {

@@ -6,7 +6,7 @@ import axios from "axios";
 import { toast } from "sonner";
 import {
   Car, Settings, Users, Pencil, Trash2, ArchiveRestore,
-  LogOut, LogIn, Clock, Gauge,
+  LogOut, LogIn, Clock, Gauge, ChevronLeft, ChevronRight,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -45,6 +45,20 @@ function useMotoristas() {
   return useQuery({
     queryKey: ["financeiro-motoristas"],
     queryFn: async () => (await axios.get("/api/financeiro/motoristas")).data.data as Motorista[],
+  });
+}
+// Listas completas (incluindo arquivados) pra permitir filtrar o histórico por
+// um carro/motorista que já foi excluído/arquivado depois de ter uso registrado.
+function useCarrosTodos() {
+  return useQuery({
+    queryKey: ["financeiro-carros", "todos"],
+    queryFn: async () => (await axios.get("/api/financeiro/carros?todos=true")).data.data as Carro[],
+  });
+}
+function useMotoristasTodos() {
+  return useQuery({
+    queryKey: ["financeiro-motoristas", "todos"],
+    queryFn: async () => (await axios.get("/api/financeiro/motoristas?todos=true")).data.data as Motorista[],
   });
 }
 
@@ -372,12 +386,36 @@ function CarroCard({ carro }: { carro: Carro }) {
   );
 }
 
+const emptyFiltros = { carroId: "", motoristaId: "", de: "", ate: "" };
+const HISTORICO_LIMIT = 15;
+
 export default function CarrosPage() {
   const { data: carros, isLoading } = useCarros();
-  const { data: historico } = useQuery({
-    queryKey: ["financeiro-carro-usos"],
-    queryFn: async () => (await axios.get("/api/financeiro/carros/usos?limit=15")).data.data as Uso[],
+  const { data: carrosTodos } = useCarrosTodos();
+  const { data: motoristasTodos } = useMotoristasTodos();
+  const [filtros, setFiltros] = useState(emptyFiltros);
+  const [page, setPage] = useState(1);
+
+  function atualizarFiltro(patch: Partial<typeof emptyFiltros>) {
+    setFiltros((f) => ({ ...f, ...patch }));
+    setPage(1);
+  }
+
+  const { data: historicoResp } = useQuery({
+    queryKey: ["financeiro-carro-usos", filtros, page],
+    queryFn: async () => {
+      const params = new URLSearchParams({ limit: String(HISTORICO_LIMIT), page: String(page) });
+      if (filtros.carroId) params.set("carroId", filtros.carroId);
+      if (filtros.motoristaId) params.set("motoristaId", filtros.motoristaId);
+      if (filtros.de) params.set("de", filtros.de);
+      if (filtros.ate) params.set("ate", filtros.ate);
+      return (await axios.get(`/api/financeiro/carros/usos?${params}`)).data as { data: Uso[]; total: number };
+    },
   });
+  const historico = historicoResp?.data ?? [];
+  const totalHistorico = historicoResp?.total ?? 0;
+  const totalPages = Math.max(1, Math.ceil(totalHistorico / HISTORICO_LIMIT));
+  const filtrosAtivos = !!(filtros.carroId || filtros.motoristaId || filtros.de || filtros.ate);
 
   const ativos = (carros ?? []).filter((c) => c.ativo);
   const emUsoCount = ativos.filter((c) => c.usoAtual).length;
@@ -416,6 +454,46 @@ export default function CarrosPage() {
         </div>
       )}
 
+      <Card className="p-4">
+        <div className="flex items-end gap-3 flex-wrap">
+          <div className="space-y-1.5">
+            <Label className="text-xs">Carro</Label>
+            <Select value={filtros.carroId || "todos"} onValueChange={(v) => atualizarFiltro({ carroId: v === "todos" ? "" : v })}>
+              <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">Todos</SelectItem>
+                {(carrosTodos ?? []).map((c) => (
+                  <SelectItem key={c.id} value={c.id}>{c.numero} · {c.modelo}{!c.ativo ? " (arquivado)" : ""}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs">Motorista</Label>
+            <Select value={filtros.motoristaId || "todos"} onValueChange={(v) => atualizarFiltro({ motoristaId: v === "todos" ? "" : v })}>
+              <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">Todos</SelectItem>
+                {(motoristasTodos ?? []).map((m) => (
+                  <SelectItem key={m.id} value={m.id}>{m.nome}{!m.ativo ? " (arquivado)" : ""}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs">De</Label>
+            <Input type="date" className="w-36" value={filtros.de} onChange={(e) => atualizarFiltro({ de: e.target.value })} />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs">Até</Label>
+            <Input type="date" className="w-36" value={filtros.ate} onChange={(e) => atualizarFiltro({ ate: e.target.value })} />
+          </div>
+          {filtrosAtivos && (
+            <Button variant="ghost" size="sm" onClick={() => { setFiltros(emptyFiltros); setPage(1); }}>Limpar filtros</Button>
+          )}
+        </div>
+      </Card>
+
       <Card>
         <div className="p-4 border-b">
           <h3 className="font-semibold text-sm">Histórico de uso</h3>
@@ -432,10 +510,10 @@ export default function CarrosPage() {
               </tr>
             </thead>
             <tbody>
-              {(historico ?? []).length === 0 ? (
-                <tr><td colSpan={5} className="p-8 text-center text-muted-foreground">Nenhum registro ainda</td></tr>
+              {historico.length === 0 ? (
+                <tr><td colSpan={5} className="p-8 text-center text-muted-foreground">{filtrosAtivos ? "Nenhum registro para esses filtros" : "Nenhum registro ainda"}</td></tr>
               ) : (
-                (historico ?? []).map((u) => (
+                historico.map((u) => (
                   <tr key={u.id} className="border-b last:border-0 hover:bg-muted/30">
                     <td className="p-3">{u.carro.numero} · {u.carro.modelo}</td>
                     <td className="p-3">{u.motorista.nome}</td>
@@ -452,6 +530,21 @@ export default function CarrosPage() {
             </tbody>
           </table>
         </div>
+
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between p-3 border-t">
+            <p className="text-xs text-muted-foreground">{totalHistorico} registro{totalHistorico !== 1 ? "s" : ""}</p>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="icon" className="h-7 w-7" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
+                <ChevronLeft className="w-3.5 h-3.5" />
+              </Button>
+              <span className="text-xs text-muted-foreground">{page} / {totalPages}</span>
+              <Button variant="outline" size="icon" className="h-7 w-7" disabled={page >= totalPages} onClick={() => setPage((p) => p + 1)}>
+                <ChevronRight className="w-3.5 h-3.5" />
+              </Button>
+            </div>
+          </div>
+        )}
       </Card>
     </div>
   );

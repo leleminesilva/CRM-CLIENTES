@@ -13,6 +13,8 @@ export async function GET(request: NextRequest) {
   const carroId = searchParams.get("carroId");
   const motoristaId = searchParams.get("motoristaId");
   const aberto = searchParams.get("aberto");
+  const de = searchParams.get("de");
+  const ate = searchParams.get("ate");
   const page = Math.max(1, Number(searchParams.get("page") ?? "1"));
   const limit = Math.min(100, Math.max(1, Number(searchParams.get("limit") ?? "20")));
 
@@ -21,6 +23,12 @@ export async function GET(request: NextRequest) {
   if (motoristaId) where.motoristaId = motoristaId;
   if (aberto === "true") where.chegadaEm = null;
   if (aberto === "false") where.chegadaEm = { not: null };
+  if (de || ate) {
+    where.saidaEm = {
+      ...(de ? { gte: new Date(`${de}T00:00:00`) } : {}),
+      ...(ate ? { lte: new Date(`${ate}T23:59:59`) } : {}),
+    };
+  }
 
   const [usos, total] = await Promise.all([
     prisma.financeiroCarroUso.findMany({

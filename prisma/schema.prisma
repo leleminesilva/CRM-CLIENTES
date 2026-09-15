@@ -165,6 +165,7 @@ model User {
   alertasLeituras        AlertaLeitura[]
   whatsappSessoes        WhatsAppSessao[]    @relation("WhatsAppAtendente")
   whatsappConversas      WhatsAppConversa[]  @relation("WhatsAppResponsavel")
+  financeiroLancamentos  FinanceiroLancamento[]
 
   @@map("users")
 }
@@ -829,5 +830,87 @@ model AlertaLeitura {
 
   @@unique([alertaId, userId])
   @@map("alertas_leituras")
+}
+
+// ── Financeiro ──────────────────────────────────────────────────────────
+// Módulo separado do CRM (acesso controlado por User.acessoFinanceiro, ver
+// canAccessFinanceiro em src/lib/rbac.ts). `origem` em Conta/Lancamento já
+// deixa o desenho pronto pra fase 2 (sincronização automática via Open
+// Finance/Pluggy) sem precisar migrar de novo — por enquanto só MANUAL é
+// usado.
+enum FinanceiroContaTipo {
+  CAIXA
+  CORRENTE
+  POUPANCA
+  INVESTIMENTO
+  CARTAO
+}
+
+enum FinanceiroOrigem {
+  MANUAL
+  OPEN_FINANCE
+}
+
+enum FinanceiroTipoLancamento {
+  ENTRADA
+  SAIDA
+}
+
+model FinanceiroConta {
+  id                  String              @id @default(cuid())
+  nome                String
+  tipo                FinanceiroContaTipo @default(CAIXA)
+  origem              FinanceiroOrigem    @default(MANUAL)
+  instituicao         String?
+  saldoInicial        Decimal             @default(0) @db.Decimal(15, 2)
+  cor                 String?
+  ativa               Boolean             @default(true)
+  // Preenchido só quando origem = OPEN_FINANCE (fase 2, integração Pluggy)
+  pluggyItemId        String?
+  pluggyAccountId     String?             @unique
+  ultimaSincronizacao DateTime?
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+
+  lancamentos FinanceiroLancamento[]
+
+  @@map("financeiro_contas")
+}
+
+model FinanceiroCategoria {
+  id        String                   @id @default(cuid())
+  nome      String
+  tipo      FinanceiroTipoLancamento
+  cor       String?
+  padrao    Boolean                  @default(false)
+  createdAt DateTime                 @default(now())
+
+  lancamentos FinanceiroLancamento[]
+
+  @@unique([nome, tipo])
+  @@map("financeiro_categorias")
+}
+
+model FinanceiroLancamento {
+  id          String                   @id @default(cuid())
+  contaId     String
+  conta       FinanceiroConta          @relation(fields: [contaId], references: [id], onDelete: Restrict)
+  categoriaId String?
+  categoria   FinanceiroCategoria?     @relation(fields: [categoriaId], references: [id], onDelete: SetNull)
+  tipo        FinanceiroTipoLancamento
+  descricao   String
+  valor       Decimal                  @db.Decimal(15, 2)
+  data        DateTime
+  origem      FinanceiroOrigem         @default(MANUAL)
+  // Preenchido só quando origem = OPEN_FINANCE (fase 2)
+  pluggyTransactionId String?          @unique
+  criadoPorId String?
+  criadoPor   User?                    @relation(fields: [criadoPorId], references: [id], onDelete: SetNull)
+  createdAt   DateTime                 @default(now())
+  updatedAt   DateTime                 @updatedAt
+
+  @@index([contaId, data])
+  @@index([categoriaId])
+  @@map("financeiro_lancamentos")
 }
 

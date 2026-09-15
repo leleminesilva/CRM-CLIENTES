@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Building2, ChevronLeft, ChevronRight, X } from "lucide-react";
+import { LayoutDashboard, ArrowLeftRight, BarChart3, Landmark, Building2, ChevronLeft, ChevronRight, X } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { Logo } from "@/components/Logo";
 import { useSidebar } from "@/contexts/SidebarContext";
@@ -14,6 +14,9 @@ import { useSidebar } from "@/contexts/SidebarContext";
 // itens aqui.
 const navItems: { href: string; label: string; icon: React.ElementType }[] = [
   { href: "/financeiro", label: "Visão geral", icon: LayoutDashboard },
+  { href: "/financeiro/caixa", label: "Caixa", icon: ArrowLeftRight },
+  { href: "/financeiro/relatorios", label: "Relatórios", icon: BarChart3 },
+  { href: "/financeiro/contas", label: "Contas", icon: Landmark },
 ];
 
 function NavLink({

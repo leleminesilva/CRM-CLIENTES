@@ -167,16 +167,21 @@ export default function ContasPage() {
 
   const [connectToken, setConnectToken] = useState<string | null>(null);
 
+  function erroMsg(error: unknown, fallback: string): string {
+    if (axios.isAxiosError(error)) return error.response?.data?.error ?? fallback;
+    return fallback;
+  }
+
   const tokenMutation = useMutation({
     mutationFn: async () => (await axios.post("/api/financeiro/open-finance/connect-token")).data.data.accessToken as string,
     onSuccess: (token) => setConnectToken(token),
-    onError: () => toast.error("Erro ao iniciar conexão com Open Finance"),
+    onError: (error) => toast.error(erroMsg(error, "Erro ao iniciar conexão com Open Finance")),
   });
 
   const importarMutation = useMutation({
     mutationFn: (itemId: string) => axios.post("/api/financeiro/open-finance/callback", { itemId }),
     onSuccess: () => { toast.success("Conta conectada via Open Finance!"); invalidar(); },
-    onError: () => toast.error("Erro ao importar dados da conta conectada"),
+    onError: (error) => toast.error(erroMsg(error, "Erro ao importar dados da conta conectada")),
   });
 
   const syncMutation = useMutation({
@@ -186,7 +191,7 @@ export default function ContasPage() {
       toast.success(novos > 0 ? `${novos} lançamento${novos !== 1 ? "s" : ""} novo${novos !== 1 ? "s" : ""}` : "Já estava em dia");
       invalidar();
     },
-    onError: () => toast.error("Erro ao sincronizar conta"),
+    onError: (error) => toast.error(erroMsg(error, "Erro ao sincronizar conta")),
   });
 
   const contas = data ?? [];

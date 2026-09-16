@@ -17,6 +17,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ data: { accessToken } });
   } catch (error) {
     console.error("[open-finance] falha ao criar connect token", error);
-    return NextResponse.json({ error: "Falha ao iniciar conexão com Open Finance" }, { status: 502 });
+    const mensagem = error instanceof Error ? error.message : "Falha ao iniciar conexão com Open Finance";
+    return NextResponse.json({ error: mensagem }, { status: 502 });
   }
 }

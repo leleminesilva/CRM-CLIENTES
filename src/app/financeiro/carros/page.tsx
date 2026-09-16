@@ -1,12 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
 import { toast } from "sonner";
 import {
   Car, Settings, Users, Pencil, Trash2, ArchiveRestore,
-  LogOut, LogIn, Clock, Gauge, ChevronLeft, ChevronRight,
+  LogOut, LogIn, Clock, Gauge, ChevronLeft, ChevronRight, Fuel,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -20,20 +20,22 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { formatDateTime } from "@/lib/utils/formatters";
+import { formatDateTime, formatCurrency } from "@/lib/utils/formatters";
 
 interface Carro {
   id: string; numero: string; modelo: string; ano: number; placa: string; cor: string | null;
   ativo: boolean; totalUsos: number; kmAtual: number | null;
-  usoAtual: { id: string; motorista: { id: string; nome: string }; kmSaida: number; saidaEm: string } | null;
+  usoAtual: { id: string; motorista: { id: string; nome: string }; kmSaida: number; saidaEm: string; valorCombustivel: string | null } | null;
 }
 interface Motorista { id: string; nome: string; telefone: string | null; ativo: boolean; _count: { usos: number } }
 interface Uso {
   id: string; kmSaida: number; saidaEm: string; kmChegada: number | null; chegadaEm: string | null; observacoes: string | null;
+  valorCombustivel: string | null;
   carro: { id: string; numero: string; modelo: string; placa: string };
   motorista: { id: string; nome: string };
   registradoPor: { id: string; nome: string } | null;
 }
+interface ContaFinanceira { id: string; nome: string; tipo: string; ativa: boolean }
 
 function useCarros() {
   return useQuery({
@@ -59,6 +61,12 @@ function useMotoristasTodos() {
   return useQuery({
     queryKey: ["financeiro-motoristas", "todos"],
     queryFn: async () => (await axios.get("/api/financeiro/motoristas?todos=true")).data.data as Motorista[],
+  });
+}
+function useContasFinanceiro() {
+  return useQuery({
+    queryKey: ["financeiro-contas"],
+    queryFn: async () => (await axios.get("/api/financeiro/contas")).data.data as ContaFinanceira[],
   });
 }
 
@@ -253,21 +261,42 @@ function GerenciarMotoristasDialog() {
 function SaidaDialog({ carro }: { carro: Carro }) {
   const qc = useQueryClient();
   const { data: motoristas } = useMotoristas();
+  const { data: contas } = useContasFinanceiro();
   const [open, setOpen] = useState(false);
   const [motoristaId, setMotoristaId] = useState("");
   const [km, setKm] = useState("");
   const [obs, setObs] = useState("");
+  const [valorGas, setValorGas] = useState("");
+  const [contaGasId, setContaGasId] = useState("");
+
+  // Assim que o valor da gasolina é preenchido, já pré-seleciona a conta Caixa
+  // (de onde o dinheiro físico normalmente sai) pra evitar um clique a mais.
+  useEffect(() => {
+    if (valorGas && !contaGasId && contas?.length) {
+      setContaGasId(contas.find((c) => c.tipo === "CAIXA")?.id ?? contas[0].id);
+    }
+  }, [valorGas, contaGasId, contas]);
 
   const mutation = useMutation({
-    mutationFn: () => axios.post("/api/financeiro/carros/usos", { carroId: carro.id, motoristaId, kmSaida: Number(km), observacoes: obs || undefined }),
+    mutationFn: () => axios.post("/api/financeiro/carros/usos", {
+      carroId: carro.id,
+      motoristaId,
+      kmSaida: Number(km),
+      observacoes: obs || undefined,
+      valorCombustivel: valorGas ? Number(valorGas) : undefined,
+      contaCombustivelId: valorGas ? contaGasId : undefined,
+    }),
     onSuccess: () => {
       toast.success(`Saída registrada — ${carro.numero} com ${motoristas?.find((m) => m.id === motoristaId)?.nome}`);
       qc.invalidateQueries({ queryKey: ["financeiro-carros"] });
       qc.invalidateQueries({ queryKey: ["financeiro-carro-usos"] });
-      setOpen(false); setMotoristaId(""); setKm(""); setObs("");
+      qc.invalidateQueries({ queryKey: ["financeiro-contas"] });
+      setOpen(false); setMotoristaId(""); setKm(""); setObs(""); setValorGas(""); setContaGasId("");
     },
     onError: (e: unknown) => toast.error((e as { response?: { data?: { error?: string } } })?.response?.data?.error || "Erro ao registrar saída"),
   });
+
+  const invalido = !motoristaId || !km || (!!valorGas && !contaGasId) || mutation.isPending;
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -291,11 +320,27 @@ function SaidaDialog({ carro }: { carro: Carro }) {
             <Input inputMode="numeric" value={km} onChange={(e) => setKm(e.target.value)} placeholder={carro.kmAtual != null ? `Última: ${carro.kmAtual} km` : "Ex: 45000"} />
           </div>
           <div className="space-y-1.5">
+            <Label className="text-xs flex items-center gap-1"><Fuel className="w-3.5 h-3.5" /> Valor entregue pra gasolina</Label>
+            <Input inputMode="decimal" value={valorGas} onChange={(e) => setValorGas(e.target.value)} placeholder="Opcional — ex: 50,00" />
+          </div>
+          {!!valorGas && (
+            <div className="space-y-1.5">
+              <Label className="text-xs">Sai de qual conta *</Label>
+              <Select value={contaGasId} onValueChange={setContaGasId}>
+                <SelectTrigger><SelectValue placeholder="Selecione a conta" /></SelectTrigger>
+                <SelectContent>
+                  {(contas ?? []).map((c) => <SelectItem key={c.id} value={c.id}>{c.nome}</SelectItem>)}
+                </SelectContent>
+              </Select>
+              <p className="text-[11px] text-muted-foreground">Gera automaticamente uma saída no Caixa, categoria &quot;Combustível&quot;.</p>
+            </div>
+          )}
+          <div className="space-y-1.5">
             <Label className="text-xs">Observações</Label>
             <Textarea value={obs} onChange={(e) => setObs(e.target.value)} rows={2} placeholder="Opcional" />
           </div>
           <Button
-            className="w-full bg-emerald-600 hover:bg-emerald-700" disabled={!motoristaId || !km || mutation.isPending}
+            className="w-full bg-emerald-600 hover:bg-emerald-700" disabled={invalido}
             onClick={() => mutation.mutate()}
           >
             {mutation.isPending ? "Registrando..." : "Confirmar saída"}
@@ -374,6 +419,9 @@ function CarroCard({ carro }: { carro: Carro }) {
           <p className="flex items-center gap-1.5 text-foreground font-medium"><Users className="w-3 h-3" /> {carro.usoAtual!.motorista.nome}</p>
           <p className="flex items-center gap-1.5"><Clock className="w-3 h-3" /> Saiu às {formatDateTime(carro.usoAtual!.saidaEm)}</p>
           <p className="flex items-center gap-1.5"><Gauge className="w-3 h-3" /> {carro.usoAtual!.kmSaida} km na saída</p>
+          {carro.usoAtual!.valorCombustivel != null && (
+            <p className="flex items-center gap-1.5"><Fuel className="w-3 h-3" /> {formatCurrency(Number(carro.usoAtual!.valorCombustivel))} pra gasolina</p>
+          )}
         </div>
       ) : (
         <p className="mt-3 text-xs text-muted-foreground">{carro.kmAtual != null ? `${carro.kmAtual} km na última chegada` : "Sem histórico de uso ainda"}</p>
@@ -507,11 +555,12 @@ export default function CarrosPage() {
                 <th className="text-left p-3 font-medium">Saída</th>
                 <th className="text-left p-3 font-medium">Chegada</th>
                 <th className="text-right p-3 font-medium">Km rodados</th>
+                <th className="text-right p-3 font-medium">Gasolina</th>
               </tr>
             </thead>
             <tbody>
               {historico.length === 0 ? (
-                <tr><td colSpan={5} className="p-8 text-center text-muted-foreground">{filtrosAtivos ? "Nenhum registro para esses filtros" : "Nenhum registro ainda"}</td></tr>
+                <tr><td colSpan={6} className="p-8 text-center text-muted-foreground">{filtrosAtivos ? "Nenhum registro para esses filtros" : "Nenhum registro ainda"}</td></tr>
               ) : (
                 historico.map((u) => (
                   <tr key={u.id} className="border-b last:border-0 hover:bg-muted/30">
@@ -523,6 +572,9 @@ export default function CarrosPage() {
                     </td>
                     <td className="p-3 text-right font-semibold tabular-nums">
                       {u.kmChegada != null ? `${u.kmChegada - u.kmSaida} km` : "—"}
+                    </td>
+                    <td className="p-3 text-right tabular-nums text-muted-foreground">
+                      {u.valorCombustivel != null ? formatCurrency(Number(u.valorCombustivel)) : "—"}
                     </td>
                   </tr>
                 ))

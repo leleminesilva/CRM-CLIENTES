@@ -76,18 +76,48 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: `Quilometragem menor que a última registrada (${ultimo.kmChegada} km)` }, { status: 400 });
   }
 
-  const uso = await prisma.financeiroCarroUso.create({
-    data: {
-      carroId: carro.id,
-      motoristaId: motorista.id,
-      kmSaida: parsed.data.kmSaida,
-      observacoes: parsed.data.observacoes || null,
-      registradoPorId: auth.payload.userId,
-    },
-    include: {
-      carro: { select: { id: true, numero: true, modelo: true, placa: true } },
-      motorista: { select: { id: true, nome: true } },
-    },
+  if (parsed.data.valorCombustivel && parsed.data.contaCombustivelId) {
+    const conta = await prisma.financeiroConta.findUnique({ where: { id: parsed.data.contaCombustivelId } });
+    if (!conta || !conta.ativa) return NextResponse.json({ error: "Conta da gasolina inválida ou arquivada" }, { status: 400 });
+  }
+
+  const uso = await prisma.$transaction(async (tx) => {
+    let lancamentoCombustivelId: string | null = null;
+    if (parsed.data.valorCombustivel && parsed.data.contaCombustivelId) {
+      const categoria = await tx.financeiroCategoria.upsert({
+        where: { nome_tipo: { nome: "Combustível", tipo: "SAIDA" } },
+        update: {},
+        create: { nome: "Combustível", tipo: "SAIDA", cor: "#0ea5e9", padrao: true },
+      });
+      const lancamento = await tx.financeiroLancamento.create({
+        data: {
+          contaId: parsed.data.contaCombustivelId,
+          categoriaId: categoria.id,
+          tipo: "SAIDA",
+          descricao: `Combustível — ${carro.numero} · ${carro.modelo} (${motorista.nome})`,
+          valor: parsed.data.valorCombustivel,
+          data: new Date(),
+          criadoPorId: auth.payload.userId,
+        },
+      });
+      lancamentoCombustivelId = lancamento.id;
+    }
+
+    return tx.financeiroCarroUso.create({
+      data: {
+        carroId: carro.id,
+        motoristaId: motorista.id,
+        kmSaida: parsed.data.kmSaida,
+        observacoes: parsed.data.observacoes || null,
+        registradoPorId: auth.payload.userId,
+        valorCombustivel: parsed.data.valorCombustivel ?? null,
+        lancamentoCombustivelId,
+      },
+      include: {
+        carro: { select: { id: true, numero: true, modelo: true, placa: true } },
+        motorista: { select: { id: true, nome: true } },
+      },
+    });
   });
 
   return NextResponse.json({ data: uso }, { status: 201 });

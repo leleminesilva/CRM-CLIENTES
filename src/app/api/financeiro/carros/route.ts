@@ -19,7 +19,7 @@ export async function GET(request: NextRequest) {
         where: { chegadaEm: null },
         orderBy: { saidaEm: "desc" },
         take: 1,
-        include: { motorista: { select: { id: true, nome: true } } },
+        select: { id: true, motorista: { select: { id: true, nome: true } }, kmSaida: true, saidaEm: true, valorCombustivel: true },
       },
       _count: { select: { usos: true } },
     },
@@ -49,7 +49,7 @@ export async function GET(request: NextRequest) {
       ativo: c.ativo,
       totalUsos: c._count.usos,
       usoAtual: usoAtual
-        ? { id: usoAtual.id, motorista: usoAtual.motorista, kmSaida: usoAtual.kmSaida, saidaEm: usoAtual.saidaEm }
+        ? { id: usoAtual.id, motorista: usoAtual.motorista, kmSaida: usoAtual.kmSaida, saidaEm: usoAtual.saidaEm, valorCombustivel: usoAtual.valorCombustivel }
         : null,
       kmAtual: usoAtual ? usoAtual.kmSaida : kmUltimaChegada,
     };

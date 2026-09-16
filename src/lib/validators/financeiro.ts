@@ -61,6 +61,13 @@ export const carroUsoSaidaSchema = z.object({
   motoristaId: z.string().min(1, "Selecione o motorista"),
   kmSaida: z.number().int("Quilometragem inválida").nonnegative(),
   observacoes: z.string().max(300).optional().nullable(),
+  // Valor entregue ao motorista pra gasolina — opcional; quando informado, precisa da
+  // conta de onde esse dinheiro sai pra gerar o lançamento automático no Caixa.
+  valorCombustivel: z.number().positive("Valor precisa ser maior que zero").optional(),
+  contaCombustivelId: z.string().optional(),
+}).refine((d) => !d.valorCombustivel || !!d.contaCombustivelId, {
+  message: "Selecione de qual conta sai o valor da gasolina",
+  path: ["contaCombustivelId"],
 });
 
 export const carroUsoChegadaSchema = z.object({

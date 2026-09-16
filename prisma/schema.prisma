@@ -911,6 +911,8 @@ model FinanceiroLancamento {
   createdAt   DateTime                 @default(now())
   updatedAt   DateTime                 @updatedAt
 
+  carroUsoCombustivel FinanceiroCarroUso? @relation("CarroUsoCombustivel")
+
   @@index([contaId, data])
   @@index([categoriaId])
   @@map("financeiro_lancamentos")
@@ -964,6 +966,13 @@ model FinanceiroCarroUso {
   registradoPor   User?                @relation(fields: [registradoPorId], references: [id], onDelete: SetNull)
   createdAt       DateTime             @default(now())
   updatedAt       DateTime             @updatedAt
+
+  // Valor entregue ao motorista pra colocar gasolina na saída. Quando preenchido, gera
+  // automaticamente um lançamento de saída no Caixa (categoria "Combustível") — ver
+  // POST /api/financeiro/carros/usos.
+  valorCombustivel        Decimal?              @db.Decimal(10, 2)
+  lancamentoCombustivelId String?               @unique
+  lancamentoCombustivel   FinanceiroLancamento? @relation("CarroUsoCombustivel", fields: [lancamentoCombustivelId], references: [id], onDelete: SetNull)
 
   @@index([carroId, saidaEm])
   @@index([motoristaId])

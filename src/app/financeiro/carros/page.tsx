@@ -664,6 +664,16 @@ export default function CarrosPage() {
     qc.invalidateQueries({ queryKey: ["financeiro-contas"] });
   };
 
+  const excluirUsoMutation = useMutation({
+    mutationFn: (id: string) => axios.delete(`/api/financeiro/carros/usos/${id}`),
+    onSuccess: () => { toast.success("Registro excluído"); onUsoAlterado(); },
+    onError: (e: unknown) => toast.error((e as { response?: { data?: { error?: string } } })?.response?.data?.error || "Erro ao excluir registro"),
+  });
+  function excluirUso(u: Uso) {
+    if (!confirm(`Excluir o registro de ${u.carro.numero} · ${u.carro.modelo} com ${u.motorista.nome}? Essa ação não pode ser desfeita.`)) return;
+    excluirUsoMutation.mutate(u.id);
+  }
+
   function atualizarFiltro(patch: Partial<typeof emptyFiltros>) {
     setFiltros((f) => ({ ...f, ...patch }));
     setPage(1);
@@ -776,7 +786,7 @@ export default function CarrosPage() {
                 <th className="text-left p-3 font-medium">Chegada</th>
                 <th className="text-right p-3 font-medium">Km rodados</th>
                 <th className="text-right p-3 font-medium">Gasolina</th>
-                <th className="w-10 p-3"></th>
+                <th className="w-20 p-3"></th>
               </tr>
             </thead>
             <tbody>
@@ -815,7 +825,16 @@ export default function CarrosPage() {
                       />
                     </td>
                     <td className="p-3">
-                      <EditarUsoDialog uso={u} carros={carrosTodos ?? []} motoristas={motoristasTodos ?? []} onSaved={onUsoAlterado} />
+                      <div className="flex items-center gap-1">
+                        <EditarUsoDialog uso={u} carros={carrosTodos ?? []} motoristas={motoristasTodos ?? []} onSaved={onUsoAlterado} />
+                        <Button
+                          size="icon" variant="ghost" className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                          title="Excluir registro" disabled={excluirUsoMutation.isPending}
+                          onClick={() => excluirUso(u)}
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </Button>
+                      </div>
                     </td>
                   </tr>
                 ))

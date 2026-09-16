@@ -3,6 +3,7 @@ import prisma from "@/lib/prisma";
 import { requireFinanceiroAccess } from "@/lib/financeiro/authz";
 import { carroUsoSaidaSchema } from "@/lib/validators/financeiro";
 import { criarLancamentoCombustivel } from "@/lib/financeiro/combustivel";
+import { createAuditLog } from "@/lib/audit";
 
 export const dynamic = "force-dynamic";
 
@@ -110,6 +111,19 @@ export async function POST(request: NextRequest) {
         motorista: { select: { id: true, nome: true } },
       },
     });
+  });
+
+  await createAuditLog({
+    userId: auth.payload.userId,
+    entidade: "FinanceiroCarroUso",
+    entidadeId: uso.id,
+    acao: "CREATE",
+    dadosNovos: {
+      carro: `${carro.numero} · ${carro.modelo}`,
+      motorista: motorista.nome,
+      kmSaida: uso.kmSaida,
+      saidaEm: uso.saidaEm,
+    },
   });
 
   return NextResponse.json({ data: uso }, { status: 201 });

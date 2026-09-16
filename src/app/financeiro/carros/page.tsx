@@ -437,7 +437,7 @@ function GasolinaDialog({
   }, [open, contaId, contas]);
 
   const mutation = useMutation({
-    mutationFn: () => axios.patch(`/api/financeiro/carros/usos/${usoId}`, { valorCombustivel: Number(valor), contaCombustivelId: contaId }),
+    mutationFn: () => axios.patch(`/api/financeiro/carros/usos/${usoId}/combustivel`, { valorCombustivel: Number(valor), contaCombustivelId: contaId }),
     onSuccess: () => {
       toast.success("Gasolina registrada");
       onSaved();
@@ -480,10 +480,123 @@ function GasolinaDialog({
   );
 }
 
+// ── Corrigir um registro do histórico de uso ──────────────────────────────
+function EditarUsoDialog({
+  uso, carros, motoristas, onSaved,
+}: {
+  uso: Uso; carros: Carro[]; motoristas: Motorista[]; onSaved: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [carroId, setCarroId] = useState(uso.carro.id);
+  const [motoristaId, setMotoristaId] = useState(uso.motorista.id);
+  const [saidaEmInput, setSaidaEmInput] = useState(() => toDatetimeLocalValue(new Date(uso.saidaEm)));
+  const [kmSaida, setKmSaida] = useState(String(uso.kmSaida));
+  const [chegadaEmInput, setChegadaEmInput] = useState(() => (uso.chegadaEm ? toDatetimeLocalValue(new Date(uso.chegadaEm)) : ""));
+  const [kmChegada, setKmChegada] = useState(uso.kmChegada != null ? String(uso.kmChegada) : "");
+  const [obs, setObs] = useState(uso.observacoes ?? "");
+
+  // Reabre sempre com os valores atuais do registro, não os da última vez que foi aberto.
+  useEffect(() => {
+    if (!open) return;
+    setCarroId(uso.carro.id);
+    setMotoristaId(uso.motorista.id);
+    setSaidaEmInput(toDatetimeLocalValue(new Date(uso.saidaEm)));
+    setKmSaida(String(uso.kmSaida));
+    setChegadaEmInput(uso.chegadaEm ? toDatetimeLocalValue(new Date(uso.chegadaEm)) : "");
+    setKmChegada(uso.kmChegada != null ? String(uso.kmChegada) : "");
+    setObs(uso.observacoes ?? "");
+  }, [open, uso]);
+
+  const mutation = useMutation({
+    mutationFn: () => axios.patch(`/api/financeiro/carros/usos/${uso.id}`, {
+      carroId,
+      motoristaId,
+      saidaEm: new Date(saidaEmInput).toISOString(),
+      kmSaida: Number(kmSaida),
+      ...(uso.chegadaEm
+        ? { chegadaEm: chegadaEmInput ? new Date(chegadaEmInput).toISOString() : null, kmChegada: kmChegada ? Number(kmChegada) : null }
+        : {}),
+      observacoes: obs || null,
+    }),
+    onSuccess: () => {
+      toast.success("Registro atualizado");
+      onSaved();
+      setOpen(false);
+    },
+    onError: (e: unknown) => toast.error((e as { response?: { data?: { error?: string } } })?.response?.data?.error || "Erro ao atualizar registro"),
+  });
+
+  const invalido = !carroId || !motoristaId || !saidaEmInput || !kmSaida || mutation.isPending;
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button size="icon" variant="ghost" className="h-7 w-7" title="Editar registro">
+          <Pencil className="w-3.5 h-3.5" />
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="max-w-sm">
+        <DialogHeader><DialogTitle>Editar registro de uso</DialogTitle></DialogHeader>
+        <div className="space-y-3 pt-2">
+          <div className="space-y-1.5">
+            <Label className="text-xs">Carro *</Label>
+            <Select value={carroId} onValueChange={setCarroId}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {carros.map((c) => <SelectItem key={c.id} value={c.id}>{c.numero} · {c.modelo}{!c.ativo ? " (arquivado)" : ""}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs">Motorista *</Label>
+            <Select value={motoristaId} onValueChange={setMotoristaId}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {motoristas.map((m) => <SelectItem key={m.id} value={m.id}>{m.nome}{!m.ativo ? " (arquivado)" : ""}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <div className="space-y-1.5">
+              <Label className="text-xs">Horário de saída *</Label>
+              <Input type="datetime-local" value={saidaEmInput} onChange={(e) => setSaidaEmInput(e.target.value)} />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Km de saída *</Label>
+              <Input inputMode="numeric" value={kmSaida} onChange={(e) => setKmSaida(e.target.value)} />
+            </div>
+          </div>
+          {uso.chegadaEm ? (
+            <div className="grid grid-cols-2 gap-2">
+              <div className="space-y-1.5">
+                <Label className="text-xs">Horário de chegada</Label>
+                <Input type="datetime-local" value={chegadaEmInput} onChange={(e) => setChegadaEmInput(e.target.value)} />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Km de chegada</Label>
+                <Input inputMode="numeric" value={kmChegada} onChange={(e) => setKmChegada(e.target.value)} />
+              </div>
+            </div>
+          ) : (
+            <p className="text-[11px] text-muted-foreground">Viagem ainda em andamento — a chegada é registrada pelo botão &quot;Registrar chegada&quot; do carro.</p>
+          )}
+          <div className="space-y-1.5">
+            <Label className="text-xs">Observações</Label>
+            <Textarea value={obs} onChange={(e) => setObs(e.target.value)} rows={2} placeholder="Opcional" />
+          </div>
+          <Button className="w-full" disabled={invalido} onClick={() => mutation.mutate()}>
+            {mutation.isPending ? "Salvando..." : "Salvar alterações"}
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function CarroCard({ carro }: { carro: Carro }) {
   const qc = useQueryClient();
   const emUso = !!carro.usoAtual;
-  const onGasolinaSalva = () => {
+  const onUsoAlterado = () => {
     qc.invalidateQueries({ queryKey: ["financeiro-carros"] });
     qc.invalidateQueries({ queryKey: ["financeiro-carro-usos"] });
     qc.invalidateQueries({ queryKey: ["financeiro-contas"] });
@@ -522,7 +635,7 @@ function CarroCard({ carro }: { carro: Carro }) {
             carroLabel={`${carro.numero} · ${carro.modelo}`}
             motoristaNome={carro.usoAtual!.motorista.nome}
             valorAtual={carro.usoAtual!.valorCombustivel}
-            onSaved={onGasolinaSalva}
+            onSaved={onUsoAlterado}
             trigger={
               <Button size="sm" variant="outline" className="w-full">
                 <Fuel className="w-3.5 h-3.5 mr-1.5" /> {carro.usoAtual!.valorCombustivel != null ? "Editar gasolina" : "Registrar gasolina"}
@@ -545,7 +658,7 @@ export default function CarrosPage() {
   const { data: motoristasTodos } = useMotoristasTodos();
   const [filtros, setFiltros] = useState(emptyFiltros);
   const [page, setPage] = useState(1);
-  const onGasolinaSalva = () => {
+  const onUsoAlterado = () => {
     qc.invalidateQueries({ queryKey: ["financeiro-carros"] });
     qc.invalidateQueries({ queryKey: ["financeiro-carro-usos"] });
     qc.invalidateQueries({ queryKey: ["financeiro-contas"] });
@@ -663,11 +776,12 @@ export default function CarrosPage() {
                 <th className="text-left p-3 font-medium">Chegada</th>
                 <th className="text-right p-3 font-medium">Km rodados</th>
                 <th className="text-right p-3 font-medium">Gasolina</th>
+                <th className="w-10 p-3"></th>
               </tr>
             </thead>
             <tbody>
               {historico.length === 0 ? (
-                <tr><td colSpan={6} className="p-8 text-center text-muted-foreground">{filtrosAtivos ? "Nenhum registro para esses filtros" : "Nenhum registro ainda"}</td></tr>
+                <tr><td colSpan={7} className="p-8 text-center text-muted-foreground">{filtrosAtivos ? "Nenhum registro para esses filtros" : "Nenhum registro ainda"}</td></tr>
               ) : (
                 historico.map((u) => (
                   <tr key={u.id} className="border-b last:border-0 hover:bg-muted/30">
@@ -686,7 +800,7 @@ export default function CarrosPage() {
                         carroLabel={`${u.carro.numero} · ${u.carro.modelo}`}
                         motoristaNome={u.motorista.nome}
                         valorAtual={u.valorCombustivel}
-                        onSaved={onGasolinaSalva}
+                        onSaved={onUsoAlterado}
                         trigger={
                           u.valorCombustivel != null ? (
                             <button className="tabular-nums text-muted-foreground hover:text-foreground hover:underline">
@@ -699,6 +813,9 @@ export default function CarrosPage() {
                           )
                         }
                       />
+                    </td>
+                    <td className="p-3">
+                      <EditarUsoDialog uso={u} carros={carrosTodos ?? []} motoristas={motoristasTodos ?? []} onSaved={onUsoAlterado} />
                     </td>
                   </tr>
                 ))

@@ -83,3 +83,15 @@ export const carroUsoChegadaSchema = z.object({
   kmChegada: z.number().int("Quilometragem inválida").nonnegative(),
   observacoes: z.string().max(300).optional().nullable(),
 });
+
+// Corrigir um registro de uso já existente — todos os campos são opcionais,
+// só entra no update o que vier preenchido (ver diff em .../usos/[id] PATCH).
+export const carroUsoEditSchema = z.object({
+  carroId: z.string().min(1).optional(),
+  motoristaId: z.string().min(1).optional(),
+  kmSaida: z.number().int("Quilometragem inválida").nonnegative().optional(),
+  saidaEm: z.string().optional(),
+  kmChegada: z.number().int("Quilometragem inválida").nonnegative().nullable().optional(),
+  chegadaEm: z.string().nullable().optional(),
+  observacoes: z.string().max(300).optional().nullable(),
+});

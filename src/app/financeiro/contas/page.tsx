@@ -229,6 +229,11 @@ export default function ContasPage() {
       {connectToken && (
         <PluggyConnect
           connectToken={connectToken}
+          // TEMPORÁRIO: cliente Pluggy em trial está bloqueando conexão com banco real
+          // (TRIAL_CLIENT_ITEM_CREATE_NOT_ALLOWED) — ligado só pra testar o fluxo com o
+          // conector fake "Pluggy Bank" enquanto isso não é resolvido com o suporte deles.
+          // Remover assim que a conta sair do trial ou for confirmada como liberada.
+          includeSandbox
           onSuccess={(data: { item: { id: string } }) => {
             setConnectToken(null);
             importarMutation.mutate(data.item.id);

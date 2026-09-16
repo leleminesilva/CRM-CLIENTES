@@ -61,6 +61,9 @@ export const carroUsoSaidaSchema = z.object({
   motoristaId: z.string().min(1, "Selecione o motorista"),
   kmSaida: z.number().int("Quilometragem inválida").nonnegative(),
   observacoes: z.string().max(300).optional().nullable(),
+  // Quem registra costuma chegar depois do horário real de saída do carro — sem isso,
+  // o carimbo ficaria sempre com o horário do registro em vez do da saída de verdade.
+  saidaEm: z.string().optional(),
   // Valor entregue ao motorista pra gasolina — opcional; quando informado, precisa da
   // conta de onde esse dinheiro sai pra gerar o lançamento automático no Caixa.
   valorCombustivel: z.number().positive("Valor precisa ser maior que zero").optional(),
@@ -68,6 +71,12 @@ export const carroUsoSaidaSchema = z.object({
 }).refine((d) => !d.valorCombustivel || !!d.contaCombustivelId, {
   message: "Selecione de qual conta sai o valor da gasolina",
   path: ["contaCombustivelId"],
+});
+
+// Registrar (ou corrigir) o valor de gasolina depois que a saída já foi criada.
+export const carroUsoCombustivelSchema = z.object({
+  valorCombustivel: z.number().positive("Valor precisa ser maior que zero"),
+  contaCombustivelId: z.string().min(1, "Selecione a conta"),
 });
 
 export const carroUsoChegadaSchema = z.object({

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { requireFinanceiroAccess } from "@/lib/financeiro/authz";
 import { carroUsoSaidaSchema } from "@/lib/validators/financeiro";
+import { criarLancamentoCombustivel } from "@/lib/financeiro/combustivel";
 
 export const dynamic = "force-dynamic";
 
@@ -84,21 +85,11 @@ export async function POST(request: NextRequest) {
   const uso = await prisma.$transaction(async (tx) => {
     let lancamentoCombustivelId: string | null = null;
     if (parsed.data.valorCombustivel && parsed.data.contaCombustivelId) {
-      const categoria = await tx.financeiroCategoria.upsert({
-        where: { nome_tipo: { nome: "Combustível", tipo: "SAIDA" } },
-        update: {},
-        create: { nome: "Combustível", tipo: "SAIDA", cor: "#0ea5e9", padrao: true },
-      });
-      const lancamento = await tx.financeiroLancamento.create({
-        data: {
-          contaId: parsed.data.contaCombustivelId,
-          categoriaId: categoria.id,
-          tipo: "SAIDA",
-          descricao: `Combustível — ${carro.numero} · ${carro.modelo} (${motorista.nome})`,
-          valor: parsed.data.valorCombustivel,
-          data: new Date(),
-          criadoPorId: auth.payload.userId,
-        },
+      const lancamento = await criarLancamentoCombustivel(tx, {
+        contaId: parsed.data.contaCombustivelId,
+        valor: parsed.data.valorCombustivel,
+        descricao: `Combustível — ${carro.numero} · ${carro.modelo} (${motorista.nome})`,
+        criadoPorId: auth.payload.userId,
       });
       lancamentoCombustivelId = lancamento.id;
     }
@@ -108,6 +99,7 @@ export async function POST(request: NextRequest) {
         carroId: carro.id,
         motoristaId: motorista.id,
         kmSaida: parsed.data.kmSaida,
+        saidaEm: parsed.data.saidaEm ? new Date(parsed.data.saidaEm) : undefined,
         observacoes: parsed.data.observacoes || null,
         registradoPorId: auth.payload.userId,
         valorCombustivel: parsed.data.valorCombustivel ?? null,

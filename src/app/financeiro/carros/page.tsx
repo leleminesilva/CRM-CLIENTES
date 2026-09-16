@@ -37,6 +37,13 @@ interface Uso {
 }
 interface ContaFinanceira { id: string; nome: string; tipo: string; ativa: boolean }
 
+// Formata pro valor que <input type="datetime-local"> espera, em horário local
+// (não UTC) — é assim que o navegador interpreta esse tipo de input.
+function toDatetimeLocalValue(d: Date) {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
 function useCarros() {
   return useQuery({
     queryKey: ["financeiro-carros"],
@@ -268,6 +275,13 @@ function SaidaDialog({ carro }: { carro: Carro }) {
   const [obs, setObs] = useState("");
   const [valorGas, setValorGas] = useState("");
   const [contaGasId, setContaGasId] = useState("");
+  const [saidaEmInput, setSaidaEmInput] = useState(() => toDatetimeLocalValue(new Date()));
+
+  // Sempre que o diálogo abre, começa com "agora" — mas quem registra pode
+  // voltar pro horário real em que o carro saiu (ela chega depois do carro).
+  useEffect(() => {
+    if (open) setSaidaEmInput(toDatetimeLocalValue(new Date()));
+  }, [open]);
 
   // Assim que o valor da gasolina é preenchido, já pré-seleciona a conta Caixa
   // (de onde o dinheiro físico normalmente sai) pra evitar um clique a mais.
@@ -282,6 +296,7 @@ function SaidaDialog({ carro }: { carro: Carro }) {
       carroId: carro.id,
       motoristaId,
       kmSaida: Number(km),
+      saidaEm: saidaEmInput ? new Date(saidaEmInput).toISOString() : undefined,
       observacoes: obs || undefined,
       valorCombustivel: valorGas ? Number(valorGas) : undefined,
       contaCombustivelId: valorGas ? contaGasId : undefined,
@@ -296,7 +311,7 @@ function SaidaDialog({ carro }: { carro: Carro }) {
     onError: (e: unknown) => toast.error((e as { response?: { data?: { error?: string } } })?.response?.data?.error || "Erro ao registrar saída"),
   });
 
-  const invalido = !motoristaId || !km || (!!valorGas && !contaGasId) || mutation.isPending;
+  const invalido = !motoristaId || !km || !saidaEmInput || (!!valorGas && !contaGasId) || mutation.isPending;
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -314,6 +329,10 @@ function SaidaDialog({ carro }: { carro: Carro }) {
                 {(motoristas ?? []).filter((m) => m.ativo).map((m) => <SelectItem key={m.id} value={m.id}>{m.nome}</SelectItem>)}
               </SelectContent>
             </Select>
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs">Horário de saída *</Label>
+            <Input type="datetime-local" value={saidaEmInput} onChange={(e) => setSaidaEmInput(e.target.value)} />
           </div>
           <div className="space-y-1.5">
             <Label className="text-xs">Quilometragem de saída *</Label>
@@ -399,8 +418,76 @@ function ChegadaDialog({ carro }: { carro: Carro }) {
   );
 }
 
+// ── Registrar/editar o valor de gasolina de um uso já criado ──────────────
+function GasolinaDialog({
+  usoId, carroLabel, motoristaNome, valorAtual, trigger, onSaved,
+}: {
+  usoId: string; carroLabel: string; motoristaNome: string; valorAtual: string | null;
+  trigger: React.ReactNode; onSaved: () => void;
+}) {
+  const { data: contas } = useContasFinanceiro();
+  const [open, setOpen] = useState(false);
+  const [valor, setValor] = useState(valorAtual ? String(Number(valorAtual)) : "");
+  const [contaId, setContaId] = useState("");
+
+  useEffect(() => {
+    if (open && !contaId && contas?.length) {
+      setContaId(contas.find((c) => c.tipo === "CAIXA")?.id ?? contas[0].id);
+    }
+  }, [open, contaId, contas]);
+
+  const mutation = useMutation({
+    mutationFn: () => axios.patch(`/api/financeiro/carros/usos/${usoId}`, { valorCombustivel: Number(valor), contaCombustivelId: contaId }),
+    onSuccess: () => {
+      toast.success("Gasolina registrada");
+      onSaved();
+      setOpen(false);
+    },
+    onError: (e: unknown) => toast.error((e as { response?: { data?: { error?: string } } })?.response?.data?.error || "Erro ao registrar gasolina"),
+  });
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>{trigger}</DialogTrigger>
+      <DialogContent className="max-w-sm">
+        <DialogHeader><DialogTitle>Gasolina — {carroLabel}</DialogTitle></DialogHeader>
+        <div className="space-y-3 pt-2">
+          <p className="text-sm text-muted-foreground">Motorista: <strong>{motoristaNome}</strong></p>
+          <div className="space-y-1.5">
+            <Label className="text-xs">Valor entregue *</Label>
+            <Input inputMode="decimal" value={valor} onChange={(e) => setValor(e.target.value)} placeholder="Ex: 50,00" />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs">Sai de qual conta *</Label>
+            <Select value={contaId} onValueChange={setContaId}>
+              <SelectTrigger><SelectValue placeholder="Selecione a conta" /></SelectTrigger>
+              <SelectContent>
+                {(contas ?? []).map((c) => <SelectItem key={c.id} value={c.id}>{c.nome}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            <p className="text-[11px] text-muted-foreground">Gera automaticamente uma saída no Caixa, categoria &quot;Combustível&quot;.</p>
+          </div>
+          <Button
+            className="w-full bg-emerald-600 hover:bg-emerald-700"
+            disabled={!valor || Number(valor) <= 0 || !contaId || mutation.isPending}
+            onClick={() => mutation.mutate()}
+          >
+            {mutation.isPending ? "Salvando..." : "Salvar"}
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function CarroCard({ carro }: { carro: Carro }) {
+  const qc = useQueryClient();
   const emUso = !!carro.usoAtual;
+  const onGasolinaSalva = () => {
+    qc.invalidateQueries({ queryKey: ["financeiro-carros"] });
+    qc.invalidateQueries({ queryKey: ["financeiro-carro-usos"] });
+    qc.invalidateQueries({ queryKey: ["financeiro-contas"] });
+  };
   return (
     <Card className="p-4">
       <div className="flex items-start justify-between gap-2">
@@ -427,8 +514,22 @@ function CarroCard({ carro }: { carro: Carro }) {
         <p className="mt-3 text-xs text-muted-foreground">{carro.kmAtual != null ? `${carro.kmAtual} km na última chegada` : "Sem histórico de uso ainda"}</p>
       )}
 
-      <div className="mt-3">
+      <div className="mt-3 space-y-1.5">
         {emUso ? <ChegadaDialog carro={carro} /> : <SaidaDialog carro={carro} />}
+        {emUso && (
+          <GasolinaDialog
+            usoId={carro.usoAtual!.id}
+            carroLabel={`${carro.numero} · ${carro.modelo}`}
+            motoristaNome={carro.usoAtual!.motorista.nome}
+            valorAtual={carro.usoAtual!.valorCombustivel}
+            onSaved={onGasolinaSalva}
+            trigger={
+              <Button size="sm" variant="outline" className="w-full">
+                <Fuel className="w-3.5 h-3.5 mr-1.5" /> {carro.usoAtual!.valorCombustivel != null ? "Editar gasolina" : "Registrar gasolina"}
+              </Button>
+            }
+          />
+        )}
       </div>
     </Card>
   );
@@ -438,11 +539,17 @@ const emptyFiltros = { carroId: "", motoristaId: "", de: "", ate: "" };
 const HISTORICO_LIMIT = 15;
 
 export default function CarrosPage() {
+  const qc = useQueryClient();
   const { data: carros, isLoading } = useCarros();
   const { data: carrosTodos } = useCarrosTodos();
   const { data: motoristasTodos } = useMotoristasTodos();
   const [filtros, setFiltros] = useState(emptyFiltros);
   const [page, setPage] = useState(1);
+  const onGasolinaSalva = () => {
+    qc.invalidateQueries({ queryKey: ["financeiro-carros"] });
+    qc.invalidateQueries({ queryKey: ["financeiro-carro-usos"] });
+    qc.invalidateQueries({ queryKey: ["financeiro-contas"] });
+  };
 
   function atualizarFiltro(patch: Partial<typeof emptyFiltros>) {
     setFiltros((f) => ({ ...f, ...patch }));
@@ -573,8 +680,25 @@ export default function CarrosPage() {
                     <td className="p-3 text-right font-semibold tabular-nums">
                       {u.kmChegada != null ? `${u.kmChegada - u.kmSaida} km` : "—"}
                     </td>
-                    <td className="p-3 text-right tabular-nums text-muted-foreground">
-                      {u.valorCombustivel != null ? formatCurrency(Number(u.valorCombustivel)) : "—"}
+                    <td className="p-3 text-right">
+                      <GasolinaDialog
+                        usoId={u.id}
+                        carroLabel={`${u.carro.numero} · ${u.carro.modelo}`}
+                        motoristaNome={u.motorista.nome}
+                        valorAtual={u.valorCombustivel}
+                        onSaved={onGasolinaSalva}
+                        trigger={
+                          u.valorCombustivel != null ? (
+                            <button className="tabular-nums text-muted-foreground hover:text-foreground hover:underline">
+                              {formatCurrency(Number(u.valorCombustivel))}
+                            </button>
+                          ) : (
+                            <button className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 hover:underline inline-flex items-center gap-1">
+                              <Fuel className="w-3 h-3" /> Adicionar
+                            </button>
+                          )
+                        }
+                      />
                     </td>
                   </tr>
                 ))

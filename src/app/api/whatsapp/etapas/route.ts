@@ -13,8 +13,27 @@ export async function GET(request: NextRequest) {
   if (!hasPermission(payload.role, "whatsapp:use")) {
     return NextResponse.json({ error: "Sem permissão" }, { status: 403 });
   }
+  // Canal (WhatsAppSessao) atualmente selecionado por quem está olhando o quadro — a
+  // visibilidade da coluna é resolvida em cima desse canal, não do usuário logado.
+  const sessaoId = request.nextUrl.searchParams.get("sessaoId");
+
   const etapas = await prisma.whatsAppEtapa.findMany({ orderBy: { ordem: "asc" } });
-  return NextResponse.json({ etapas, podeEditar: isAdmin(payload.role) });
+  const podeEditar = isAdmin(payload.role);
+  return NextResponse.json({
+    etapas: etapas.map((e) => ({
+      id: e.id,
+      nome: e.nome,
+      cor: e.cor,
+      ordem: e.ordem,
+      sistema: e.sistema,
+      // Admin/Dev sempre veem tudo. Sem canal selecionado (ex: automações) não dá pra restringir, então libera.
+      // Os demais só veem se a lista estiver vazia (livre pra todos) ou incluir o canal selecionado.
+      podeVer: podeEditar || !sessaoId || e.visivelParaCanais.length === 0 || e.visivelParaCanais.includes(sessaoId),
+      // A lista de canais liberados só vai pra quem pode editar (só ela é usada no modal de gestão).
+      ...(podeEditar ? { visivelParaCanais: e.visivelParaCanais } : {}),
+    })),
+    podeEditar,
+  });
 }
 
 export async function POST(request: NextRequest) {

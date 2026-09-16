@@ -593,13 +593,14 @@ enum WhatsAppConversaStatus {
 // ordem, criar/excluir). WhatsAppConversa.etapa guarda o id desta linha
 // (junção manual por string, no mesmo padrão de clienteId).
 model WhatsAppEtapa {
-  id        String   @id @default(cuid())
-  nome      String
-  cor       String   @default("#6366f1")
-  ordem     Int
-  sistema   Boolean  @default(false) // as 6 originais: renomear/reordenar sim, excluir não
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id                String   @id @default(cuid())
+  nome              String
+  cor               String   @default("#6366f1")
+  ordem             Int
+  sistema           Boolean  @default(false) // as 6 originais: renomear/reordenar sim, excluir não
+  visivelParaCanais String[] @default([]) // ids de WhatsAppSessao (canais) liberados a ver a coluna no Quadro; vazio = todo mundo vê. Admin/Dev sempre veem, independente do canal selecionado.
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 
   @@map("whatsapp_etapas")
 }

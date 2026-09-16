@@ -19,6 +19,7 @@ import {
   Paperclip, FileText, X as XIcon, Download, UserRound, ExternalLink, Sparkles,
   Zap, Clock, ArrowRight, Activity, Inbox, CreditCard, StickyNote,
   Users, PanelRightClose, PanelRight, Pencil, Settings, ChevronUp, ChevronDown,
+  Eye, Lock,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -141,6 +142,8 @@ interface EtapaCol {
   cor: string; // hex
   ordem: number;
   sistema: boolean;
+  podeVer: boolean; // se o canal selecionado pode ver essa coluna no Quadro
+  visivelParaCanais?: string[]; // ids de WhatsAppSessao liberados; só vem preenchido pra quem pode editar
 }
 
 function formatDuracao(ms: number): string {
@@ -184,19 +187,23 @@ function useRespostasRapidas() {
 
 // Fallback enquanto /api/whatsapp/etapas não carregou (mesmos ids semeados na migration).
 const ETAPAS_FALLBACK: EtapaCol[] = [
-  { id: "NOVA",               nome: "Novas",              cor: "#94a3b8", ordem: 0, sistema: true },
-  { id: "EM_ATENDIMENTO",     nome: "Em atendimento",     cor: "#3b82f6", ordem: 1, sistema: true },
-  { id: "AGUARDANDO_CLIENTE", nome: "Aguardando cliente", cor: "#f59e0b", ordem: 2, sistema: true },
-  { id: "ORCAMENTO_ENVIADO",  nome: "Orçamento enviado",  cor: "#22c55e", ordem: 3, sistema: true },
-  { id: "FECHADO",            nome: "Fechado",            cor: "#059669", ordem: 4, sistema: true },
-  { id: "SEM_RETORNO",        nome: "Sem retorno",        cor: "#ef4444", ordem: 5, sistema: true },
+  { id: "NOVA",               nome: "Novas",              cor: "#94a3b8", ordem: 0, sistema: true, podeVer: true },
+  { id: "EM_ATENDIMENTO",     nome: "Em atendimento",     cor: "#3b82f6", ordem: 1, sistema: true, podeVer: true },
+  { id: "AGUARDANDO_CLIENTE", nome: "Aguardando cliente", cor: "#f59e0b", ordem: 2, sistema: true, podeVer: true },
+  { id: "ORCAMENTO_ENVIADO",  nome: "Orçamento enviado",  cor: "#22c55e", ordem: 3, sistema: true, podeVer: true },
+  { id: "FECHADO",            nome: "Fechado",            cor: "#059669", ordem: 4, sistema: true, podeVer: true },
+  { id: "SEM_RETORNO",        nome: "Sem retorno",        cor: "#ef4444", ordem: 5, sistema: true, podeVer: true },
 ];
 
-function useEtapas() {
+// sessaoId = canal selecionado no momento — a visibilidade de cada coluna é
+// resolvida em cima dele (ver /api/whatsapp/etapas). Sem canal (ex: tela de
+// Automações), o servidor não restringe nada.
+function useEtapas(sessaoId?: string | null) {
   return useQuery({
-    queryKey: ["wa-etapas"],
+    queryKey: ["wa-etapas", sessaoId ?? null],
     queryFn: async () => {
-      const { data } = await axios.get("/api/whatsapp/etapas");
+      const qs = sessaoId ? `?sessaoId=${sessaoId}` : "";
+      const { data } = await axios.get(`/api/whatsapp/etapas${qs}`);
       return data as { etapas: EtapaCol[]; podeEditar: boolean };
     },
     staleTime: 60000,
@@ -2076,8 +2083,9 @@ function QuadroKanban({
   const [agrupar, setAgrupar] = useState<AgrupamentoQuadro>("etapa");
   const [modalEtapas, setModalEtapas] = useState(false);
 
-  const etapasQuery = useEtapas();
-  const etapas = etapasQuery.data?.etapas ?? ETAPAS_FALLBACK;
+  const etapasQuery = useEtapas(sessaoId);
+  const etapasTodas = etapasQuery.data?.etapas ?? ETAPAS_FALLBACK;
+  const etapas = etapasTodas.filter((e) => e.podeVer);
   const podeEditarEtapas = etapasQuery.data?.podeEditar ?? false;
 
   const { data: conversas = [] } = useQuery({
@@ -2123,7 +2131,13 @@ function QuadroKanban({
   });
 
   const idsEtapas = new Set(etapas.map((e) => e.id));
-  const etapaDe = (c: Conversa) => (c.etapa && idsEtapas.has(c.etapa) ? c.etapa : etapas[0]?.id ?? "NOVA");
+  const idsEtapasTodas = new Set(etapasTodas.map((e) => e.id));
+  // null = a conversa está numa coluna que existe mas esse usuário não pode ver — some do quadro em vez de cair em outra coluna.
+  const etapaDe = (c: Conversa): string | null => {
+    if (c.etapa && idsEtapas.has(c.etapa)) return c.etapa;
+    if (c.etapa && idsEtapasTodas.has(c.etapa)) return null;
+    return etapas[0]?.id ?? "NOVA";
+  };
   const porEtapa = (e: EtapaQuadro) => conversas.filter((c) => etapaDe(c) === e);
   const naoAtribuidas = conversas.filter((c) => !c.responsavelId).length;
 
@@ -2248,7 +2262,7 @@ function QuadroKanban({
 
       {modalEtapas && (
         <ModalEtapas
-          etapas={etapas}
+          etapas={etapasTodas}
           onClose={() => setModalEtapas(false)}
           onChange={() => {
             queryClient.invalidateQueries({ queryKey: ["wa-etapas"] });
@@ -2270,6 +2284,7 @@ function ModalEtapas({
   onChange: () => void;
 }) {
   const [busy, setBusy] = useState(false);
+  const [visibilidadeEtapa, setVisibilidadeEtapa] = useState<EtapaCol | null>(null);
   const call = async (fn: () => Promise<unknown>) => {
     setBusy(true);
     try {
@@ -2327,6 +2342,19 @@ function ModalEtapas({
                 onBlur={(ev) => ev.target.value.trim() && ev.target.value.trim() !== e.nome && renomear(e.id, ev.target.value.trim())}
                 className="flex-1 min-w-0 text-sm rounded-md border border-border bg-background px-2 py-1 outline-none"
               />
+              <button
+                onClick={() => setVisibilidadeEtapa(e)}
+                disabled={busy}
+                title={(e.visivelParaCanais?.length ?? 0) > 0 ? `Restrita a ${e.visivelParaCanais?.length} canal(is)` : "Visível em todos os canais"}
+                className={cn(
+                  "shrink-0 rounded-md border p-1.5",
+                  (e.visivelParaCanais?.length ?? 0) > 0
+                    ? "border-amber-500/40 text-amber-600 dark:text-amber-400 bg-amber-500/10"
+                    : "border-border text-muted-foreground hover:text-foreground",
+                )}
+              >
+                {(e.visivelParaCanais?.length ?? 0) > 0 ? <Lock className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+              </button>
               {e.sistema ? (
                 <span className="text-[10px] text-muted-foreground shrink-0" title="Coluna padrão — não pode ser excluída">padrão</span>
               ) : (
@@ -2346,9 +2374,102 @@ function ModalEtapas({
         </div>
         <p className="text-[11px] text-muted-foreground">
           Nome e cor salvam ao sair do campo. As 6 colunas padrão podem ser renomeadas e reordenadas, mas não excluídas.
+          O ícone de {"\u{1F512}"}/olho controla em quais canais de WhatsApp cada coluna aparece no quadro — Admin e Dev sempre veem todas.
         </p>
         <DialogFooter>
           <Button onClick={onClose}>Fechar</Button>
+        </DialogFooter>
+      </DialogContent>
+      {visibilidadeEtapa && (
+        <ModalVisibilidadeEtapa
+          etapa={visibilidadeEtapa}
+          onClose={() => setVisibilidadeEtapa(null)}
+          onSaved={() => {
+            setVisibilidadeEtapa(null);
+            onChange();
+          }}
+        />
+      )}
+    </Dialog>
+  );
+}
+
+// ── Em quais canais cada coluna do quadro aparece ─────────────────────────
+
+function ModalVisibilidadeEtapa({
+  etapa, onClose, onSaved,
+}: {
+  etapa: EtapaCol;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const { data: canais = [] } = useQuery({
+    queryKey: ["wa-sessoes-visibilidade"],
+    queryFn: async () => {
+      const { data } = await axios.get("/api/whatsapp/sessoes?escopo=todas");
+      return data as Sessao[];
+    },
+  });
+  const [restrita, setRestrita] = useState((etapa.visivelParaCanais?.length ?? 0) > 0);
+  const [selecionados, setSelecionados] = useState<string[]>(etapa.visivelParaCanais ?? []);
+  const [salvando, setSalvando] = useState(false);
+
+  const toggle = (id: string) => {
+    setSelecionados((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  };
+
+  const salvar = async () => {
+    setSalvando(true);
+    try {
+      await axios.patch(`/api/whatsapp/etapas/${etapa.id}`, { visivelParaCanais: restrita ? selecionados : [] });
+      onSaved();
+    } catch (e: unknown) {
+      const msg = (e as { response?: { data?: { error?: string } } })?.response?.data?.error;
+      toast.error(msg ?? "Erro ao salvar visibilidade");
+    } finally {
+      setSalvando(false);
+    }
+  };
+
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-sm">
+        <DialogHeader>
+          <DialogTitle>Em quais canais &quot;{etapa.nome}&quot; aparece</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-3">
+          <label className="flex items-start gap-2 text-sm rounded-lg border border-border p-2 cursor-pointer">
+            <input type="radio" className="mt-0.5" checked={!restrita} onChange={() => setRestrita(false)} />
+            <div>
+              <p className="font-semibold">Todos os canais veem</p>
+              <p className="text-[11px] text-muted-foreground">A coluna aparece no quadro não importa qual canal estiver selecionado.</p>
+            </div>
+          </label>
+          <label className="flex items-start gap-2 text-sm rounded-lg border border-border p-2 cursor-pointer">
+            <input type="radio" className="mt-0.5" checked={restrita} onChange={() => setRestrita(true)} />
+            <div>
+              <p className="font-semibold">Só os canais que eu marcar</p>
+              <p className="text-[11px] text-muted-foreground">A coluna some do quadro quando um canal fora da lista estiver selecionado. Admin e Dev sempre veem.</p>
+            </div>
+          </label>
+          {restrita && (
+            <ScrollArea className="max-h-56 rounded-lg border border-border">
+              <div className="p-1">
+                {canais.map((s) => (
+                  <label key={s.id} className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-muted/50 text-sm cursor-pointer">
+                    <input type="checkbox" checked={selecionados.includes(s.id)} onChange={() => toggle(s.id)} />
+                    <span className="flex-1 min-w-0 truncate">{s.nome}</span>
+                    {s.atendente && <span className="text-[10px] text-muted-foreground shrink-0">{s.atendente.nome}</span>}
+                  </label>
+                ))}
+                {canais.length === 0 && <p className="text-xs text-muted-foreground p-2">Carregando…</p>}
+              </div>
+            </ScrollArea>
+          )}
+        </div>
+        <DialogFooter>
+          <Button variant="ghost" onClick={onClose} disabled={salvando}>Cancelar</Button>
+          <Button onClick={salvar} disabled={salvando}>{salvando ? "Salvando..." : "Salvar"}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

@@ -16,10 +16,13 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
   if (!etapa) return NextResponse.json({ error: "Coluna não encontrada" }, { status: 404 });
 
   const body = await request.json().catch(() => ({}));
-  const data: { nome?: string; cor?: string; ordem?: number } = {};
+  const data: { nome?: string; cor?: string; ordem?: number; visivelParaCanais?: string[] } = {};
   if (typeof body.nome === "string" && body.nome.trim()) data.nome = body.nome.trim().slice(0, 40);
   if (typeof body.cor === "string" && HEX.test(body.cor)) data.cor = body.cor;
   if (typeof body.ordem === "number" && Number.isInteger(body.ordem)) data.ordem = body.ordem;
+  if (Array.isArray(body.visivelParaCanais)) {
+    data.visivelParaCanais = body.visivelParaCanais.filter((i: unknown): i is string => typeof i === "string");
+  }
 
   const atualizada = await prisma.whatsAppEtapa.update({ where: { id: params.id }, data });
   return NextResponse.json(atualizada);

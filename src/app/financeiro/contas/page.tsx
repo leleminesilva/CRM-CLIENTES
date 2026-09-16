@@ -1,10 +1,15 @@
 "use client";
 
 import { useState } from "react";
+import dynamic from "next/dynamic";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
 import { toast } from "sonner";
-import { Plus, Pencil, Archive, ArchiveRestore, Landmark, Trash2 } from "lucide-react";
+import { Plus, Pencil, Archive, ArchiveRestore, Landmark, Trash2, Link2, RefreshCw } from "lucide-react";
+
+// react-pluggy-connect lê `window` no import do módulo — precisa ficar fora do bundle
+// server-side (Next tenta prerenderizar esta página no build, mesmo sendo "use client").
+const PluggyConnect = dynamic(() => import("react-pluggy-connect").then((m) => m.PluggyConnect), { ssr: false });
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -22,11 +27,13 @@ interface Conta {
   id: string;
   nome: string;
   tipo: string;
+  origem: "MANUAL" | "OPEN_FINANCE";
   instituicao: string | null;
   saldoInicial: string;
   saldo: number;
   cor: string | null;
   ativa: boolean;
+  ultimaSincronizacao: string | null;
   _count: { lancamentos: number };
 }
 
@@ -158,6 +165,30 @@ export default function ContasPage() {
     onError: () => toast.error("Erro ao excluir conta"),
   });
 
+  const [connectToken, setConnectToken] = useState<string | null>(null);
+
+  const tokenMutation = useMutation({
+    mutationFn: async () => (await axios.post("/api/financeiro/open-finance/connect-token")).data.data.accessToken as string,
+    onSuccess: (token) => setConnectToken(token),
+    onError: () => toast.error("Erro ao iniciar conexão com Open Finance"),
+  });
+
+  const importarMutation = useMutation({
+    mutationFn: (itemId: string) => axios.post("/api/financeiro/open-finance/callback", { itemId }),
+    onSuccess: () => { toast.success("Conta conectada via Open Finance!"); invalidar(); },
+    onError: () => toast.error("Erro ao importar dados da conta conectada"),
+  });
+
+  const syncMutation = useMutation({
+    mutationFn: (contaId: string) => axios.post(`/api/financeiro/open-finance/contas/${contaId}/sync`),
+    onSuccess: (res) => {
+      const novos = res.data?.data?.novos ?? 0;
+      toast.success(novos > 0 ? `${novos} lançamento${novos !== 1 ? "s" : ""} novo${novos !== 1 ? "s" : ""}` : "Já estava em dia");
+      invalidar();
+    },
+    onError: () => toast.error("Erro ao sincronizar conta"),
+  });
+
   const contas = data ?? [];
   const ativas = contas.filter((c) => c.ativa);
   const arquivadas = contas.filter((c) => !c.ativa);
@@ -172,13 +203,44 @@ export default function ContasPage() {
           </h2>
           <p className="text-muted-foreground">Contas de banco e caixa usadas nos lançamentos</p>
         </div>
-        <ContaFormDialog
-          title="Nova conta"
-          onSubmit={(values) => createMutation.mutate(values)}
-          isPending={createMutation.isPending}
-          trigger={<Button className="bg-emerald-600 hover:bg-emerald-700"><Plus className="w-4 h-4 mr-2" /> Nova conta</Button>}
-        />
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            disabled={tokenMutation.isPending}
+            onClick={() => tokenMutation.mutate()}
+          >
+            <Link2 className="w-4 h-4 mr-2" />
+            {tokenMutation.isPending ? "Abrindo..." : "Conectar via Open Finance"}
+          </Button>
+          <ContaFormDialog
+            title="Nova conta"
+            onSubmit={(values) => createMutation.mutate(values)}
+            isPending={createMutation.isPending}
+            trigger={<Button className="bg-emerald-600 hover:bg-emerald-700"><Plus className="w-4 h-4 mr-2" /> Nova conta</Button>}
+          />
+        </div>
       </div>
+
+      {connectToken && (
+        <PluggyConnect
+          connectToken={connectToken}
+          onSuccess={(data: { item: { id: string } }) => {
+            setConnectToken(null);
+            importarMutation.mutate(data.item.id);
+          }}
+          onError={(error: { message?: string }) => {
+            console.error("[open-finance] erro no widget Pluggy Connect", error);
+            setConnectToken(null);
+            toast.error(error?.message || "Erro na conexão com Open Finance");
+          }}
+          onClose={() => setConnectToken(null)}
+          onLoadError={(error: Error) => {
+            console.error("[open-finance] widget Pluggy Connect falhou ao carregar", error);
+            setConnectToken(null);
+            toast.error("Não consegui carregar o widget da Pluggy");
+          }}
+        />
+      )}
 
       {isLoading ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -193,13 +255,28 @@ export default function ContasPage() {
                   <div className="flex items-center gap-2 min-w-0">
                     <span className="w-3 h-3 rounded-full shrink-0" style={{ background: c.cor || "#10b981" }} />
                     <div className="min-w-0">
-                      <p className="font-semibold text-sm truncate">{c.nome}</p>
+                      <p className="font-semibold text-sm truncate flex items-center gap-1.5">
+                        {c.nome}
+                        {c.origem === "OPEN_FINANCE" && (
+                          <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-4">Open Finance</Badge>
+                        )}
+                      </p>
                       <p className="text-xs text-muted-foreground truncate">
                         {TIPO_LABELS[c.tipo] ?? c.tipo}{c.instituicao ? ` · ${c.instituicao}` : ""}
                       </p>
                     </div>
                   </div>
                   <div className="flex items-center gap-1 shrink-0">
+                    {c.origem === "OPEN_FINANCE" && (
+                      <Button
+                        variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground"
+                        title="Sincronizar agora"
+                        disabled={syncMutation.isPending}
+                        onClick={() => syncMutation.mutate(c.id)}
+                      >
+                        <RefreshCw className={`w-3.5 h-3.5 ${syncMutation.isPending && syncMutation.variables === c.id ? "animate-spin" : ""}`} />
+                      </Button>
+                    )}
                     <ContaFormDialog
                       title="Editar conta"
                       defaultValues={{ nome: c.nome, tipo: c.tipo, instituicao: c.instituicao ?? "", cor: c.cor ?? CORES[0] }}
@@ -217,7 +294,10 @@ export default function ContasPage() {
                   </div>
                 </div>
                 <p className={`text-2xl font-bold mt-4 tabular-nums ${c.saldo < 0 ? "text-red-500" : ""}`}>{formatCurrency(c.saldo)}</p>
-                <p className="text-xs text-muted-foreground mt-1">{c._count.lancamentos} lançamento{c._count.lancamentos !== 1 ? "s" : ""}</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {c._count.lancamentos} lançamento{c._count.lancamentos !== 1 ? "s" : ""}
+                  {c.origem === "OPEN_FINANCE" && c.ultimaSincronizacao && ` · sincronizado ${new Date(c.ultimaSincronizacao).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}`}
+                </p>
               </Card>
             ))}
             {ativas.length === 0 && (

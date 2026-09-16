@@ -11,6 +11,9 @@ const PUBLIC_PATHS = [
   // tem como enviar o cookie de sessão do app. Autenticado pelo próprio
   // hub.verify_token no handler, não pelo login de usuário.
   "/api/whatsapp/webhook",
+  // Mesma situação: a Pluggy chama direto, sem cookie de sessão. Autenticado
+  // pelo header x-webhook-secret conferido dentro do handler.
+  "/api/financeiro/open-finance/webhook",
 ];
 
 export async function middleware(request: NextRequest) {

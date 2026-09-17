@@ -82,6 +82,9 @@ export const carroUsoCombustivelSchema = z.object({
 export const carroUsoChegadaSchema = z.object({
   kmChegada: z.number().int("Quilometragem inválida").nonnegative(),
   observacoes: z.string().max(300).optional().nullable(),
+  // Quem registra costuma chegar depois do funcionário — sem isso, o carimbo
+  // ficaria sempre com o horário do registro em vez do da chegada de verdade.
+  chegadaEm: z.string().optional(),
 });
 
 // Corrigir um registro de uso já existente — todos os campos são opcionais,

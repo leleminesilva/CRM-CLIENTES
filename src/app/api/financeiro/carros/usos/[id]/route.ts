@@ -96,6 +96,12 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     return NextResponse.json({ error: `Km de chegada não pode ser menor que a de saída (${kmSaidaFinal} km)` }, { status: 400 });
   }
 
+  const saidaEmFinal = (data.saidaEm as Date | undefined) ?? atual.saidaEm;
+  const chegadaEmFinal = "chegadaEm" in data ? (data.chegadaEm as Date | null) : atual.chegadaEm;
+  if (chegadaEmFinal != null && chegadaEmFinal.getTime() < saidaEmFinal.getTime()) {
+    return NextResponse.json({ error: "Horário de chegada não pode ser antes da saída" }, { status: 400 });
+  }
+
   if (Object.keys(data).length === 0) {
     return NextResponse.json({ data: atual });
   }
@@ -132,7 +138,10 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
     return NextResponse.json({ error: `Quilometragem de chegada não pode ser menor que a de saída (${uso.kmSaida} km)` }, { status: 400 });
   }
 
-  const chegadaEm = new Date();
+  const chegadaEm = parsed.data.chegadaEm ? new Date(parsed.data.chegadaEm) : new Date();
+  if (chegadaEm.getTime() < uso.saidaEm.getTime()) {
+    return NextResponse.json({ error: "Horário de chegada não pode ser antes da saída" }, { status: 400 });
+  }
   const atualizado = await prisma.financeiroCarroUso.update({
     where: { id: params.id },
     data: {

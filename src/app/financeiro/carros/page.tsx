@@ -376,10 +376,21 @@ function ChegadaDialog({ carro }: { carro: Carro }) {
   const [open, setOpen] = useState(false);
   const [km, setKm] = useState("");
   const [obs, setObs] = useState("");
+  const [chegadaEmInput, setChegadaEmInput] = useState(() => toDatetimeLocalValue(new Date()));
   const uso = carro.usoAtual!;
 
+  // Sempre que o diálogo abre, começa com "agora" — mas quem registra pode
+  // voltar pro horário real em que o carro chegou (ela chega depois do carro).
+  useEffect(() => {
+    if (open) setChegadaEmInput(toDatetimeLocalValue(new Date()));
+  }, [open]);
+
   const mutation = useMutation({
-    mutationFn: () => axios.put(`/api/financeiro/carros/usos/${uso.id}`, { kmChegada: Number(km), observacoes: obs || undefined }),
+    mutationFn: () => axios.put(`/api/financeiro/carros/usos/${uso.id}`, {
+      kmChegada: Number(km),
+      chegadaEm: chegadaEmInput ? new Date(chegadaEmInput).toISOString() : undefined,
+      observacoes: obs || undefined,
+    }),
     onSuccess: () => {
       const rodados = Number(km) - uso.kmSaida;
       toast.success(`Chegada registrada — ${rodados} km rodados`);
@@ -402,6 +413,10 @@ function ChegadaDialog({ carro }: { carro: Carro }) {
             Saiu com <strong>{uso.motorista.nome}</strong> às {formatDateTime(uso.saidaEm)}, km {uso.kmSaida}.
           </p>
           <div className="space-y-1.5">
+            <Label className="text-xs">Horário de chegada *</Label>
+            <Input type="datetime-local" value={chegadaEmInput} onChange={(e) => setChegadaEmInput(e.target.value)} />
+          </div>
+          <div className="space-y-1.5">
             <Label className="text-xs">Quilometragem de chegada *</Label>
             <Input inputMode="numeric" value={km} onChange={(e) => setKm(e.target.value)} placeholder={`Mín. ${uso.kmSaida} km`} />
           </div>
@@ -409,7 +424,7 @@ function ChegadaDialog({ carro }: { carro: Carro }) {
             <Label className="text-xs">Observações</Label>
             <Textarea value={obs} onChange={(e) => setObs(e.target.value)} rows={2} placeholder="Opcional" />
           </div>
-          <Button className="w-full" disabled={!km || mutation.isPending} onClick={() => mutation.mutate()}>
+          <Button className="w-full" disabled={!km || !chegadaEmInput || mutation.isPending} onClick={() => mutation.mutate()}>
             {mutation.isPending ? "Registrando..." : "Confirmar chegada"}
           </Button>
         </div>

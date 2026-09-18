@@ -162,18 +162,22 @@ export async function POST(request: NextRequest) {
     });
 
     // Automação: cliente cadastrado com WhatsApp → abre a conversa e roda as
-    // regras (ex: mensagem de boas-vindas). Não bloqueia a resposta.
+    // regras (ex: mensagem de boas-vindas). Aguarda de propósito: em função
+    // serverless, disparar sem await e responder na sequência arrisca o
+    // runtime congelar a execução antes da automação terminar (intermitente,
+    // sem padrão) — já causou boas-vindas não enviadas em ~40% dos cadastros.
     if (cliente.whatsapp) {
-      import("@/lib/whatsapp/automacoes")
-        .then((m) =>
-          m.executarAutomacoesClienteCadastrado({
-            id: cliente.id,
-            nome: cliente.nome,
-            whatsapp: cliente.whatsapp,
-            responsavelId: cliente.responsavelId,
-          }),
-        )
-        .catch((err) => console.error("automação cliente cadastrado:", err));
+      try {
+        const m = await import("@/lib/whatsapp/automacoes");
+        await m.executarAutomacoesClienteCadastrado({
+          id: cliente.id,
+          nome: cliente.nome,
+          whatsapp: cliente.whatsapp,
+          responsavelId: cliente.responsavelId,
+        });
+      } catch (err) {
+        console.error("automação cliente cadastrado:", err);
+      }
     }
 
     return NextResponse.json({ data: cliente }, { status: 201 });

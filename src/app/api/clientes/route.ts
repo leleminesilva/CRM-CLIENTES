@@ -98,7 +98,7 @@ export async function GET(request: NextRequest) {
             where: { deletedAt: null },
             orderBy: { createdAt: "desc" },
             take: 1,
-            select: { estagio: true },
+            select: { id: true, estagio: true },
           },
         },
         orderBy: sort === "createdAt_asc"

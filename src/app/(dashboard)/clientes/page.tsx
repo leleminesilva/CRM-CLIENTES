@@ -22,6 +22,9 @@ import {
   ArrowUp,
   ArrowDown,
   ArrowUpDown,
+  ArrowRight,
+  ThumbsUp,
+  ThumbsDown,
   SlidersHorizontal,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -66,7 +69,8 @@ import {
 import { ORIGEM_LABELS } from "@/lib/utils/formatters";
 import { cn } from "@/lib/utils/cn";
 import { SERVICOS } from "@/lib/constants";
-import type { Cliente } from "@/types";
+import type { Cliente, EstagioLead } from "@/types";
+import { proximaEtapaPipeline, usePipelineActions, type PipelineCtx } from "@/components/clientes/pipeline-actions";
 
 const TEMP_CONFIG: Record<string, { label: string; color: string; icon: string }> = {
   QUENTE: { label: "Quente", color: "text-red-400",    icon: "🔥" },
@@ -215,6 +219,10 @@ export default function ClientesPage() {
     },
     onError: () => toast.error("Erro ao remover cliente"),
   });
+
+  // Instância única (não por linha) das ações rápidas de etapa do "...", usada
+  // tanto na tabela quanto nos cards mobile.
+  const pipeline = usePipelineActions({ onUpdate: () => qc.invalidateQueries({ queryKey: ["clientes"] }) });
 
   const ESTAGIO_ORDER: Record<string, number> = {
     REENGAJAR: -1,
@@ -375,27 +383,62 @@ export default function ClientesPage() {
     );
   }
 
-  const ActionMenu = ({ c }: { c: Cliente }) => (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" className="h-8 w-8">
-          <MoreHorizontal className="w-4 h-4" />
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
-        <DropdownMenuItem asChild>
-          <Link href={`/clientes/${c.id}`}><Eye className="w-4 h-4 mr-2" />Visualizar</Link>
-        </DropdownMenuItem>
-        <DropdownMenuItem asChild>
-          <Link href={`/clientes/${c.id}/editar`}><Edit className="w-4 h-4 mr-2" />Editar</Link>
-        </DropdownMenuItem>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => setDeleteId(c.id)}>
-          <Trash2 className="w-4 h-4 mr-2" />Remover
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
-  );
+  const ActionMenu = ({ c }: { c: Cliente }) => {
+    const lead = (c as unknown as { leads?: { id: string; estagio: string }[] }).leads?.[0];
+    const estagioAtual = (lead?.estagio as EstagioLead) ?? "NOVO_LEAD";
+    const ctx: PipelineCtx = {
+      leadId: lead?.id ?? null,
+      clienteId: c.id,
+      clienteNome: c.nome,
+      estagioAtual,
+      numeroOrcamentoAtual: c.numeroOrcamento,
+    };
+    const proxima = proximaEtapaPipeline(estagioAtual);
+
+    return (
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="ghost" size="icon" className="h-8 w-8">
+            <MoreHorizontal className="w-4 h-4" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <DropdownMenuItem asChild>
+            <Link href={`/clientes/${c.id}`}><Eye className="w-4 h-4 mr-2" />Visualizar</Link>
+          </DropdownMenuItem>
+          <DropdownMenuItem asChild>
+            <Link href={`/clientes/${c.id}/editar`}><Edit className="w-4 h-4 mr-2" />Editar</Link>
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem
+            disabled={!proxima || pipeline.isPending}
+            onClick={() => proxima && pipeline.abrirEtapa(ctx, proxima.estagio)}
+          >
+            <ArrowRight className="w-4 h-4 mr-2" />
+            {proxima ? `Próximo passo: ${proxima.label}` : "Próximo passo"}
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            className="text-emerald-600 focus:text-emerald-600"
+            disabled={pipeline.isPending}
+            onClick={() => pipeline.abrirConfirmar(ctx)}
+          >
+            <ThumbsUp className="w-4 h-4 mr-2" />Confirmado
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            className="text-red-600 focus:text-red-600"
+            disabled={pipeline.isPending}
+            onClick={() => pipeline.abrirCancelar(ctx)}
+          >
+            <ThumbsDown className="w-4 h-4 mr-2" />Cancelar
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => setDeleteId(c.id)}>
+            <Trash2 className="w-4 h-4 mr-2" />Remover
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    );
+  };
 
   return (
     <div className="space-y-4 md:space-y-6 animate-fade-in">
@@ -774,6 +817,8 @@ export default function ClientesPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {pipeline.dialogs}
     </div>
   );
 }

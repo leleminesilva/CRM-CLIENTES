@@ -5,11 +5,9 @@ import { useSearchParams, useRouter } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
 import {
-  DndContext, closestCenter, PointerSensor, useSensor, useSensors,
-  useDroppable, type DragEndEvent,
+  DndContext, DragOverlay, closestCenter, pointerWithin, PointerSensor, useSensor, useSensors,
+  useDroppable, useDraggable, type CollisionDetection, type DragEndEvent, type DragStartEvent,
 } from "@dnd-kit/core";
-import { useSortable, SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
-import { CSS } from "@dnd-kit/utilities";
 import { format, isToday, isYesterday } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import {
@@ -1948,23 +1946,23 @@ function PainelConfig({
 
 // ── Quadro (kanban de atendimento) ───────────────────────────────────────
 
-function KanbanCard({ c, onAbrir }: { c: Conversa; onAbrir: (c: Conversa) => void }) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+function KanbanCard({ c, onAbrir, overlay }: { c: Conversa; onAbrir: (c: Conversa) => void; overlay?: boolean }) {
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: c.id,
     data: { etapa: (c.etapa ?? "NOVA") as EtapaQuadro },
   });
   const lastMsg = c.mensagens?.[0];
   return (
     <div
-      ref={setNodeRef}
-      style={{ transform: CSS.Translate.toString(transform), transition }}
+      ref={overlay ? undefined : setNodeRef}
       className={cn(
         "rounded-lg border border-border bg-card p-2.5 text-left cursor-grab active:cursor-grabbing",
-        isDragging && "opacity-50"
+        isDragging && !overlay && "opacity-40",
+        overlay && "shadow-lg rotate-1 cursor-grabbing"
       )}
-      {...attributes}
-      {...listeners}
-      onClick={() => !isDragging && onAbrir(c)}
+      {...(overlay ? {} : attributes)}
+      {...(overlay ? {} : listeners)}
+      onClick={() => !isDragging && !overlay && onAbrir(c)}
     >
       <div className="flex items-start gap-2">
         <AvatarWA fotoUrl={c.fotoUrl} nome={c.contatoNome} phone={c.contatoPhone} grupo={c.isGrupo} className="w-5 h-5 text-[8px]" iconClass="w-3 h-3" />
@@ -2014,11 +2012,9 @@ function KanbanColuna({
         ref={setNodeRef}
         className={cn("flex-1 overflow-y-auto p-2 flex flex-col gap-2 min-h-[60px]", isOver && "bg-green-500/5")}
       >
-        <SortableContext items={conversas.map((c) => c.id)} strategy={verticalListSortingStrategy}>
-          {conversas.map((c) => (
-            <KanbanCard key={c.id} c={c} onAbrir={onAbrir} />
-          ))}
-        </SortableContext>
+        {conversas.map((c) => (
+          <KanbanCard key={c.id} c={c} onAbrir={onAbrir} />
+        ))}
       </div>
     </div>
   );
@@ -2082,6 +2078,7 @@ function QuadroKanban({
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
   const [agrupar, setAgrupar] = useState<AgrupamentoQuadro>("etapa");
   const [modalEtapas, setModalEtapas] = useState(false);
+  const [activeId, setActiveId] = useState<string | null>(null);
 
   const etapasQuery = useEtapas(sessaoId);
   const etapasTodas = etapasQuery.data?.etapas ?? ETAPAS_FALLBACK;
@@ -2140,6 +2137,15 @@ function QuadroKanban({
   };
   const porEtapa = (e: EtapaQuadro) => conversas.filter((c) => etapaDe(c) === e);
   const naoAtribuidas = conversas.filter((c) => !c.responsavelId).length;
+  const activeConversa = conversas.find((c) => c.id === activeId) ?? null;
+
+  // Prioriza a coluna sob o ponteiro (pointerWithin) e só cai pro "mais próximo"
+  // quando o ponteiro está num vão entre colunas — evita o card cair na coluna
+  // vizinha (anterior/posterior) em vez da que o mouse está apontando.
+  const collisionDetection: CollisionDetection = (args) => {
+    const porPonteiro = pointerWithin(args);
+    return porPonteiro.length > 0 ? porPonteiro : closestCenter(args);
+  };
 
   // Colunas dinâmicas para agrupamentos que não são "etapa"
   const CORES_COL = ["bg-blue-500", "bg-green-500", "bg-amber-500", "bg-purple-500", "bg-rose-500", "bg-cyan-500", "bg-slate-400"];
@@ -2174,7 +2180,12 @@ function QuadroKanban({
       }));
   })();
 
+  function onDragStart(evt: DragStartEvent) {
+    setActiveId(evt.active.id as string);
+  }
+
   function onDragEnd(evt: DragEndEvent) {
+    setActiveId(null);
     const { active, over } = evt;
     if (!over) return;
     const de = (active.data.current as { etapa?: EtapaQuadro })?.etapa;
@@ -2235,7 +2246,12 @@ function QuadroKanban({
         </div>
       )}
       {agrupar === "etapa" ? (
-        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
+        <DndContext
+          sensors={sensors}
+          collisionDetection={collisionDetection}
+          onDragStart={onDragStart}
+          onDragEnd={onDragEnd}
+        >
           <div className="flex-1 flex gap-3 overflow-x-auto pb-2">
             {etapas.map((col) => (
               <KanbanColuna
@@ -2248,6 +2264,9 @@ function QuadroKanban({
               />
             ))}
           </div>
+          <DragOverlay>
+            {activeConversa && <KanbanCard c={activeConversa} onAbrir={onAbrir} overlay />}
+          </DragOverlay>
         </DndContext>
       ) : (
         <div className="flex-1 flex gap-3 overflow-x-auto pb-2">

@@ -104,3 +104,16 @@ export interface IWhatsAppProvider {
     limite: number
   ): Promise<NormalizedMessage[]>;
 }
+
+/**
+ * O gateway recusou o anexo por tamanho (HTTP 413). Na VPS da Evolution o
+ * Nginx usa o limite padrão de 1 MB de corpo, e o arquivo vai em base64 no
+ * JSON — na prática, anexos acima de ~700 KB. Subir `client_max_body_size`
+ * no Nginx da VPS libera arquivos maiores sem mudar código.
+ */
+export class ArquivoGrandeDemaisError extends Error {
+  constructor() {
+    super("Arquivo grande demais para enviar pelo CRM. Envie pelo celular.");
+    this.name = "ArquivoGrandeDemaisError";
+  }
+}

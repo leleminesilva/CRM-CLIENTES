@@ -1,7 +1,6 @@
 import prisma from "@/lib/prisma";
 import type { WhatsAppConversa, WhatsAppSessao, WhatsAppMensagemStatus } from "@prisma/client";
 import { getProvider } from "./providers";
-import { signedUrlMedia } from "./media";
 
 type ConversaComSessao = WhatsAppConversa & { sessao: WhatsAppSessao };
 
@@ -46,34 +45,32 @@ export async function sendWhatsAppMessage(conversa: ConversaComSessao, mensagem:
 }
 
 /**
- * Envia um anexo (imagem/vídeo/áudio/documento) já presente no bucket privado
- * whatsapp-media — gera uma URL assinada de curta duração só pra o gateway
- * buscar e entregar; o que fica salvo no banco é sempre o caminho no Storage,
- * nunca uma URL. Ver src/lib/whatsapp/media.ts e docs/architecture/whatsapp.md.
+ * Envia um anexo (imagem/vídeo/áudio/documento) mandando o conteúdo em base64
+ * direto pro gateway. O arquivo NÃO é guardado no Storage (a cota do plano
+ * Free do Supabase estourou em set/2026): no CRM fica só o registro de que
+ * foi enviado um anexo. Documento sem legenda guarda o nome do arquivo.
  */
 export async function sendWhatsAppMedia(
   conversa: ConversaComSessao,
   payload: {
     tipo: "imagem" | "video" | "audio" | "documento";
-    path: string;
+    base64: string;
     mimeType: string;
     legenda?: string;
     filename?: string;
   }
 ) {
   const provider = getProvider(conversa.sessao.provider);
-  const urlEnvio = await signedUrlMedia(payload.path, "envio");
 
   const { providerMessageId } = await provider.sendMessage(conversa.sessao.providerSessionId, conversa.contatoPhone, {
     tipo: payload.tipo,
-    media: { url: urlEnvio, mimeType: payload.mimeType, filename: payload.filename },
+    media: { base64: payload.base64, mimeType: payload.mimeType, filename: payload.filename },
     legenda: payload.legenda,
   });
 
   return persistirEnvio(conversa, {
     providerMessageId,
     tipo: payload.tipo,
-    conteudo: payload.legenda ?? "",
-    mediaUrl: payload.path,
+    conteudo: payload.legenda || (payload.tipo === "documento" ? payload.filename ?? "" : ""),
   });
 }

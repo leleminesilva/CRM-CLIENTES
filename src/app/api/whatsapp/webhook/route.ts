@@ -117,9 +117,12 @@ export async function POST(request: NextRequest) {
         : null;
       if (!sessao) continue;
 
+      // Mídia NÃO é baixada nem guardada: o CRM só registra que chegou uma
+      // foto/vídeo/áudio/documento e o atendente abre no celular. Guardar tudo
+      // estourou a cota de 1 GB do Storage do Supabase (plano Free) em set/2026.
       const res = await ingerirMensagem(sessao.id, msg, provider, instanceName!, {
         contaNaoLidas: true,
-        baixarMidia: true,
+        baixarMidia: false,
       });
       if (!res) continue; // duplicata, evento vazio, ou eco de envio pelo CRM
 

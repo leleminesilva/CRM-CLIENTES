@@ -3,7 +3,8 @@ import { getCurrentUser } from "@/lib/auth";
 import { hasPermission, isAdmin } from "@/lib/rbac";
 import prisma from "@/lib/prisma";
 import { sendWhatsAppMessage, sendWhatsAppMedia } from "@/lib/whatsapp/send";
-import { uploadMedia, caminhoMedia, tipoDoMime } from "@/lib/whatsapp/media";
+import { tipoDoMime } from "@/lib/whatsapp/media";
+import { ArquivoGrandeDemaisError } from "@/lib/whatsapp/providers/types";
 
 export const dynamic = "force-dynamic";
 
@@ -37,14 +38,13 @@ export async function POST(request: NextRequest) {
 
   try {
     if (file) {
+      // O arquivo vai direto pro WhatsApp e não fica guardado no Storage.
       const mimeType = file.type || "application/octet-stream";
-      const path = caminhoMedia(conversa.sessaoId, conversa.id, mimeType, file.name);
-      const buffer = Buffer.from(await file.arrayBuffer());
-      await uploadMedia(path, buffer, mimeType);
+      const base64 = Buffer.from(await file.arrayBuffer()).toString("base64");
 
       const novaMensagem = await sendWhatsAppMedia(conversa, {
         tipo: tipoDoMime(mimeType),
-        path,
+        base64,
         mimeType,
         legenda: mensagem,
         filename: file.name,
@@ -55,6 +55,9 @@ export async function POST(request: NextRequest) {
     const novaMensagem = await sendWhatsAppMessage(conversa, mensagem!);
     return NextResponse.json(novaMensagem, { status: 201 });
   } catch (err) {
+    if (err instanceof ArquivoGrandeDemaisError) {
+      return NextResponse.json({ error: err.message }, { status: 413 });
+    }
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Erro ao enviar mensagem" },
       { status: 502 }

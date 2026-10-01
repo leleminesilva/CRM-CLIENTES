@@ -2,8 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
 import { hasPermission, isAdmin } from "@/lib/rbac";
 import prisma from "@/lib/prisma";
-import { signedUrlMedia } from "@/lib/whatsapp/media";
-import { waLogger } from "@/lib/whatsapp/logger";
 import { emit } from "@/lib/whatsapp/events";
 import type { WhatsAppConversaStatus } from "@prisma/client";
 
@@ -125,20 +123,11 @@ export async function GET(
     prisma.whatsAppMensagem.count({ where: { conversaId: params.id } }),
   ]);
 
-  // mediaUrl no banco é um caminho no bucket privado, não uma URL — vira URL
-  // assinada (curta duração) só na hora de servir ao frontend. Ver
-  // src/lib/whatsapp/media.ts e docs/architecture/whatsapp.md.
-  const mensagens = await Promise.all(
-    mensagensRaw.map(async (m) => {
-      if (!m.mediaUrl) return m;
-      try {
-        return { ...m, mediaUrl: await signedUrlMedia(m.mediaUrl, "leitura") };
-      } catch (err) {
-        waLogger.error("falha ao assinar URL de mídia", { erro: err, conversationId: params.id });
-        return { ...m, mediaUrl: null };
-      }
-    })
-  );
+  // Mídias não são mais exibidas no CRM (só o aviso "Foto", "Vídeo" etc.).
+  // Mensagens antigas ainda têm o caminho no Storage em mediaUrl, mas ele não
+  // é mais assinado nem enviado ao frontend — os arquivos vão ser apagados do
+  // bucket para voltar à cota do plano Free.
+  const mensagens = mensagensRaw.map((m) => ({ ...m, mediaUrl: null }));
 
   // Zera contador de não lidas ao abrir a conversa
   await prisma.whatsAppConversa.update({

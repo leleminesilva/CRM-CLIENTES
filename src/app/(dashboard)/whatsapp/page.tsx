@@ -17,7 +17,7 @@ import {
   Paperclip, FileText, X as XIcon, Download, UserRound, ExternalLink, Sparkles,
   Zap, Clock, ArrowRight, Activity, Inbox, CreditCard, StickyNote,
   Users, PanelRightClose, PanelRight, Pencil, Settings, ChevronUp, ChevronDown,
-  Eye, Lock,
+  Eye, Lock, Camera, Video, Mic,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -613,46 +613,30 @@ function ListaConversas({
 
 // ── Área do chat ───────────────────────────────────────────────────────────
 
-const LABEL_MIDIA: Record<string, string> = {
-  imagem: "Foto",
-  video: "Vídeo",
-  audio: "Áudio",
-  documento: "Documento",
+// Mídias não são baixadas nem exibidas no CRM (o Storage do plano Free do
+// Supabase só comporta 1 GB): a bolha só avisa que chegou/foi enviado um
+// anexo, e o atendente abre no celular.
+const MIDIA_INFO: Record<string, { label: string; Icone: typeof Camera }> = {
+  imagem: { label: "Foto", Icone: Camera },
+  video: { label: "Vídeo", Icone: Video },
+  audio: { label: "Áudio", Icone: Mic },
+  documento: { label: "Documento", Icone: FileText },
 };
 
 function BolhaMedia({ msg }: { msg: Mensagem }) {
-  if (!msg.mediaUrl) {
-    if (LABEL_MIDIA[msg.tipo]) {
-      return (
-        <div className="flex items-center gap-2 bg-black/5 dark:bg-white/5 rounded-lg px-3 py-2 mb-1.5 text-sm text-muted-foreground">
-          <Paperclip className="w-4 h-4 shrink-0" />
-          <span>{LABEL_MIDIA[msg.tipo]} (não recuperado)</span>
-        </div>
-      );
-    }
-    return null;
-  }
-  if (msg.tipo === "imagem") {
-    // eslint-disable-next-line @next/next/no-img-element
-    return <img src={msg.mediaUrl} alt={msg.conteudo || "Imagem"} className="rounded-lg max-w-full max-h-64 mb-1.5" />;
-  }
-  if (msg.tipo === "video") {
-    return <video src={msg.mediaUrl} controls className="rounded-lg max-w-full max-h-64 mb-1.5" />;
-  }
-  if (msg.tipo === "audio") {
-    return <audio src={msg.mediaUrl} controls className="mb-1.5 max-w-full" />;
-  }
+  const info = MIDIA_INFO[msg.tipo];
+  if (!info) return null;
+  const { label, Icone } = info;
+  // Documento guarda o nome do arquivo em `conteudo` (a legenda não é exibida à parte).
+  const nomeDocumento = msg.tipo === "documento" ? msg.conteudo?.trim() : "";
   return (
-    <a
-      href={msg.mediaUrl}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="flex items-center gap-2 bg-black/5 dark:bg-white/5 rounded-lg px-3 py-2 mb-1.5 hover:bg-black/10 dark:hover:bg-white/10 transition-colors"
-    >
-      <FileText className="w-5 h-5 shrink-0" />
-      <span className="text-sm truncate">{msg.conteudo || "Documento"}</span>
-      <Download className="w-4 h-4 shrink-0 ml-auto opacity-60" />
-    </a>
+    <div className="flex items-center gap-2 bg-black/5 dark:bg-white/5 rounded-lg px-3 py-2 mb-1.5 text-sm">
+      <Icone className="w-4 h-4 shrink-0 opacity-70" />
+      <div className="min-w-0">
+        <p className="font-medium truncate">{nomeDocumento ? `${label}: ${nomeDocumento}` : label}</p>
+        <p className="text-[11px] opacity-60">Abra no celular para ver</p>
+      </div>
+    </div>
   );
 }
 

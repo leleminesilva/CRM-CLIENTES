@@ -98,7 +98,8 @@ export async function ingerirMensagem(
         providerMessageId: msg.providerMessageId,
         direcao: fromMe ? "saida" : "entrada",
         tipo: msg.tipo,
-        conteudo: msg.conteudo ?? "",
+        // Documento sem legenda: guarda o nome do arquivo, já que o arquivo em si não fica salvo.
+        conteudo: msg.conteudo ?? (msg.tipo === "documento" ? msg.media?.filename : undefined) ?? "",
         remetenteNome: msg.remetenteNome ?? null,
         remetentePhone: msg.remetentePhone ?? null,
         mediaUrl: mediaPath,

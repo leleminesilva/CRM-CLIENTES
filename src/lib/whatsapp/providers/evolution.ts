@@ -7,6 +7,7 @@ import type {
   NormalizedMessage,
   NormalizedWebhookEvent,
 } from "./types";
+import { ArquivoGrandeDemaisError } from "./types";
 import type { WhatsAppSessaoStatus } from "@prisma/client";
 
 // Implementação concreta contra a Evolution API (https://github.com/EvolutionAPI/evolution-api).
@@ -19,6 +20,14 @@ const TIMEOUT_MS = 15_000;
 const MAX_RETRIES = 3;
 
 type TipoMensagem = "texto" | "imagem" | "video" | "audio" | "documento";
+
+// O sendMedia da Evolution valida "mediatype" contra os nomes em inglês.
+const MEDIATYPE_EVOLUTION: Record<Exclude<TipoMensagem, "texto">, string> = {
+  imagem: "image",
+  video: "video",
+  audio: "audio",
+  documento: "document",
+};
 
 // Mídia no WhatsApp é criptografada ponta a ponta — o campo "url" bruto do
 // Baileys aponta pra um blob cifrado no CDN da Meta, sem uso direto. A
@@ -214,13 +223,15 @@ export class EvolutionProvider implements IWhatsAppProvider {
         ? { number: toPhone, text: payload.conteudo }
         : {
             number: toPhone,
-            mediatype: payload.tipo,
+            mediatype: MEDIATYPE_EVOLUTION[payload.tipo],
+            mimetype: payload.media.mimeType,
             media: payload.media.url ?? payload.media.base64,
             caption: payload.legenda,
             fileName: payload.media.filename,
           };
 
     const res = await chamarComRetry(path, { method: "POST", body: JSON.stringify(body) });
+    if (res.status === 413) throw new ArquivoGrandeDemaisError();
     if (!res.ok) throw new Error(`Erro ao enviar mensagem via Evolution API: ${res.status}`);
     const data = await res.json();
     const providerMessageId = data.key?.id ?? data.messageId;

@@ -127,7 +127,7 @@ function KanbanCard({ lead, overlay }: { lead: Lead; overlay?: boolean }) {
       onClick={handleClick}
       className={`bg-card border rounded-lg p-3 cursor-grab active:cursor-grabbing shadow-sm hover:shadow-md transition-shadow ${
         overlay ? "shadow-lg rotate-1" : ""
-      } ${lead.clienteId && !overlay ? "hover:border-indigo-400 dark:hover:border-indigo-600" : ""}`}
+      } ${lead.clienteId && !overlay ? "hover:border-primary" : ""}`}
     >
       <div className="flex items-start justify-between gap-2">
         <p className="font-medium text-sm leading-tight">{lead.titulo}</p>
@@ -144,8 +144,8 @@ function KanbanCard({ lead, overlay }: { lead: Lead; overlay?: boolean }) {
       <div className="flex items-center justify-between mt-3">
         {lead.responsavel ? (
           <div className="flex items-center gap-1.5">
-            <div className="w-5 h-5 bg-indigo-100 dark:bg-indigo-900 rounded-full flex items-center justify-center">
-              <User2 className="w-3 h-3 text-indigo-600" />
+            <div className="w-5 h-5 bg-muted rounded-full flex items-center justify-center">
+              <User2 className="w-3 h-3 text-primary" />
             </div>
             <span className="text-xs text-muted-foreground">{lead.responsavel.nome.split(" ")[0]}</span>
           </div>
@@ -232,7 +232,7 @@ function NovoLeadDialog({ estagio, onSuccess }: { estagio: EstagioLead; onSucces
           <div className="flex justify-end gap-2">
             <Button variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
             <Button
-              className="bg-indigo-600 hover:bg-indigo-700"
+              className="bg-primary hover:bg-primary/90"
               onClick={() => mutation.mutate()}
               disabled={!titulo || mutation.isPending}
             >
@@ -362,7 +362,7 @@ export default function LeadsKanbanPage() {
             {temFiltroData && " (filtrado por data)"}
           </p>
         </div>
-        <Button className="bg-indigo-600 hover:bg-indigo-700">
+        <Button className="bg-primary hover:bg-primary/90">
           <Plus className="w-4 h-4 mr-2" />
           Novo Lead
         </Button>

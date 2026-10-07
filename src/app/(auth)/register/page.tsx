@@ -38,7 +38,7 @@ export default function RegisterPage() {
       <div className="w-full max-w-md">
         <div className="bg-card border rounded-2xl shadow-xl p-8 space-y-6">
           <div className="text-center">
-            <div className="w-12 h-12 bg-indigo-600 rounded-xl flex items-center justify-center mx-auto mb-4">
+            <div className="w-12 h-12 bg-primary rounded-xl flex items-center justify-center mx-auto mb-4">
               <UserPlus className="w-6 h-6 text-white" />
             </div>
             <h1 className="text-2xl font-bold">Criar Conta</h1>
@@ -101,14 +101,14 @@ export default function RegisterPage() {
               </Select>
             </div>
 
-            <Button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-700" disabled={loading}>
+            <Button type="submit" className="w-full bg-primary hover:bg-primary/90" disabled={loading}>
               {loading ? "Criando..." : "Criar Conta"}
             </Button>
           </form>
 
           <p className="text-center text-sm text-muted-foreground">
             Já tem conta?{" "}
-            <Link href="/login" className="text-indigo-600 hover:underline font-medium">Entrar</Link>
+            <Link href="/login" className="text-primary hover:underline font-medium">Entrar</Link>
           </p>
         </div>
       </div>

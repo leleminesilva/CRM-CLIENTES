@@ -1,11 +1,20 @@
 import type { Config } from "tailwindcss";
 
+// Cor vinda de variável CSS em hex que aceita modificador de opacidade (bg-ink/10).
+// O Tailwind 3 aceita cor como função, mas o tipo `Config` só prevê string: daí o cast.
+const token = (name: string) =>
+  (({ opacityValue }: { opacityValue?: string }) =>
+    opacityValue === undefined
+      ? `var(--${name})`
+      : `color-mix(in srgb, var(--${name}) calc(${opacityValue} * 100%), transparent)`) as unknown as string;
+
 const config: Config = {
   darkMode: ["class"],
   content: [
     "./src/pages/**/*.{js,ts,jsx,tsx,mdx}",
     "./src/components/**/*.{js,ts,jsx,tsx,mdx}",
     "./src/app/**/*.{js,ts,jsx,tsx,mdx}",
+    "./src/fin/**/*.{js,ts,jsx,tsx,mdx}",
   ],
   theme: {
     container: {
@@ -15,6 +24,26 @@ const config: Config = {
     },
     extend: {
       colors: {
+        // Tokens nomeados do Financeiro novo (hex em globals.css). Função com color-mix para que
+        // a transparência (`bg-ink/10`) funcione no Tailwind 3, como no Tailwind 4 do sistema original.
+        page: token("page"),
+        surface: { DEFAULT: token("surface"), raised: token("surface-raised"), sunken: token("surface-sunken") },
+        ink: { DEFAULT: token("ink"), 2: token("ink-2"), 3: token("ink-3") },
+        line: { DEFAULT: token("line"), strong: token("line-strong") },
+        positive: token("positive"),
+        critical: token("critical"),
+        "warning-text": token("warning-text"),
+        "on-ink": token("on-ink"),
+        series: {
+          income: token("series-income"),
+          expense: token("series-expense"),
+          commission: token("series-commission"),
+          variable: token("series-variable"),
+          extra: token("series-extra"),
+          other: token("series-other"),
+        },
+        // Status: fixos, sempre acompanhados de ícone e texto
+        status: { good: "#0ca30c", warning: "#fab219", serious: "#ec835a", critical: "#d03b3b" },
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",
@@ -60,9 +89,26 @@ const config: Config = {
         lg: "var(--radius)",
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",
+        // Design system do Financeiro novo
+        control: "6px",
+        card: "10px",
+        dialog: "14px",
       },
+      boxShadow: {
+        float: "var(--shadow-float)",
+      },
+      // O Tailwind 4 aceita qualquer opacidade inteira (bg-ink/88); o 3 só a escala de 5 em 5.
+      opacity: Object.fromEntries(Array.from({ length: 101 }, (_, n) => [String(n), String(n / 100)])),
+      // Campos com erro (aria-invalid="true"), variante nativa do Tailwind 4.
+      aria: { invalid: 'invalid="true"' },
+      transitionTimingFunction: {
+        standard: "cubic-bezier(0.2, 0, 0, 1)",
+      },
+      // Durações do design system com nome: `duration-[120ms]` fica ambíguo no Tailwind 3
+      // (o tailwindcss-animate também registra `duration-*`) e não gera CSS.
+      transitionDuration: { 120: "120ms", 280: "280ms" },
       fontFamily: {
-        sans: ["Inter", "system-ui", "sans-serif"],
+        sans: ["var(--font-archivo)", "Archivo", "system-ui", "sans-serif"],
       },
       keyframes: {
         "accordion-down": {

@@ -130,7 +130,7 @@ export default function AlertaPage() {
         <Card className="lg:col-span-1 h-fit">
           <CardHeader>
             <CardTitle className="text-lg flex items-center gap-2">
-              <Megaphone className="w-5 h-5 text-indigo-500" />
+              <Megaphone className="w-5 h-5 text-primary" />
               Novo Alerta
             </CardTitle>
             <CardDescription>
@@ -182,7 +182,7 @@ export default function AlertaPage() {
 
               <Button
                 type="submit"
-                className="w-full bg-indigo-600 hover:bg-indigo-700"
+                className="w-full bg-primary hover:bg-primary/90"
                 disabled={createMutation.isPending}
               >
                 {createMutation.isPending ? "Disparando..." : "Disparar Alerta"}
@@ -195,7 +195,7 @@ export default function AlertaPage() {
         <Card className="lg:col-span-2">
           <CardHeader>
             <CardTitle className="text-lg flex items-center gap-2">
-              <Bell className="w-5 h-5 text-indigo-500" />
+              <Bell className="w-5 h-5 text-primary" />
               Histórico de Alertas Enviados
             </CardTitle>
             <CardDescription>

@@ -39,3 +39,9 @@ prisma/.env
 next-env.d.ts
 
 # Prisma
+
+# Anexos do Financeiro em desenvolvimento
+/storage/
+
+# Capturas e logs dos testes de navegador (Playwright MCP)
+/.playwright-mcp/

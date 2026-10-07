@@ -246,7 +246,7 @@ function FormGestor({ cliente, usuarios, onSuccess, userRole }: {
 
       <div className="flex gap-3 justify-end pb-8">
         <Button type="button" variant="outline" onClick={onSuccess}>Cancelar</Button>
-        <Button type="submit" className="bg-indigo-600 hover:bg-indigo-700 min-w-[160px]" disabled={mutation.isPending}>
+        <Button type="submit" className="bg-primary hover:bg-primary/90 min-w-[160px]" disabled={mutation.isPending}>
           {mutation.isPending ? "Salvando..." : "Salvar Alterações"}
         </Button>
       </div>

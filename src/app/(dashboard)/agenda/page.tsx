@@ -222,7 +222,7 @@ export default function AgendaPage() {
                 key={day.toISOString()}
                 className={cn(
                   "p-3 text-center border-r last:border-r-0 cursor-pointer hover:bg-accent/40 transition-colors",
-                  isToday(day) && "bg-indigo-950/40"
+                  isToday(day) && "bg-primary/10"
                 )}
                 onClick={() => { setCurrentDate(day); setView("dia"); }}
               >
@@ -231,7 +231,7 @@ export default function AgendaPage() {
                 </p>
                 <p className={cn(
                   "text-lg font-bold mt-0.5",
-                  isToday(day) ? "text-indigo-400" : "text-foreground"
+                  isToday(day) ? "text-primary" : "text-foreground"
                 )}>
                   {format(day, "d")}
                 </p>
@@ -250,13 +250,13 @@ export default function AgendaPage() {
                   key={day.toISOString()}
                   className={cn(
                     "p-2 flex flex-col gap-1 overflow-hidden min-h-0",
-                    isToday(day) && "bg-indigo-950/20"
+                    isToday(day) && "bg-primary/5"
                   )}
                 >
                   {visible.map((ev) => <EventCard key={ev.id} event={ev} compact />)}
                   {extra > 0 && (
                     <button
-                      className="text-xs text-indigo-400 font-medium hover:underline text-left"
+                      className="text-xs text-primary font-medium hover:underline text-left"
                       onClick={() => { setCurrentDate(day); setView("dia"); }}
                     >
                       +{extra} mais
@@ -341,7 +341,7 @@ export default function AgendaPage() {
             <div className="flex items-center gap-3 mb-2">
               <div className={cn(
                 "flex flex-col items-center justify-center w-10 h-10 rounded-lg text-center",
-                isToday(day) ? "bg-indigo-600 text-white" : "bg-muted text-foreground"
+                isToday(day) ? "bg-primary text-primary-foreground" : "bg-muted text-foreground"
               )}>
                 <span className="text-xs font-medium leading-none">{format(day, "EEE", { locale: ptBR }).toUpperCase()}</span>
                 <span className="text-lg font-bold leading-tight">{format(day, "d")}</span>
@@ -390,7 +390,7 @@ export default function AgendaPage() {
           <h2 className="text-2xl font-bold">Agenda</h2>
           <p className="text-muted-foreground">Visualização de tarefas e compromissos</p>
         </div>
-        <Button onClick={() => setOpen(true)} className="bg-indigo-600 hover:bg-indigo-700 gap-2">
+        <Button onClick={() => setOpen(true)} className="bg-primary hover:bg-primary/90 gap-2">
           <Plus className="w-4 h-4" /> Novo Evento
         </Button>
       </div>
@@ -551,7 +551,7 @@ export default function AgendaPage() {
 
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => { setOpen(false); setAtribuicao(ATRIBUICAO_INICIAL); }}>Cancelar</Button>
-              <Button type="submit" className="bg-indigo-600 hover:bg-indigo-700" disabled={mutation.isPending}>
+              <Button type="submit" className="bg-primary hover:bg-primary/90" disabled={mutation.isPending}>
                 {mutation.isPending ? "Salvando..." : "Salvar Evento"}
               </Button>
             </DialogFooter>

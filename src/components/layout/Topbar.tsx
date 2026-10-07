@@ -56,7 +56,7 @@ const NOTIF_COLORS: Record<string, string> = {
   TAREFA_VENCENDO: "text-amber-500",
   OPORTUNIDADE_PARADA: "text-orange-500",
   CLIENTE_SEM_CONTATO: "text-red-500",
-  SISTEMA: "text-indigo-500",
+  SISTEMA: "text-primary",
 };
 
 interface Tarefa {
@@ -223,7 +223,7 @@ export function Topbar() {
               {naoLidas > 0 && (
                 <button
                   onClick={marcarTodasLidas}
-                  className="text-xs text-indigo-600 hover:underline"
+                  className="text-xs text-primary hover:underline"
                 >
                   Marcar todas como lidas
                 </button>
@@ -253,7 +253,7 @@ export function Topbar() {
                               <p className="text-sm font-medium leading-tight truncate">{n.titulo}</p>
                               <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{n.mensagem}</p>
                             </div>
-                            <span className="w-1.5 h-1.5 bg-indigo-500 rounded-full shrink-0 mt-1.5" />
+                            <span className="w-1.5 h-1.5 bg-primary rounded-full shrink-0 mt-1.5" />
                           </div>
                         </button>
                       );
@@ -326,7 +326,7 @@ export function Topbar() {
               <Button
                 variant="ghost"
                 size="sm"
-                className="w-full text-xs text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 dark:hover:bg-indigo-950/30"
+                className="w-full text-xs text-primary hover:text-foreground hover:bg-muted"
                 onClick={() => router.push("/agenda")}
               >
                 Ver agenda completa
@@ -342,7 +342,7 @@ export function Topbar() {
               <Avatar className="w-8 h-8">
                 <AvatarImage src={user?.avatar || undefined} />
                 <AvatarFallback
-                  className={cn("text-white text-xs", !activeTheme && "bg-indigo-600")}
+                  className={cn("text-xs", !activeTheme && "bg-primary text-primary-foreground")}
                   style={activeTheme ? { background: activeTheme.avatarBg } : undefined}
                 >
                   {initials}

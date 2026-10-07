@@ -168,6 +168,12 @@ model User {
   financeiroLancamentos  FinanceiroLancamento[]
   financeiroCarroUsos    FinanceiroCarroUso[]
 
+  // Financeiro novo (tabelas fin_*)
+  finMemberships   WorkspaceMember[]
+  finNotifications Notification[]
+  finAuditLogs     FinAuditLog[]
+  finAttachments   Attachment[]
+
   @@map("users")
 }
 
@@ -979,3 +985,918 @@ model FinanceiroCarroUso {
   @@map("financeiro_carro_usos")
 }
 
+// ==========================================
+// FINANCEIRO (sistema novo, portado de Financeiro/prisma/schema)
+// ==========================================
+// Tabelas com prefixo fin_ para não colidir com as do CRM. Não substituem as
+// financeiro_* (Caixa e Carros), que continuam intactas até a migração da Fase 3.
+// Login e usuários são os do CRM (model User); papel no workspace vem de
+// canAccessFinanceiro. Convenções: Financeiro/docs/03-banco-de-dados.md.
+
+// Gerador, datasource e enums compartilhados.
+// Convenções: docs/03-banco-de-dados.md · Dinheiro em Decimal(14,2), datas de negócio em @db.Date.
+
+enum WorkspaceKind {
+  PERSONAL
+  BUSINESS
+}
+
+enum WorkspaceRole {
+  OWNER
+  ADMIN
+  MEMBER
+  VIEWER
+}
+
+enum AccountType {
+  CHECKING // conta corrente
+  SAVINGS // poupança
+  WALLET // dinheiro em espécie
+  INVESTMENT // conta de investimento / corretora
+  BENEFIT // vale-refeição / alimentação
+  OTHER
+}
+
+enum CategoryKind {
+  INCOME
+  EXPENSE
+}
+
+/// Agrupa receitas no painel: Base · Comissões · Renda extra · Outros.
+enum IncomeClass {
+  BASE
+  COMMISSION
+  EXTRA
+  OTHER
+}
+
+enum ExpenseNature {
+  FIXED
+  VARIABLE
+}
+
+enum TransactionType {
+  INCOME // receita
+  EXPENSE // despesa (em conta ou cartão)
+  REFUND // estorno: abate despesa da mesma categoria
+  TRANSFER // entre contas do workspace
+  CARD_PAYMENT // pagamento de fatura (não é despesa; as compras já foram)
+}
+
+/// "Atrasado" não é gravado: é PENDING com vencimento < hoje.
+enum TransactionStatus {
+  PENDING // previsto / a pagar / a receber
+  SETTLED // pago / recebido
+  CANCELED
+}
+
+enum PaymentMethod {
+  PIX
+  DEBIT_CARD
+  CREDIT_CARD
+  BOLETO
+  BANK_TRANSFER
+  AUTO_DEBIT
+  CASH
+  BENEFIT_CARD
+  OTHER
+}
+
+enum RecurrenceFrequency {
+  WEEKLY
+  MONTHLY
+  YEARLY
+}
+
+enum RecurrenceDayRule {
+  FIXED_DAY // dia fixo (31 = último dia do mês)
+  NTH_BUSINESS_DAY // ex.: 5º dia útil
+  LAST_BUSINESS_DAY
+}
+
+/// O que fazer quando a data cai em fim de semana ou feriado.
+enum BusinessDayShift {
+  NONE
+  NEXT
+  PREVIOUS
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  PAUSED
+  CANCELED
+}
+
+enum CardBrand {
+  VISA
+  MASTERCARD
+  ELO
+  AMEX
+  HIPERCARD
+  OTHER
+}
+
+enum InvoiceStatus {
+  OPEN
+  CLOSED
+  PARTIALLY_PAID
+  PAID
+}
+
+enum InstallmentPlanStatus {
+  ACTIVE
+  FINISHED
+  SETTLED_EARLY // quitação antecipada
+  CANCELED
+}
+
+enum GoalKind {
+  EMERGENCY_FUND
+  SAVINGS
+  PURCHASE
+  INVESTMENT
+  DEBT_PAYOFF
+  OTHER
+}
+
+enum GoalStatus {
+  ACTIVE
+  PAUSED
+  ACHIEVED
+  ARCHIVED
+}
+
+enum AssetKind {
+  INVESTMENT
+  EQUIPMENT
+  VEHICLE
+  REAL_ESTATE
+  OTHER
+}
+
+enum LiabilityKind {
+  LOAN
+  FINANCING
+  PERSONAL_DEBT
+  OTHER
+}
+
+/// Informação · Atenção · Importante · Crítico
+enum NotificationPriority {
+  INFO
+  ATTENTION
+  IMPORTANT
+  CRITICAL
+}
+
+enum SnapshotPeriod {
+  DAILY
+  MONTHLY
+}
+
+enum ImportSource {
+  CSV
+  XLSX
+  OFX
+  OPEN_FINANCE
+}
+
+enum ImportStatus {
+  DRAFT // em revisão, ainda não gerou lançamentos definitivos
+  COMMITTED
+  ROLLED_BACK
+  FAILED
+}
+
+enum JobStatus {
+  RUNNING
+  SUCCEEDED
+  FAILED
+}
+
+// Tenancy: todo dado financeiro pertence a um workspace.
+
+/// Tenant. Hoje: 1 usuário, 1 workspace pessoal (+ 1 de demonstração).
+/// Amanhã: família, empresa (PJ), planos SaaS — sem migrar dados.
+model Workspace {
+  id           String        @id @default(uuid(7)) @db.Uuid
+  name         String
+  slug         String        @unique
+  kind         WorkspaceKind @default(PERSONAL)
+  isDemo       Boolean       @default(false) @map("is_demo")
+  baseCurrency String        @default("BRL") @map("base_currency") @db.Char(3)
+  timezone     String        @default("America/Sao_Paulo")
+  locale       String        @default("pt-BR")
+  /// Preferências não estruturais (horizonte de projeção, meses da média etc.).
+  settings     Json          @default("{}")
+  createdAt    DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt    DateTime      @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  members            WorkspaceMember[]
+  accounts           Account[]
+  categories         Category[]
+  transactions       Transaction[]
+  recurrences        Recurrence[]
+  subscriptions      Subscription[]
+  creditCards        CreditCard[]
+  invoices           CreditCardInvoice[]
+  installmentPlans   InstallmentPlan[]
+  commissions        Commission[]
+  budgets            Budget[]
+  goals              Goal[]
+  goalContributions  GoalContribution[]
+  assets             Asset[]
+  liabilities        Liability[]
+  attachments        Attachment[]
+  notifications      Notification[]
+  financialSnapshots FinancialSnapshot[]
+  importBatches      ImportBatch[]
+  monthCloses        MonthClose[]
+  auditLogs          FinAuditLog[]
+
+  @@map("fin_workspaces")
+}
+
+model WorkspaceMember {
+  id          String        @id @default(uuid(7)) @db.Uuid
+  workspaceId String        @map("workspace_id") @db.Uuid
+  userId      String        @map("user_id")
+  role        WorkspaceRole @default(OWNER)
+  createdAt   DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, userId])
+  @@index([userId])
+  @@map("fin_workspace_members")
+}
+
+// Livro-caixa: contas, categorias, lançamentos, recorrências, assinaturas e comissões.
+
+/// Conta bancária, carteira, poupança, corretora ou vale-benefício.
+/// Saldo = saldo inicial + efeitos dos lançamentos liquidados (calculado).
+model Account {
+  id                 String      @id @default(uuid(7)) @db.Uuid
+  workspaceId        String      @map("workspace_id") @db.Uuid
+  name               String
+  type               AccountType
+  institution        String?
+  currency           String      @default("BRL") @db.Char(3)
+  initialBalance     Decimal     @default(0) @map("initial_balance") @db.Decimal(14, 2)
+  initialBalanceDate DateTime    @map("initial_balance_date") @db.Date
+  /// Compõe o "saldo disponível" do painel.
+  isLiquid           Boolean     @default(true) @map("is_liquid")
+  includeInNetWorth  Boolean     @default(true) @map("include_in_net_worth")
+  color              String?     @db.VarChar(7)
+  icon               String?
+  sortOrder          Int         @default(0) @map("sort_order")
+  /// id da linha correspondente em financeiro_* (Caixa antigo): torna a cópia repetível.
+  legacyId           String?     @map("legacy_id")
+  archivedAt         DateTime?   @map("archived_at") @db.Timestamptz(3)
+  createdAt          DateTime    @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt          DateTime    @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  workspace         Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  transactions      Transaction[]     @relation("TransactionAccount")
+  incomingTransfers Transaction[]     @relation("TransactionTransferAccount")
+  recurrences       Recurrence[]
+  installmentPlans  InstallmentPlan[]
+  cardsPaidFromHere CreditCard[]
+  goals             Goal[]
+  importBatches     ImportBatch[]
+
+  @@unique([workspaceId, name])
+  @@unique([workspaceId, legacyId])
+  @@map("fin_accounts")
+}
+
+/// Hierarquia de 2 níveis (ex.: Moradia → Aluguel, Condomínio, Energia).
+model Category {
+  id            String         @id @default(uuid(7)) @db.Uuid
+  workspaceId   String         @map("workspace_id") @db.Uuid
+  parentId      String?        @map("parent_id") @db.Uuid
+  kind          CategoryKind
+  name          String
+  /// Nome do ícone Lucide.
+  icon          String
+  color         String         @db.VarChar(7)
+  incomeClass   IncomeClass?   @map("income_class")
+  defaultNature ExpenseNature? @map("default_nature")
+  /// Custo essencial: entra no cálculo de cobertura da reserva de emergência.
+  isEssential   Boolean        @default(false) @map("is_essential")
+  /// Categorias do sistema (não excluíveis): "commission", "card_fees", ...
+  systemKey     String?        @map("system_key")
+  sortOrder     Int            @default(0) @map("sort_order")
+  /// id da linha correspondente em financeiro_* (Caixa antigo): torna a cópia repetível.
+  legacyId      String?        @map("legacy_id")
+  archivedAt    DateTime?      @map("archived_at") @db.Timestamptz(3)
+  createdAt     DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt     DateTime       @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  workspace        Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  parent           Category?         @relation("CategoryTree", fields: [parentId], references: [id], onDelete: NoAction)
+  children         Category[]        @relation("CategoryTree")
+  transactions     Transaction[]
+  recurrences      Recurrence[]
+  installmentPlans InstallmentPlan[]
+  budgets          Budget[]
+
+  @@unique([workspaceId, systemKey])
+  @@unique([workspaceId, legacyId])
+  @@index([workspaceId, kind, sortOrder])
+  @@map("fin_categories")
+}
+
+model Transaction {
+  id          String            @id @default(uuid(7)) @db.Uuid
+  workspaceId String            @map("workspace_id") @db.Uuid
+  type        TransactionType
+  status      TransactionStatus @default(PENDING)
+  description String
+  notes       String?
+  /// Sempre > 0. O sinal vem do tipo.
+  amount      Decimal           @db.Decimal(14, 2)
+
+  /// Competência: data da compra / do fato gerador.
+  date      DateTime  @db.Date
+  /// Vencimento ou previsão de recebimento. Em compras no cartão = vencimento da fatura.
+  dueDate   DateTime  @map("due_date") @db.Date
+  /// Data efetiva do pagamento/recebimento.
+  settledAt DateTime? @map("settled_at") @db.Date
+
+  /// Conta de origem (despesa/transferência/pagamento de fatura) ou de destino (receita).
+  accountId         String?        @map("account_id") @db.Uuid
+  /// Destino de uma transferência.
+  transferAccountId String?        @map("transfer_account_id") @db.Uuid
+  creditCardId      String?        @map("credit_card_id") @db.Uuid
+  /// Fatura onde a compra cai — ou fatura que um CARD_PAYMENT quita.
+  invoiceId         String?        @map("invoice_id") @db.Uuid
+  categoryId        String?        @map("category_id") @db.Uuid
+  nature            ExpenseNature?
+  paymentMethod     PaymentMethod? @map("payment_method")
+
+  recurrenceId         String?   @map("recurrence_id") @db.Uuid
+  /// Data "natural" da ocorrência (chave de idempotência da geração).
+  recurrenceDate       DateTime? @map("recurrence_date") @db.Date
+  /// Ocorrência editada à mão: alterações na regra não a sobrescrevem.
+  isRecurrenceOverride Boolean   @default(false) @map("is_recurrence_override")
+  installmentPlanId    String?   @map("installment_plan_id") @db.Uuid
+  installmentNumber    Int?      @map("installment_number")
+  refundOfId           String?   @map("refund_of_id") @db.Uuid
+  /// Ajuste de conciliação de saldo: afeta o saldo, fica fora dos relatórios.
+  isBalanceAdjustment  Boolean   @default(false) @map("is_balance_adjustment")
+
+  importBatchId String? @map("import_batch_id") @db.Uuid
+  /// FITID do OFX ou id do Open Finance (deduplicação de importações).
+  externalId    String? @map("external_id")
+  /// id da linha correspondente em financeiro_* (Caixa antigo): torna a cópia repetível.
+  legacyId      String? @map("legacy_id")
+
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  /// Lixeira: excluído pelo usuário, restaurável.
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(3)
+
+  workspace        Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  account          Account?           @relation("TransactionAccount", fields: [accountId], references: [id], onDelete: NoAction)
+  transferAccount  Account?           @relation("TransactionTransferAccount", fields: [transferAccountId], references: [id], onDelete: NoAction)
+  creditCard       CreditCard?        @relation(fields: [creditCardId], references: [id], onDelete: NoAction)
+  invoice          CreditCardInvoice? @relation(fields: [invoiceId], references: [id], onDelete: NoAction)
+  category         Category?          @relation(fields: [categoryId], references: [id], onDelete: NoAction)
+  recurrence       Recurrence?        @relation(fields: [recurrenceId], references: [id], onDelete: NoAction)
+  installmentPlan  InstallmentPlan?   @relation(fields: [installmentPlanId], references: [id], onDelete: NoAction)
+  refundOf         Transaction?       @relation("Refunds", fields: [refundOfId], references: [id], onDelete: NoAction)
+  refunds          Transaction[]      @relation("Refunds")
+  importBatch      ImportBatch?       @relation(fields: [importBatchId], references: [id], onDelete: NoAction)
+  commission       Commission?
+  goalContribution GoalContribution?
+  attachments      Attachment[]
+
+  @@unique([recurrenceId, recurrenceDate])
+  @@unique([installmentPlanId, installmentNumber])
+  @@unique([accountId, externalId])
+  @@unique([workspaceId, legacyId])
+  @@index([workspaceId, dueDate])
+  @@index([workspaceId, date])
+  @@index([workspaceId, status, dueDate])
+  @@index([workspaceId, categoryId, date])
+  @@index([accountId, settledAt])
+  @@index([creditCardId, dueDate])
+  @@index([invoiceId])
+  @@map("fin_transactions")
+}
+
+/// Regra que gera lançamentos (salário, aluguel, assinaturas...).
+/// As ocorrências são materializadas num horizonte móvel de 12 meses.
+model Recurrence {
+  id                  String              @id @default(uuid(7)) @db.Uuid
+  workspaceId         String              @map("workspace_id") @db.Uuid
+  /// Apenas INCOME ou EXPENSE (CHECK).
+  type                TransactionType
+  description         String
+  amount              Decimal             @db.Decimal(14, 2)
+  /// Valor varia a cada mês (ex.: energia): a previsão usa a média recente.
+  isEstimatedAmount   Boolean             @default(false) @map("is_estimated_amount")
+  categoryId          String?             @map("category_id") @db.Uuid
+  accountId           String?             @map("account_id") @db.Uuid
+  creditCardId        String?             @map("credit_card_id") @db.Uuid
+  paymentMethod       PaymentMethod?      @map("payment_method")
+  nature              ExpenseNature?
+  frequency           RecurrenceFrequency
+  intervalCount       Int                 @default(1) @map("interval_count")
+  dayRule             RecurrenceDayRule   @default(FIXED_DAY) @map("day_rule")
+  /// FIXED_DAY: 1–31 · NTH_BUSINESS_DAY: n-ésimo dia útil.
+  dayOfMonth          Int?                @map("day_of_month")
+  /// WEEKLY: 0 (domingo) – 6.
+  weekday             Int?
+  /// YEARLY: 1–12.
+  monthOfYear         Int?                @map("month_of_year")
+  nonBusinessDayShift BusinessDayShift    @default(NONE) @map("non_business_day_shift")
+  startDate           DateTime            @map("start_date") @db.Date
+  endDate             DateTime?           @map("end_date") @db.Date
+  maxOccurrences      Int?                @map("max_occurrences")
+  /// Até onde as ocorrências já foram materializadas.
+  generatedUntil      DateTime?           @map("generated_until") @db.Date
+  pausedAt            DateTime?           @map("paused_at") @db.Timestamptz(3)
+  createdAt           DateTime            @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt           DateTime            @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt           DateTime?           @map("deleted_at") @db.Timestamptz(3)
+
+  workspace    Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  category     Category?     @relation(fields: [categoryId], references: [id], onDelete: NoAction)
+  account      Account?      @relation(fields: [accountId], references: [id], onDelete: NoAction)
+  creditCard   CreditCard?   @relation(fields: [creditCardId], references: [id], onDelete: NoAction)
+  transactions Transaction[]
+  subscription Subscription?
+
+  @@index([workspaceId, type])
+  @@map("fin_recurrences")
+}
+
+/// Metadados de assinatura sobre uma recorrência de despesa.
+model Subscription {
+  id           String             @id @default(uuid(7)) @db.Uuid
+  workspaceId  String             @map("workspace_id") @db.Uuid
+  recurrenceId String             @unique @map("recurrence_id") @db.Uuid
+  name         String
+  provider     String?
+  website      String?
+  status       SubscriptionStatus @default(ACTIVE)
+  startedAt    DateTime?          @map("started_at") @db.Date
+  trialEndsAt  DateTime?          @map("trial_ends_at") @db.Date
+  canceledAt   DateTime?          @map("canceled_at") @db.Date
+  notes        String?
+  createdAt    DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt    DateTime           @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  workspace  Workspace  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  recurrence Recurrence @relation(fields: [recurrenceId], references: [id], onDelete: NoAction)
+
+  @@index([workspaceId, status])
+  @@map("fin_subscriptions")
+}
+
+/// Dados da venda. O valor, a previsão, a data de recebimento e o status
+/// vivem no Transaction (receita a receber) — fonte única para o fluxo de caixa.
+model Commission {
+  id                 String    @id @default(uuid(7)) @db.Uuid
+  workspaceId        String    @map("workspace_id") @db.Uuid
+  transactionId      String    @unique @map("transaction_id") @db.Uuid
+  clientName         String    @map("client_name")
+  saleDescription    String    @map("sale_description")
+  saleAmount         Decimal   @map("sale_amount") @db.Decimal(14, 2)
+  ratePercent        Decimal   @map("rate_percent") @db.Decimal(7, 4)
+  /// true quando o valor foi digitado em vez de calculado (venda × %).
+  isAmountOverridden Boolean   @default(false) @map("is_amount_overridden")
+  saleDate           DateTime  @map("sale_date") @db.Date
+  notes              String?
+  createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt          DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt          DateTime? @map("deleted_at") @db.Timestamptz(3)
+
+  workspace   Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  transaction Transaction  @relation(fields: [transactionId], references: [id], onDelete: NoAction)
+  attachments Attachment[]
+
+  @@index([workspaceId, saleDate])
+  @@index([workspaceId, clientName])
+  @@map("fin_commissions")
+}
+
+// Cartões, faturas e compras parceladas.
+
+/// Limite disponível = limite − compras/parcelas ainda não pagas (calculado).
+model CreditCard {
+  id               String    @id @default(uuid(7)) @db.Uuid
+  workspaceId      String    @map("workspace_id") @db.Uuid
+  name             String
+  issuer           String
+  brand            CardBrand
+  lastFour         String?   @map("last_four") @db.Char(4)
+  creditLimit      Decimal   @map("credit_limit") @db.Decimal(14, 2)
+  closingDay       Int       @map("closing_day")
+  dueDay           Int       @map("due_day")
+  /// Conta usada por padrão para pagar a fatura.
+  paymentAccountId String?   @map("payment_account_id") @db.Uuid
+  color            String?   @db.VarChar(7)
+  sortOrder        Int       @default(0) @map("sort_order")
+  archivedAt       DateTime? @map("archived_at") @db.Timestamptz(3)
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt        DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  workspace        Workspace           @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  paymentAccount   Account?            @relation(fields: [paymentAccountId], references: [id], onDelete: SetNull)
+  invoices         CreditCardInvoice[]
+  transactions     Transaction[]
+  recurrences      Recurrence[]
+  installmentPlans InstallmentPlan[]
+  importBatches    ImportBatch[]
+
+  @@unique([workspaceId, name])
+  @@map("fin_credit_cards")
+}
+
+/// Datas gravadas na fatura: mudar o dia de fechamento do cartão
+/// só afeta faturas futuras.
+model CreditCardInvoice {
+  id              String        @id @default(uuid(7)) @db.Uuid
+  workspaceId     String        @map("workspace_id") @db.Uuid
+  creditCardId    String        @map("credit_card_id") @db.Uuid
+  /// 1º dia do mês de vencimento ("fatura de outubro" vence em outubro).
+  referenceMonth  DateTime      @map("reference_month") @db.Date
+  closingDate     DateTime      @map("closing_date") @db.Date
+  dueDate         DateTime      @map("due_date") @db.Date
+  status          InvoiceStatus @default(OPEN)
+  /// Valor que o banco cobrou (conciliação com a soma dos itens).
+  statementAmount Decimal?      @map("statement_amount") @db.Decimal(14, 2)
+  closedAt        DateTime?     @map("closed_at") @db.Timestamptz(3)
+  createdAt       DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt       DateTime      @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  workspace    Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  creditCard   CreditCard    @relation(fields: [creditCardId], references: [id], onDelete: NoAction)
+  transactions Transaction[]
+  attachments  Attachment[]
+
+  @@unique([creditCardId, referenceMonth])
+  @@index([workspaceId, dueDate])
+  @@map("fin_credit_card_invoices")
+}
+
+/// Compra parcelada (cartão, boleto, carnê, crediário). Cada parcela é um
+/// Transaction com installmentNumber.
+model InstallmentPlan {
+  id               String                @id @default(uuid(7)) @db.Uuid
+  workspaceId      String                @map("workspace_id") @db.Uuid
+  description      String
+  merchant         String?
+  categoryId       String?               @map("category_id") @db.Uuid
+  /// Valor total parcelado (com juros, se houver).
+  totalAmount      Decimal               @map("total_amount") @db.Decimal(14, 2)
+  /// Preço à vista, para mostrar os juros embutidos.
+  cashPrice        Decimal?              @map("cash_price") @db.Decimal(14, 2)
+  installmentCount Int                   @map("installment_count")
+  /// Parcelas já pagas antes de o sistema ser usado (não geram lançamentos).
+  priorPaidCount   Int                   @default(0) @map("prior_paid_count")
+  purchaseDate     DateTime              @map("purchase_date") @db.Date
+  firstDueDate     DateTime              @map("first_due_date") @db.Date
+  creditCardId     String?               @map("credit_card_id") @db.Uuid
+  accountId        String?               @map("account_id") @db.Uuid
+  paymentMethod    PaymentMethod?        @map("payment_method")
+  status           InstallmentPlanStatus @default(ACTIVE)
+  notes            String?
+  createdAt        DateTime              @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt        DateTime              @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt        DateTime?             @map("deleted_at") @db.Timestamptz(3)
+
+  workspace    Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  category     Category?     @relation(fields: [categoryId], references: [id], onDelete: NoAction)
+  creditCard   CreditCard?   @relation(fields: [creditCardId], references: [id], onDelete: NoAction)
+  account      Account?      @relation(fields: [accountId], references: [id], onDelete: NoAction)
+  installments Transaction[]
+  asset        Asset?
+  liability    Liability?
+  attachments  Attachment[]
+
+  @@index([workspaceId, status])
+  @@map("fin_installment_plans")
+}
+
+// Planejamento: orçamento e metas.
+
+/// Limite mensal por categoria, com vigência: mudar o limite a partir de
+/// novembro não reescreve outubro.
+model Budget {
+  id                    String    @id @default(uuid(7)) @db.Uuid
+  workspaceId           String    @map("workspace_id") @db.Uuid
+  categoryId            String    @map("category_id") @db.Uuid
+  amount                Decimal   @db.Decimal(14, 2)
+  /// 1º dia do mês inicial.
+  effectiveFrom         DateTime  @map("effective_from") @db.Date
+  /// 1º dia do último mês (inclusive); null = vigente.
+  effectiveTo           DateTime? @map("effective_to") @db.Date
+  alertThresholdPercent Int       @default(80) @map("alert_threshold_percent")
+  createdAt             DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt             DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  category  Category  @relation(fields: [categoryId], references: [id], onDelete: NoAction)
+
+  @@unique([categoryId, effectiveFrom])
+  @@index([workspaceId])
+  @@map("fin_budgets")
+}
+
+/// Valor atual = saldo da conta vinculada OU valor inicial + aportes.
+model Goal {
+  id              String     @id @default(uuid(7)) @db.Uuid
+  workspaceId     String     @map("workspace_id") @db.Uuid
+  name            String
+  kind            GoalKind
+  targetAmount    Decimal    @map("target_amount") @db.Decimal(14, 2)
+  initialAmount   Decimal    @default(0) @map("initial_amount") @db.Decimal(14, 2)
+  targetDate      DateTime?  @map("target_date") @db.Date
+  linkedAccountId String?    @map("linked_account_id") @db.Uuid
+  status          GoalStatus @default(ACTIVE)
+  achievedAt      DateTime?  @map("achieved_at") @db.Date
+  icon            String?
+  color           String?    @db.VarChar(7)
+  sortOrder       Int        @default(0) @map("sort_order")
+  notes           String?
+  createdAt       DateTime   @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt       DateTime   @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  workspace     Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  linkedAccount Account?           @relation(fields: [linkedAccountId], references: [id], onDelete: SetNull)
+  contributions GoalContribution[]
+
+  @@index([workspaceId, status])
+  @@map("fin_goals")
+}
+
+/// Aporte (positivo) ou resgate (negativo — única exceção à regra do valor
+/// positivo, protegida por CHECK amount <> 0).
+model GoalContribution {
+  id            String   @id @default(uuid(7)) @db.Uuid
+  workspaceId   String   @map("workspace_id") @db.Uuid
+  goalId        String   @map("goal_id") @db.Uuid
+  amount        Decimal  @db.Decimal(14, 2)
+  date          DateTime @db.Date
+  /// Transferência que materializou o aporte, se houver.
+  transactionId String?  @unique @map("transaction_id") @db.Uuid
+  notes         String?
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  workspace   Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  goal        Goal         @relation(fields: [goalId], references: [id], onDelete: Cascade)
+  transaction Transaction? @relation(fields: [transactionId], references: [id], onDelete: SetNull)
+
+  @@index([goalId, date])
+  @@map("fin_goal_contributions")
+}
+
+// Patrimônio: bens, dívidas e fotografias periódicas.
+
+/// Bens fora das contas (equipamentos, veículos, investimentos avaliados à mão).
+model Asset {
+  id                String    @id @default(uuid(7)) @db.Uuid
+  workspaceId       String    @map("workspace_id") @db.Uuid
+  name              String
+  kind              AssetKind
+  acquisitionDate   DateTime? @map("acquisition_date") @db.Date
+  acquisitionValue  Decimal?  @map("acquisition_value") @db.Decimal(14, 2)
+  currentValue      Decimal   @map("current_value") @db.Decimal(14, 2)
+  valuedAt          DateTime  @map("valued_at") @db.Date
+  /// Bem comprado parcelado (ex.: FX30): ativo e dívida ficam ligados.
+  installmentPlanId String?   @unique @map("installment_plan_id") @db.Uuid
+  notes             String?
+  archivedAt        DateTime? @map("archived_at") @db.Timestamptz(3)
+  createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt         DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  workspace       Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  installmentPlan InstallmentPlan? @relation(fields: [installmentPlanId], references: [id], onDelete: SetNull)
+  valuations      AssetValuation[]
+  attachments     Attachment[]
+
+  @@index([workspaceId, kind])
+  @@map("fin_assets")
+}
+
+model AssetValuation {
+  id        String   @id @default(uuid(7)) @db.Uuid
+  assetId   String   @map("asset_id") @db.Uuid
+  date      DateTime @db.Date
+  value     Decimal  @db.Decimal(14, 2)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  asset Asset @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  @@unique([assetId, date])
+  @@map("fin_asset_valuations")
+}
+
+/// Dívidas fora do cartão. Se ligada a um InstallmentPlan, o saldo devedor é
+/// calculado das parcelas; senão, usa currentBalance informado.
+/// Cartões e parcelas no cartão NÃO são duplicados aqui.
+model Liability {
+  id                  String        @id @default(uuid(7)) @db.Uuid
+  workspaceId         String        @map("workspace_id") @db.Uuid
+  name                String
+  kind                LiabilityKind
+  creditor            String?
+  originalAmount      Decimal       @map("original_amount") @db.Decimal(14, 2)
+  currentBalance      Decimal?      @map("current_balance") @db.Decimal(14, 2)
+  balanceUpdatedAt    DateTime?     @map("balance_updated_at") @db.Date
+  monthlyInterestRate Decimal?      @map("monthly_interest_rate") @db.Decimal(7, 4)
+  startDate           DateTime      @map("start_date") @db.Date
+  endDate             DateTime?     @map("end_date") @db.Date
+  installmentPlanId   String?       @unique @map("installment_plan_id") @db.Uuid
+  notes               String?
+  archivedAt          DateTime?     @map("archived_at") @db.Timestamptz(3)
+  createdAt           DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt           DateTime      @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  workspace       Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  installmentPlan InstallmentPlan? @relation(fields: [installmentPlanId], references: [id], onDelete: SetNull)
+
+  @@index([workspaceId, kind])
+  @@map("fin_liabilities")
+}
+
+/// Fotografia periódica (diária/mensal) para histórico de patrimônio e
+/// gráficos rápidos. Gerada por job idempotente.
+model FinancialSnapshot {
+  id               String         @id @default(uuid(7)) @db.Uuid
+  workspaceId      String         @map("workspace_id") @db.Uuid
+  period           SnapshotPeriod
+  /// Último dia do período.
+  date             DateTime       @db.Date
+  liquidBalance    Decimal        @map("liquid_balance") @db.Decimal(14, 2)
+  investedBalance  Decimal        @map("invested_balance") @db.Decimal(14, 2)
+  totalAssets      Decimal        @map("total_assets") @db.Decimal(14, 2)
+  totalLiabilities Decimal        @map("total_liabilities") @db.Decimal(14, 2)
+  netWorth         Decimal        @map("net_worth") @db.Decimal(14, 2)
+  incomeTotal      Decimal        @map("income_total") @db.Decimal(14, 2)
+  expenseTotal     Decimal        @map("expense_total") @db.Decimal(14, 2)
+  /// Quebras por conta, categoria e cartão (formato versionado).
+  breakdown        Json           @default("{}")
+  schemaVersion    Int            @default(1) @map("schema_version")
+  createdAt        DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, period, date])
+  @@map("fin_financial_snapshots")
+}
+
+// Sistema: anexos, alertas, importação, auditoria e jobs.
+
+/// Arquivo fora de /public, servido por rota autenticada.
+/// Exatamente um dono (CHECK no banco).
+model Attachment {
+  id                String    @id @default(uuid(7)) @db.Uuid
+  workspaceId       String    @map("workspace_id") @db.Uuid
+  fileName          String    @map("file_name")
+  mimeType          String    @map("mime_type")
+  sizeBytes         Int       @map("size_bytes")
+  /// Caminho no provedor de armazenamento (local hoje; S3/Supabase amanhã).
+  storageKey        String    @unique @map("storage_key")
+  checksumSha256    String    @map("checksum_sha256") @db.Char(64)
+  transactionId     String?   @map("transaction_id") @db.Uuid
+  installmentPlanId String?   @map("installment_plan_id") @db.Uuid
+  commissionId      String?   @map("commission_id") @db.Uuid
+  invoiceId         String?   @map("invoice_id") @db.Uuid
+  assetId           String?   @map("asset_id") @db.Uuid
+  uploadedById      String?   @map("uploaded_by_id")
+  createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  deletedAt         DateTime? @map("deleted_at") @db.Timestamptz(3)
+
+  workspace       Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  transaction     Transaction?       @relation(fields: [transactionId], references: [id], onDelete: NoAction)
+  installmentPlan InstallmentPlan?   @relation(fields: [installmentPlanId], references: [id], onDelete: NoAction)
+  commission      Commission?        @relation(fields: [commissionId], references: [id], onDelete: NoAction)
+  invoice         CreditCardInvoice? @relation(fields: [invoiceId], references: [id], onDelete: NoAction)
+  asset           Asset?             @relation(fields: [assetId], references: [id], onDelete: NoAction)
+  uploadedBy      User?              @relation(fields: [uploadedById], references: [id], onDelete: SetNull)
+
+  @@index([transactionId])
+  @@index([installmentPlanId])
+  @@index([commissionId])
+  @@index([invoiceId])
+  @@index([assetId])
+  @@map("fin_attachments")
+}
+
+/// Alerta gerado pelo motor de regras. `dedupeKey` torna a geração idempotente
+/// (ex.: "bill_due:1:<transactionId>").
+model Notification {
+  id           String               @id @default(uuid(7)) @db.Uuid
+  workspaceId  String               @map("workspace_id") @db.Uuid
+  /// null = todos os membros do workspace.
+  userId       String?              @map("user_id")
+  /// Código da regra, ex.: "bill.due_soon", "budget.threshold".
+  code         String
+  priority     NotificationPriority
+  title        String
+  body         String
+  href         String?
+  entityType   String?              @map("entity_type")
+  entityId     String?              @map("entity_id")
+  dedupeKey    String               @map("dedupe_key")
+  readAt       DateTime?            @map("read_at") @db.Timestamptz(3)
+  dismissedAt  DateTime?            @map("dismissed_at") @db.Timestamptz(3)
+  snoozedUntil DateTime?            @map("snoozed_until") @db.Timestamptz(3)
+  /// Depois disso o alerta deixa de fazer sentido (ex.: conta já venceu e foi paga).
+  validUntil   DateTime?            @map("valid_until") @db.Timestamptz(3)
+  createdAt    DateTime             @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user      User?     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, dedupeKey])
+  @@index([workspaceId, dismissedAt, priority])
+  @@map("fin_notifications")
+}
+
+model ImportBatch {
+  id           String       @id @default(uuid(7)) @db.Uuid
+  workspaceId  String       @map("workspace_id") @db.Uuid
+  source       ImportSource
+  fileName     String?      @map("file_name")
+  accountId    String?      @map("account_id") @db.Uuid
+  creditCardId String?      @map("credit_card_id") @db.Uuid
+  status       ImportStatus @default(DRAFT)
+  /// Linhas lidas, novas, duplicadas, ignoradas.
+  stats        Json         @default("{}")
+  createdAt    DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
+  committedAt  DateTime?    @map("committed_at") @db.Timestamptz(3)
+
+  workspace    Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  account      Account?      @relation(fields: [accountId], references: [id], onDelete: NoAction)
+  creditCard   CreditCard?   @relation(fields: [creditCardId], references: [id], onDelete: NoAction)
+  transactions Transaction[]
+
+  @@index([workspaceId, createdAt])
+  @@map("fin_import_batches")
+}
+
+/// Trilha de auditoria append-only (quem mudou o quê, antes/depois).
+model FinAuditLog {
+  id          String   @id @default(uuid(7)) @db.Uuid
+  workspaceId String?  @map("workspace_id") @db.Uuid
+  userId      String?  @map("user_id")
+  /// Ex.: "transaction.update", "backup.restore", "auth.login".
+  action      String
+  entityType  String?  @map("entity_type")
+  entityId    String?  @map("entity_id")
+  /// { before, after } apenas dos campos alterados.
+  changes     Json?
+  ipAddress   String?  @map("ip_address")
+  userAgent   String?  @map("user_agent")
+  requestId   String?  @map("request_id")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  workspace Workspace? @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user      User?      @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([workspaceId, entityType, entityId])
+  @@index([workspaceId, createdAt])
+  @@map("fin_audit_logs")
+}
+
+/// Execuções de jobs (recorrências, alertas, snapshots, backup).
+/// (name, runKey) único → cada job roda uma vez por período, mesmo que o
+/// gatilho dispare várias vezes.
+model JobRun {
+  id         String    @id @default(uuid(7)) @db.Uuid
+  name       String
+  runKey     String    @map("run_key")
+  status     JobStatus @default(RUNNING)
+  startedAt  DateTime  @default(now()) @map("started_at") @db.Timestamptz(3)
+  finishedAt DateTime? @map("finished_at") @db.Timestamptz(3)
+  error      String?
+  details    Json?
+
+  @@unique([name, runKey])
+  @@map("fin_job_runs")
+}
+
+/// Fechamento mensal: registro do ritual de conferência com os totais congelados no dia.
+model MonthClose {
+  id          String   @id @default(uuid(7)) @db.Uuid
+  workspaceId String   @map("workspace_id") @db.Uuid
+  /// Mês fechado, "2026-09".
+  month       String   @db.Char(7)
+  closedAt    DateTime @default(now()) @map("closed_at") @db.Timestamptz(3)
+  closedById  String?  @map("closed_by_id")
+  notes       String?
+  /// Receitas, despesas, resultado, patrimônio e maior categoria no momento do fechamento.
+  summary     Json
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, month])
+  @@map("fin_month_closes")
+}

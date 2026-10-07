@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
-import { Eye, EyeOff, Building2, Wallet } from "lucide-react";
+import { Eye, EyeOff, Building2, Wallet, Loader2 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Logo } from "@/components/Logo";
 import { loginSchema, type LoginInput } from "@/lib/validators/usuario";
@@ -44,7 +44,6 @@ export default function LoginPage() {
       }
     } catch {
       toast.error("E-mail ou senha inválidos");
-    } finally {
       setLoading(false);
     }
   }
@@ -105,9 +104,16 @@ export default function LoginPage() {
           boxShadow: "0 25px 60px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.08)",
         }}
       >
+        {/* Barra de progresso enquanto entra */}
+        {loading && (
+          <div className="absolute inset-x-8 top-0 h-[3px] overflow-hidden rounded-b-full" aria-hidden>
+            <div className="login-progress h-full w-1/3 rounded-full" style={{ background: atual.accent }} />
+          </div>
+        )}
+
         {/* Logo */}
         <div className="text-center mb-8">
-          <div className="flex items-center justify-center mb-5">
+          <div className={`flex items-center justify-center mb-5 transition-transform duration-500 ${loading ? "animate-pulse scale-95" : ""}`}>
             <Logo height={90} />
           </div>
 
@@ -156,7 +162,11 @@ export default function LoginPage() {
         </div>
 
         {/* Form */}
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+        <form
+          onSubmit={handleSubmit(onSubmit)}
+          className={`space-y-5 transition-opacity duration-300 ${loading ? "pointer-events-none [&_input]:opacity-60 [&_label]:opacity-60" : ""}`}
+          aria-busy={loading}
+        >
           <div className="space-y-1.5">
             <Label htmlFor="email" className="text-white/70 text-sm font-medium">
               E-mail
@@ -217,14 +227,21 @@ export default function LoginPage() {
 
           <Button
             type="submit"
-            className="w-full h-11 rounded-xl text-sm font-semibold tracking-wide transition-all duration-200"
+            className="w-full h-11 rounded-xl text-sm font-semibold tracking-wide text-white transition-all duration-200 disabled:opacity-100"
             disabled={loading}
             style={{
               background: atual.accent,
               boxShadow: `0 4px 20px ${atual.glow}`,
             }}
           >
-            {loading ? "Entrando..." : `Entrar no ${atual.label}`}
+            {loading ? (
+              <span className="flex items-center justify-center gap-2">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Entrando…
+              </span>
+            ) : (
+              `Entrar no ${atual.label}`
+            )}
           </Button>
         </form>
 

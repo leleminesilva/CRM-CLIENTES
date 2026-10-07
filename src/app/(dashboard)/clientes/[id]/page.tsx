@@ -103,8 +103,8 @@ function PipelineTracker({
                   onClick={() => abrirEtapa(ctx, etapa.estagio)}
                   className={cn(
                     "flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all border",
-                    isActive && "bg-indigo-600 text-white border-indigo-600 shadow-sm",
-                    isPast   && "bg-indigo-600/20 text-indigo-400 border-indigo-600/30 hover:bg-indigo-600/30",
+                    isActive && "bg-primary text-primary-foreground border-primary shadow-sm",
+                    isPast   && "bg-primary/15 text-foreground border-primary/30 hover:bg-primary/25",
                     !isActive && !isPast && "bg-muted text-muted-foreground border-border hover:bg-accent hover:text-accent-foreground",
                   )}
                 >
@@ -204,7 +204,7 @@ function OrcamentoCard({
       </div>
       <div className="space-y-2 text-sm">
         {/* Primeiro Orçamento */}
-        <p className="text-xs font-semibold text-indigo-400 uppercase tracking-wide">Primeiro Orçamento</p>
+        <p className="text-xs font-semibold text-primary uppercase tracking-wide">Primeiro Orçamento</p>
         <div className="flex justify-between">
           <span className="text-muted-foreground">Número</span>
           <span className="font-medium font-mono">{numeroOrcamento || "—"}</span>
@@ -308,7 +308,7 @@ function ObservacoesCard({
             <button
               onClick={() => mutation.mutate()}
               disabled={mutation.isPending}
-              className="text-indigo-500 hover:text-indigo-400 font-medium text-xs flex items-center gap-1"
+              className="text-primary hover:text-primary font-medium text-xs flex items-center gap-1"
             >
               <Check className="w-3.5 h-3.5" />
               {mutation.isPending ? "Salvando..." : "Salvar"}
@@ -730,7 +730,7 @@ export default function ClienteDetalhePage() {
           {cliente.responsavel ? (
             <div className="flex items-center gap-2">
               <Avatar className="w-8 h-8">
-                <AvatarFallback className="text-xs bg-indigo-100 text-indigo-600">
+                <AvatarFallback className="text-xs bg-muted text-foreground">
                   {cliente.responsavel.nome.slice(0, 2).toUpperCase()}
                 </AvatarFallback>
               </Avatar>
@@ -1074,7 +1074,7 @@ export default function ClienteDetalhePage() {
               ) : (
                 cliente.atividades.map(a => (
                   <div key={a.id} className="flex gap-3 items-start">
-                    <div className="w-2 h-2 rounded-full bg-indigo-500 mt-2 shrink-0" />
+                    <div className="w-2 h-2 rounded-full bg-primary mt-2 shrink-0" />
                     <div className="flex-1">
                       <p className="text-sm">{a.descricao}</p>
                       <p className="text-xs text-muted-foreground">{a.user.nome} · {formatDateTime(a.createdAt)}</p>
@@ -1183,7 +1183,7 @@ export default function ClienteDetalhePage() {
                 <Card key={c.id} className="p-4">
                   <div className="flex items-center gap-2 mb-2">
                     <Avatar className="w-6 h-6">
-                      <AvatarFallback className="text-[10px] bg-indigo-100 text-indigo-600">
+                      <AvatarFallback className="text-[10px] bg-muted text-foreground">
                         {c.user.nome.slice(0, 2).toUpperCase()}
                       </AvatarFallback>
                     </Avatar>

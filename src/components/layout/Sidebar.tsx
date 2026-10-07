@@ -293,13 +293,15 @@ export function Sidebar() {
     >
       <Logo height={collapsed ? 28 : 40} className={activeTheme ? undefined : "invert dark:invert-0"} />
       {!collapsed && (
-        <span className="font-black text-base truncate tracking-wide" style={activeTheme ? { fontFamily: activeTheme.fontVar } : undefined}>
-          <span style={activeTheme ? { color: activeTheme.text } : undefined} className={activeTheme ? undefined : "text-sidebar-foreground"}>INFINITY</span>
-          <span
-            className={cn("ml-1", !activeTheme && "text-blue-400")}
-            style={activeTheme ? accentStyle(activeTheme.navIndicator ?? activeTheme.totalLineColor) : undefined}
-          >
-            GLASS
+        <span className="truncate" style={activeTheme ? { fontFamily: activeTheme.fontVar } : undefined}>
+          <span className="font-black text-[15px] tracking-wide">
+            <span style={activeTheme ? { color: activeTheme.text } : undefined} className={activeTheme ? undefined : "text-sidebar-foreground"}>INFINITY</span>
+            <span
+              className={cn("ml-1", !activeTheme && "text-blue-400")}
+              style={activeTheme ? accentStyle(activeTheme.navIndicator ?? activeTheme.totalLineColor) : undefined}
+            >
+              GLASS
+            </span>
           </span>
         </span>
       )}
@@ -358,13 +360,15 @@ export function Sidebar() {
         >
           <div className="flex items-center gap-3">
             <Logo height={40} className={activeTheme ? undefined : "invert dark:invert-0"} />
-            <span className="font-black text-base tracking-wide" style={activeTheme ? { fontFamily: activeTheme.fontVar } : undefined}>
-              <span>INFINITY</span>
-              <span
-                className={cn("ml-1", !activeTheme && "text-blue-400")}
-                style={activeTheme ? accentStyle(activeTheme.navIndicator ?? activeTheme.totalLineColor) : undefined}
-              >
-                GLASS
+            <span style={activeTheme ? { fontFamily: activeTheme.fontVar } : undefined}>
+                  <span className="font-black text-[15px] tracking-wide">
+                <span>INFINITY</span>
+                <span
+                  className={cn("ml-1", !activeTheme && "text-blue-400")}
+                  style={activeTheme ? accentStyle(activeTheme.navIndicator ?? activeTheme.totalLineColor) : undefined}
+                >
+                  GLASS
+                </span>
               </span>
             </span>
           </div>

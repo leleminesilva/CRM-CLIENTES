@@ -209,7 +209,7 @@ export default function ConfiguracoesPage() {
                   className="w-16 h-16 rounded-full object-cover"
                 />
               ) : (
-                <div className="w-16 h-16 bg-indigo-600 rounded-full flex items-center justify-center text-white text-2xl font-bold">
+                <div className="w-16 h-16 bg-primary rounded-full flex items-center justify-center text-primary-foreground text-2xl font-bold">
                   {user?.nome?.slice(0, 2).toUpperCase()}
                 </div>
               )}
@@ -224,7 +224,7 @@ export default function ConfiguracoesPage() {
             <div>
               <p className="font-semibold text-lg">{user?.nome}</p>
               <p className="text-muted-foreground">{user?.email}</p>
-              <p className="text-sm text-indigo-600 font-medium">{ROLE_LABELS[user?.role || ""]}</p>
+              <p className="text-sm text-primary font-medium">{ROLE_LABELS[user?.role || ""]}</p>
               <button
                 type="button"
                 onClick={() => avatarInputRef.current?.click()}
@@ -297,7 +297,7 @@ export default function ConfiguracoesPage() {
 
             <Button
               type="submit"
-              className="w-full bg-indigo-600 hover:bg-indigo-700"
+              className="w-full bg-primary hover:bg-primary/90"
               disabled={!senhaAtual || !novaSenha || !confirmarSenha || mudarSenhaMutation.isPending}
             >
               {mudarSenhaMutation.isPending ? "Alterando..." : "Alterar Senha"}
@@ -415,7 +415,7 @@ export default function ConfiguracoesPage() {
             <div className="space-y-2">
               <p className="text-sm font-medium">Exportar tudo</p>
               <Button
-                className="w-full bg-indigo-600 hover:bg-indigo-700"
+                className="w-full bg-primary hover:bg-primary/90"
                 onClick={() => handleExport()}
                 disabled={exportando}
               >

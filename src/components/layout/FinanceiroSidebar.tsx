@@ -3,22 +3,24 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, ArrowLeftRight, BarChart3, Landmark, Car, Shield, Building2, ChevronLeft, ChevronRight, X } from "lucide-react";
+import { Car, Shield, Building2, ChevronLeft, ChevronRight, X } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { Logo } from "@/components/Logo";
 import { useSidebar } from "@/contexts/SidebarContext";
+import { NAV_FOOTER, NAV_GROUPS, isActive, type NavGroup } from "@fin/components/layout/nav";
 
 // Sidebar própria do Financeiro — separada da <Sidebar> do CRM de propósito
-// (o usuário não quer ver o menu do CRM enquanto está no Financeiro). Conforme
-// novas telas forem sendo criadas dentro do Financeiro, é só ir adicionando
-// itens aqui.
-const navItems: { href: string; label: string; icon: React.ElementType }[] = [
-  { href: "/financeiro", label: "Visão geral", icon: LayoutDashboard },
-  { href: "/financeiro/caixa", label: "Caixa", icon: ArrowLeftRight },
-  { href: "/financeiro/relatorios", label: "Relatórios", icon: BarChart3 },
-  { href: "/financeiro/contas", label: "Contas", icon: Landmark },
-  { href: "/financeiro/carros", label: "Carros", icon: Car },
-  { href: "/financeiro/auditoria", label: "Auditoria", icon: Shield },
+// (o usuário não quer ver o menu do CRM enquanto está no Financeiro). Os grupos vêm do
+// Financeiro novo (src/fin/components/layout/nav.ts); Carros e Auditoria são do CRM.
+const GROUPS: NavGroup[] = [
+  ...NAV_GROUPS,
+  {
+    label: "Operação",
+    items: [
+      { href: "/financeiro/carros", label: "Carros", icon: Car },
+      { href: "/financeiro/auditoria", label: "Auditoria", icon: Shield },
+    ],
+  },
 ];
 
 function NavLink({
@@ -32,16 +34,16 @@ function NavLink({
       href={href}
       onClick={onClick}
       className={cn(
-        "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors",
+        "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
         active
-          ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"
+          ? "bg-primary text-primary-foreground"
           : "text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-foreground/10",
         collapsed && "justify-center px-2"
       )}
       title={collapsed ? label : undefined}
     >
-      <Icon className="w-5 h-5 shrink-0" />
-      {!collapsed && <span>{label}</span>}
+      <Icon className="w-[18px] h-[18px] shrink-0" />
+      {!collapsed && <span className="truncate">{label}</span>}
     </Link>
   );
 }
@@ -49,16 +51,36 @@ function NavLink({
 function SidebarContent({ collapsed, onLinkClick }: { collapsed: boolean; onLinkClick?: () => void }) {
   const pathname = usePathname();
   return (
-    <nav className="flex-1 px-2 py-4 space-y-1">
-      {navItems.map((item) => (
-        <NavLink
-          key={item.href}
-          {...item}
-          active={pathname === item.href}
-          collapsed={collapsed}
-          onClick={onLinkClick}
-        />
+    <nav className="flex-1 min-h-0 overflow-y-auto px-2 py-3 space-y-4 scrollbar-thin">
+      {GROUPS.map((group) => (
+        <div key={group.label} className="space-y-0.5">
+          {!collapsed && (
+            <p className="px-3 pb-1 text-[11px] font-semibold uppercase tracking-wider text-sidebar-foreground/45">
+              {group.label}
+            </p>
+          )}
+          {group.items.map((item) => (
+            <NavLink
+              key={item.href}
+              {...item}
+              active={isActive(pathname, item.href)}
+              collapsed={collapsed}
+              onClick={onLinkClick}
+            />
+          ))}
+        </div>
       ))}
+      <div className="space-y-0.5 border-t border-sidebar-border pt-3">
+        {NAV_FOOTER.map((item) => (
+          <NavLink
+            key={item.href}
+            {...item}
+            active={isActive(pathname, item.href)}
+            collapsed={collapsed}
+            onClick={onLinkClick}
+          />
+        ))}
+      </div>
     </nav>
   );
 }
@@ -87,8 +109,8 @@ export function FinanceiroSidebar() {
     <div className={cn("flex items-center h-16 border-b border-sidebar-border shrink-0", collapsed ? "justify-center px-2" : "gap-3 px-4")}>
       <Logo height={collapsed ? 28 : 40} className="invert dark:invert-0" />
       {!collapsed && (
-        <span className="font-black text-base truncate tracking-wide text-sidebar-foreground">
-          INFINITY<span className="ml-1 text-emerald-500">GLASS</span>
+        <span className="truncate text-sidebar-foreground">
+          <span className="font-black text-[15px] tracking-wide">INFINITY<span className="ml-1 text-blue-400">GLASS</span></span>
         </span>
       )}
     </div>
@@ -130,8 +152,8 @@ export function FinanceiroSidebar() {
         <div className="flex items-center justify-between h-16 px-4 border-b border-sidebar-border shrink-0">
           <div className="flex items-center gap-3">
             <Logo height={40} className="invert dark:invert-0" />
-            <span className="font-black text-base tracking-wide">
-              INFINITY<span className="ml-1 text-emerald-500">GLASS</span>
+            <span>
+              <span className="font-black text-[15px] tracking-wide">INFINITY<span className="ml-1 text-blue-400">GLASS</span></span>
             </span>
           </div>
           <button onClick={closeMobile} className="p-1.5 rounded-lg hover:bg-sidebar-foreground/10 transition-colors">

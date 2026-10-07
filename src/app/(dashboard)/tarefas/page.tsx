@@ -63,7 +63,7 @@ function NovaTarefaDialog({ onSuccess }: { onSuccess: () => void }) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button className="bg-indigo-600 hover:bg-indigo-700">
+        <Button className="bg-primary hover:bg-primary/90">
           <Plus className="w-4 h-4 mr-2" />
           Nova Tarefa
         </Button>
@@ -120,7 +120,7 @@ function NovaTarefaDialog({ onSuccess }: { onSuccess: () => void }) {
           <div className="flex justify-end gap-2">
             <Button variant="outline" onClick={() => { setOpen(false); setAtribuicao(ATRIBUICAO_INICIAL); }}>Cancelar</Button>
             <Button
-              className="bg-indigo-600 hover:bg-indigo-700"
+              className="bg-primary hover:bg-primary/90"
               onClick={criar}
               disabled={!form.titulo || !form.dataVencimento || mutation.isPending}
             >

@@ -124,7 +124,7 @@ export default function AuditoriaPage() {
                     <td className="p-4">
                       <div className="flex items-center gap-2">
                         <Avatar className="w-7 h-7">
-                          <AvatarFallback className="text-xs bg-indigo-100 text-indigo-600">
+                          <AvatarFallback className="text-xs bg-muted text-foreground">
                             {log.user?.nome?.slice(0, 2).toUpperCase()}
                           </AvatarFallback>
                         </Avatar>

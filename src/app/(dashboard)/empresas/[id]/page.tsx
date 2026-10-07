@@ -36,8 +36,8 @@ export default function EmpresaDetalhePage() {
         </Button>
         <div className="flex-1">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 bg-indigo-100 dark:bg-indigo-900 rounded-xl flex items-center justify-center">
-              <Building2 className="w-6 h-6 text-indigo-600" />
+            <div className="w-12 h-12 bg-muted rounded-xl flex items-center justify-center">
+              <Building2 className="w-6 h-6 text-primary" />
             </div>
             <div>
               <h2 className="text-2xl font-bold">{empresa.nomeFantasia || empresa.razaoSocial}</h2>
@@ -67,7 +67,7 @@ export default function EmpresaDetalhePage() {
             {empresa.website && (
               <div className="flex items-center gap-2 text-sm">
                 <Globe className="w-4 h-4 text-muted-foreground" />
-                <a href={empresa.website} target="_blank" rel="noreferrer" className="hover:underline text-indigo-600">
+                <a href={empresa.website} target="_blank" rel="noreferrer" className="hover:underline text-primary">
                   {empresa.website}
                 </a>
               </div>
@@ -95,7 +95,7 @@ export default function EmpresaDetalhePage() {
               empresa.contatos.map((c: { id: string; nome: string; cargo?: string; email?: string; principal?: boolean }) => (
                 <div key={c.id} className="flex items-center gap-3">
                   <Avatar className="w-8 h-8">
-                    <AvatarFallback className="text-xs bg-violet-100 text-violet-600">
+                    <AvatarFallback className="text-xs bg-muted text-foreground">
                       {c.nome.slice(0, 2).toUpperCase()}
                     </AvatarFallback>
                   </Avatar>

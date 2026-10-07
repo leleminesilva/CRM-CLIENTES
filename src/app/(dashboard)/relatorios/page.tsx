@@ -203,7 +203,7 @@ export default function RelatoriosPage() {
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 <KPICard title="Leads Gerados" value={comercial?.leadsGerados ?? 0} />
                 <KPICard title="Leads Convertidos" value={comercial?.leadsConvertidos ?? 0} color="text-emerald-600" />
-                <KPICard title="Taxa de Conversão" value={`${comercial?.taxaConversaoLeads ?? 0}%`} color="text-indigo-600" />
+                <KPICard title="Taxa de Conversão" value={`${comercial?.taxaConversaoLeads ?? 0}%`} color="text-primary" />
                 <KPICard title="Vendas Fechadas" value={comercial?.vendasFechadas ?? 0} color="text-emerald-600" />
                 <KPICard title="Receita Fechada" value={formatCurrency(comercial?.receitaFechada ?? 0)} color="text-emerald-600" />
                 <KPICard title="Ticket Médio" value={formatCurrency(comercial?.ticketMedio ?? 0)} />
@@ -413,10 +413,10 @@ export default function RelatoriosPage() {
                 </Card>
                 <Card className="p-4 col-span-2">
                   <div className="flex items-center gap-2 mb-1">
-                    <DollarSign className="w-4 h-4 text-indigo-500" />
+                    <DollarSign className="w-4 h-4 text-primary" />
                     <p className="text-sm text-muted-foreground">Em Negociação (Pipeline Atual)</p>
                   </div>
-                  <p className="text-3xl font-bold text-indigo-600">{formatCurrency(financeiro?.receitaPrevista ?? 0)}</p>
+                  <p className="text-3xl font-bold text-primary">{formatCurrency(financeiro?.receitaPrevista ?? 0)}</p>
                   <p className="text-xs text-muted-foreground mt-1">Orçamentos pendentes de aprovação</p>
                 </Card>
                 <KPICard title="Ticket Médio" value={formatCurrency(financeiro?.ticketMedio ?? 0)} />
@@ -698,7 +698,7 @@ export default function RelatoriosPage() {
                             <tr key={c.id} className="border-b hover:bg-muted/30">
                               <td className="p-3 font-medium">
                                 {c.clienteId ? (
-                                  <Link href={`/clientes/${c.clienteId}`} className="hover:text-indigo-400 flex items-center gap-1">
+                                  <Link href={`/clientes/${c.clienteId}`} className="hover:text-primary flex items-center gap-1">
                                     {c.clienteNome}
                                     <ExternalLink className="w-3 h-3 opacity-50" />
                                   </Link>
@@ -709,7 +709,7 @@ export default function RelatoriosPage() {
                                 <div className="flex flex-wrap gap-1">
                                   {c.servico !== "—"
                                     ? c.servico.split(",").map((s) => s.trim()).filter(Boolean).map((s) => (
-                                        <span key={s} className="inline-flex px-1.5 py-0.5 rounded text-xs bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">{s}</span>
+                                        <span key={s} className="inline-flex px-1.5 py-0.5 rounded text-xs bg-indigo-500/10 text-primary border border-primary/20">{s}</span>
                                       ))
                                     : <span className="text-muted-foreground">—</span>}
                                 </div>
@@ -817,7 +817,7 @@ export default function RelatoriosPage() {
                               <div className="flex flex-wrap gap-1">
                                 {c.servico !== "—"
                                   ? c.servico.split(",").map((s) => s.trim()).filter(Boolean).map((s) => (
-                                      <span key={s} className="inline-flex px-1.5 py-0.5 rounded text-xs bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">{s}</span>
+                                      <span key={s} className="inline-flex px-1.5 py-0.5 rounded text-xs bg-indigo-500/10 text-primary border border-primary/20">{s}</span>
                                     ))
                                   : <span className="text-muted-foreground">—</span>}
                               </div>

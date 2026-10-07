@@ -266,8 +266,8 @@ export default function DashboardPage() {
             </Select>
 
             {/* Seletor de intervalo de datas customizado */}
-            <div className={`flex items-center gap-1.5 bg-muted px-2 py-1 rounded-lg border ${usandoDataCustom ? "border-indigo-500" : "border-transparent"}`}>
-              <CalendarRange className={`w-4 h-4 shrink-0 ${usandoDataCustom ? "text-indigo-500" : "text-muted-foreground"}`} />
+            <div className={`flex items-center gap-1.5 bg-muted px-2 py-1 rounded-lg border ${usandoDataCustom ? "border-primary" : "border-transparent"}`}>
+              <CalendarRange className={`w-4 h-4 shrink-0 ${usandoDataCustom ? "text-primary" : "text-muted-foreground"}`} />
               <input
                 type="date"
                 value={dataInicio}
@@ -300,7 +300,7 @@ export default function DashboardPage() {
               value={vendedorId || "_all"}
               onValueChange={(v) => setVendedorId(v === "_all" ? "" : v)}
             >
-              <SelectTrigger className={`h-9 w-48 text-sm ${vendedorId ? "border-indigo-500 text-indigo-600 dark:text-indigo-400" : ""}`}>
+              <SelectTrigger className={`h-9 w-48 text-sm ${vendedorId ? "border-primary text-foreground" : ""}`}>
                 <SelectValue placeholder="Todos os vendedores" />
               </SelectTrigger>
               <SelectContent>

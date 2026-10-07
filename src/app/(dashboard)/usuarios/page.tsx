@@ -152,7 +152,7 @@ function UserFormDialog({
           <div className="flex justify-end gap-2 pt-2">
             <Button variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
             <Button
-              className="bg-indigo-600 hover:bg-indigo-700"
+              className="bg-primary hover:bg-primary/90"
               onClick={() => { onSubmit(form); setOpen(false); }}
               disabled={!valid || isPending}
             >
@@ -269,7 +269,7 @@ export default function UsuariosPage() {
         <UserFormDialog
           title="Adicionar Funcionário"
           trigger={
-            <Button className="bg-indigo-600 hover:bg-indigo-700">
+            <Button className="bg-primary hover:bg-primary/90">
               <Plus className="w-4 h-4 mr-2" />
               Novo Funcionário
             </Button>
@@ -283,7 +283,7 @@ export default function UsuariosPage() {
       {/* KPI Row */}
       <div className="grid grid-cols-3 gap-2 sm:gap-4">
         {[
-          { label: "Total", value: usuarios.length, icon: Users,     color: "text-indigo-600" },
+          { label: "Total", value: usuarios.length, icon: Users,     color: "text-primary" },
           { label: "Ativos",  value: ativos,         icon: UserCheck, color: "text-emerald-600" },
           { label: "Inativos",value: inativos,       icon: UserX,     color: "text-red-500" },
         ].map(s => (
@@ -346,7 +346,7 @@ export default function UsuariosPage() {
                   >
                     <Avatar className="w-11 h-11">
                       {u.avatar && <AvatarImage src={u.avatar} alt={u.nome} />}
-                      <AvatarFallback className="bg-indigo-100 dark:bg-indigo-900 text-indigo-700 font-bold text-sm">
+                      <AvatarFallback className="bg-muted text-foreground font-bold text-sm">
                         {u.nome.slice(0, 2).toUpperCase()}
                       </AvatarFallback>
                     </Avatar>

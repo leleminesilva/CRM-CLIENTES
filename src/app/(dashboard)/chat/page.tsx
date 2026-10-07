@@ -100,7 +100,7 @@ function NovoDmDialog({ open, onClose, onSelect, excluirId }: { open: boolean; o
                 onClick={() => onSelect(u)}
                 className="w-full flex items-center gap-3 px-2 py-2 rounded-lg hover:bg-accent transition-colors text-left"
               >
-                <div className="w-9 h-9 rounded-full bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400 flex items-center justify-center text-xs font-bold shrink-0">
+                <div className="w-9 h-9 rounded-full bg-muted text-foreground flex items-center justify-center text-xs font-bold shrink-0">
                   {getInitials(u.nome)}
                 </div>
                 <span className="text-sm font-medium">{u.nome}</span>
@@ -139,7 +139,7 @@ function ListaConversas({
               selecionado?.tipo === "geral" && "bg-accent"
             )}
           >
-            <div className="w-9 h-9 rounded-full bg-indigo-600 text-white flex items-center justify-center shrink-0">
+            <div className="w-9 h-9 rounded-full bg-primary text-primary-foreground flex items-center justify-center shrink-0">
               <Hash className="w-4 h-4" />
             </div>
             <div className="flex-1 min-w-0">
@@ -147,7 +147,7 @@ function ListaConversas({
               <p className="text-xs text-muted-foreground">Canal de toda a equipe</p>
             </div>
             {!!resumo?.naoLidasGeral && (
-              <Badge className="bg-indigo-600 text-white h-5 min-w-[20px] shrink-0 text-xs px-1.5">{resumo.naoLidasGeral}</Badge>
+              <Badge className="bg-primary text-primary-foreground h-5 min-w-[20px] shrink-0 text-xs px-1.5">{resumo.naoLidasGeral}</Badge>
             )}
           </button>
         </div>
@@ -168,7 +168,7 @@ function ListaConversas({
                 selecionado?.tipo === "dm" && selecionado.usuario.id === c.usuario.id && "bg-accent"
               )}
             >
-              <div className="w-9 h-9 rounded-full bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400 flex items-center justify-center text-xs font-bold shrink-0">
+              <div className="w-9 h-9 rounded-full bg-muted text-foreground flex items-center justify-center text-xs font-bold shrink-0">
                 {getInitials(c.usuario.nome)}
               </div>
               <div className="flex-1 min-w-0">
@@ -178,7 +178,7 @@ function ListaConversas({
                 </div>
                 <p className="text-xs text-muted-foreground truncate">{c.ultimaMensagem.conteudo}</p>
               </div>
-              {c.naoLidas > 0 && <Badge className="bg-indigo-600 text-white h-5 min-w-[20px] shrink-0 text-xs px-1.5">{c.naoLidas}</Badge>}
+              {c.naoLidas > 0 && <Badge className="bg-primary text-primary-foreground h-5 min-w-[20px] shrink-0 text-xs px-1.5">{c.naoLidas}</Badge>}
             </button>
           ))}
         </div>
@@ -285,7 +285,7 @@ function AreaMensagens({ selecionado }: { selecionado: { tipo: "geral" } | { tip
   return (
     <div className="flex-1 flex flex-col min-w-0 min-h-0">
       <div className="h-14 flex items-center gap-3 px-4 border-b border-border bg-card shrink-0">
-        <div className={cn("w-9 h-9 rounded-full flex items-center justify-center shrink-0", selecionado.tipo === "geral" ? "bg-indigo-600 text-white" : "bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400 text-xs font-bold")}>
+        <div className={cn("w-9 h-9 rounded-full flex items-center justify-center shrink-0", selecionado.tipo === "geral" ? "bg-primary text-primary-foreground" : "bg-muted text-foreground text-xs font-bold")}>
           {selecionado.tipo === "geral" ? <Hash className="w-4 h-4" /> : getInitials(selecionado.usuario.nome)}
         </div>
         <div className="flex-1 min-w-0">
@@ -312,17 +312,17 @@ function AreaMensagens({ selecionado }: { selecionado: { tipo: "geral" } | { tip
                     return (
                       <div key={msg.id} className={cn("flex gap-2", minha ? "justify-end" : "justify-start")}>
                         {!minha && selecionado.tipo === "geral" && (
-                          <div className="w-7 h-7 rounded-full bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400 flex items-center justify-center text-[10px] font-bold shrink-0 mt-auto">
+                          <div className="w-7 h-7 rounded-full bg-muted text-foreground flex items-center justify-center text-[10px] font-bold shrink-0 mt-auto">
                             {getInitials(msg.autor.nome)}
                           </div>
                         )}
-                        <div className={cn("max-w-[70%] rounded-2xl px-3.5 py-2 text-sm shadow-sm", minha ? "bg-indigo-600 text-white rounded-tr-sm" : "bg-card text-foreground rounded-tl-sm border border-border")}>
+                        <div className={cn("max-w-[70%] rounded-2xl px-3.5 py-2 text-sm shadow-sm", minha ? "bg-primary text-primary-foreground rounded-tr-sm" : "bg-card text-foreground rounded-tl-sm border border-border")}>
                           {!minha && selecionado.tipo === "geral" && (
-                            <p className="text-xs font-semibold mb-0.5 text-indigo-500">{msg.autor.nome}</p>
+                            <p className="text-xs font-semibold mb-0.5 text-primary">{msg.autor.nome}</p>
                           )}
                           <p className="whitespace-pre-wrap break-words">{msg.conteudo}</p>
                           <div className={cn("flex items-center gap-1 mt-1", minha ? "justify-end" : "justify-start")}>
-                            <span className={cn("text-[10px]", minha ? "text-indigo-200" : "text-muted-foreground")}>{formatMsgTime(msg.createdAt)}</span>
+                            <span className={cn("text-[10px]", minha ? "text-primary-foreground/70" : "text-muted-foreground")}>{formatMsgTime(msg.createdAt)}</span>
                           </div>
                         </div>
                       </div>
@@ -343,13 +343,13 @@ function AreaMensagens({ selecionado }: { selecionado: { tipo: "geral" } | { tip
             onKeyDown={handleKeyDown}
             placeholder="Digite uma mensagem... (Enter para enviar)"
             rows={1}
-            className="flex-1 resize-none rounded-xl border border-input bg-background px-3.5 py-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition-all min-h-[42px] max-h-32"
+            className="flex-1 resize-none rounded-xl border border-input bg-background px-3.5 py-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-primary transition-all min-h-[42px] max-h-32"
             style={{ scrollbarWidth: "none" }}
           />
           <button
             disabled={!texto.trim() || enviar.isPending}
             onClick={() => texto.trim() && enviar.mutate(texto.trim())}
-            className="w-10 h-10 rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white shrink-0 flex items-center justify-center"
+            className="w-10 h-10 rounded-xl bg-primary hover:bg-primary/90 disabled:opacity-50 text-primary-foreground shrink-0 flex items-center justify-center"
           >
             {enviar.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
           </button>

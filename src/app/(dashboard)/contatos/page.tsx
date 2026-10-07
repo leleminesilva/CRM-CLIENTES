@@ -51,7 +51,7 @@ function NovoContatoDialog({ onSuccess }: { onSuccess: () => void }) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button className="bg-indigo-600 hover:bg-indigo-700">
+        <Button className="bg-primary hover:bg-primary/90">
           <Plus className="w-4 h-4 mr-2" />
           Novo Contato
         </Button>
@@ -93,7 +93,7 @@ function NovoContatoDialog({ onSuccess }: { onSuccess: () => void }) {
           <div className="flex justify-end gap-2">
             <Button variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
             <Button
-              className="bg-indigo-600 hover:bg-indigo-700"
+              className="bg-primary hover:bg-primary/90"
               onClick={() => mutation.mutate()}
               disabled={!form.nome || mutation.isPending}
             >
@@ -171,7 +171,7 @@ export default function ContatosPage() {
             <Card key={c.id} className="p-4 hover:shadow-md transition-shadow">
               <div className="flex items-start gap-3">
                 <Avatar className="w-10 h-10 shrink-0">
-                  <AvatarFallback className="bg-violet-100 dark:bg-violet-900 text-violet-600">
+                  <AvatarFallback className="bg-muted text-foreground">
                     {c.nome.slice(0, 2).toUpperCase()}
                   </AvatarFallback>
                 </Avatar>

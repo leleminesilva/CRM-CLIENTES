@@ -1,16 +1,21 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import { Archivo } from "next/font/google";
 import "./globals.css";
 import { Providers } from "./providers";
 
-const inter = Inter({ subsets: ["latin"] });
+const archivo = Archivo({
+  subsets: ["latin", "latin-ext"],
+  axes: ["wdth"],
+  variable: "--font-archivo",
+  display: "swap",
+});
 
 export const metadata: Metadata = {
   title: {
-    default: "Infinity Glass CRM",
+    default: "Infinity Glass",
     template: "%s | Infinity Glass",
   },
-  description: "Sistema CRM Infinity Glass Vidraçaria — gestão de clientes, leads e oportunidades",
+  description: "Infinity Glass — gestão de clientes, leads, oportunidades e financeiro",
 };
 
 export default function RootLayout({
@@ -20,7 +25,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="pt-BR" suppressHydrationWarning>
-      <body className={inter.className}>
+      <body className={`${archivo.variable} font-sans`}>
         <Providers>{children}</Providers>
       </body>
     </html>

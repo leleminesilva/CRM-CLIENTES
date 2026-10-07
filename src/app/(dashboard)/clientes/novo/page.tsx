@@ -341,7 +341,7 @@ export default function NovoClientePage() {
           <Link href="/clientes">
             <Button variant="outline" type="button">Cancelar</Button>
           </Link>
-          <Button type="submit" className="bg-indigo-600 hover:bg-indigo-700 min-w-[160px]" disabled={mutation.isPending}>
+          <Button type="submit" className="bg-primary hover:bg-primary/90 min-w-[160px]" disabled={mutation.isPending}>
             {mutation.isPending ? "Cadastrando..." : "Cadastrar Cliente"}
           </Button>
         </div>

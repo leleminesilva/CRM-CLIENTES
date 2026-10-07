@@ -34,11 +34,18 @@ export default function FinanceiroLayout({
     }
   }, [semAcesso, router]);
 
+  // Diálogos e menus são renderizados em portais no <body>, fora deste layout:
+  // a classe precisa estar no body para o acento verde valer neles também.
+  useEffect(() => {
+    document.body.classList.add("financeiro-theme");
+    return () => document.body.classList.remove("financeiro-theme");
+  }, []);
+
   if (loading || semAcesso) return null;
 
   return (
     <SidebarProvider>
-      <div className="flex h-svh overflow-hidden bg-background">
+      <div className="financeiro-theme flex h-svh overflow-hidden bg-background text-foreground">
         <FinanceiroSidebar />
         <div className="flex-1 flex flex-col min-w-0 min-h-0 overflow-hidden">
           <FinanceiroTopbar />

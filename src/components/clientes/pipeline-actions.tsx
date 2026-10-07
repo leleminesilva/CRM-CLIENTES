@@ -273,7 +273,7 @@ export function usePipelineActions({ onUpdate }: { onUpdate: () => void }) {
       <Dialog open={orcDialog} onOpenChange={(o) => { if (!o) setOrcDialog(false); }}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-indigo-500">
+            <DialogTitle className="flex items-center gap-2 text-primary">
               <FileText className="w-4 h-4" />
               {orcTargetEstagio === "PROPOSTA_ENVIADA" ? "Orçamento Final" : "Primeiro Orçamento"}
             </DialogTitle>
@@ -313,7 +313,7 @@ export function usePipelineActions({ onUpdate }: { onUpdate: () => void }) {
           <DialogFooter className="gap-2">
             <Button variant="outline" onClick={() => setOrcDialog(false)}>Voltar</Button>
             <Button
-              className="bg-indigo-600 hover:bg-indigo-700"
+              className="bg-primary hover:bg-primary/90"
               disabled={!ctx || !orcNumero || !orcValor || isNaN(parseBRL(orcValor)) || !orcData || mutation.isPending}
               onClick={async () => {
                 if (!ctx) return;

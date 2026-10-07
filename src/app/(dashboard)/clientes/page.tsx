@@ -451,7 +451,7 @@ export default function ClientesPage() {
           </p>
         </div>
         <Link href="/clientes/novo">
-          <Button className="bg-indigo-600 hover:bg-indigo-700" size="sm">
+          <Button className="bg-primary hover:bg-primary/90" size="sm">
             <Plus className="w-4 h-4 mr-2" />
             Novo Cliente
           </Button>
@@ -477,7 +477,7 @@ export default function ClientesPage() {
               <Button variant="outline" size="icon" className="relative shrink-0 md:hidden">
                 <SlidersHorizontal className="w-4 h-4" />
                 {activeFilterCount > 0 && (
-                  <span className="absolute -top-1.5 -right-1.5 flex items-center justify-center w-4 h-4 rounded-full bg-indigo-600 text-[10px] font-bold text-white">
+                  <span className="absolute -top-1.5 -right-1.5 flex items-center justify-center w-4 h-4 rounded-full bg-primary text-[10px] font-bold text-primary-foreground">
                     {activeFilterCount}
                   </span>
                 )}
@@ -497,7 +497,7 @@ export default function ClientesPage() {
                     Limpar
                   </Button>
                 )}
-                <Button onClick={() => setFiltersOpen(false)} className="flex-1 bg-indigo-600 hover:bg-indigo-700">
+                <Button onClick={() => setFiltersOpen(false)} className="flex-1 bg-primary hover:bg-primary/90">
                   Aplicar
                 </Button>
               </DialogFooter>
@@ -530,7 +530,7 @@ export default function ClientesPage() {
             <div className="flex items-start justify-between gap-2">
               <Link href={`/clientes/${c.id}`} className="flex items-center gap-3 flex-1 min-w-0">
                 <Avatar className="w-10 h-10 shrink-0">
-                  <AvatarFallback className="bg-indigo-100 text-indigo-600 text-xs font-bold">
+                  <AvatarFallback className="bg-muted text-foreground text-xs font-bold">
                     {c.nome.slice(0, 2).toUpperCase()}
                   </AvatarFallback>
                 </Avatar>
@@ -564,7 +564,7 @@ export default function ClientesPage() {
                     <div className="flex items-center gap-1.5 mt-1.5">
                       <Avatar className="w-4 h-4">
                         {c.responsavel.avatar && <AvatarImage src={c.responsavel.avatar} alt={c.responsavel.nome} />}
-                        <AvatarFallback className="text-[9px] bg-violet-100 text-violet-600">
+                        <AvatarFallback className="text-[9px] bg-muted text-foreground">
                           {c.responsavel.nome.slice(0, 2).toUpperCase()}
                         </AvatarFallback>
                       </Avatar>
@@ -601,8 +601,8 @@ export default function ClientesPage() {
                   >
                     Temperatura
                     {tempSort === 0 && <ArrowUpDown className="w-3.5 h-3.5 opacity-40 group-hover:opacity-70" />}
-                    {tempSort === 1 && <ArrowUp className="w-3.5 h-3.5 text-indigo-400" />}
-                    {tempSort === 2 && <ArrowDown className="w-3.5 h-3.5 text-indigo-400" />}
+                    {tempSort === 1 && <ArrowUp className="w-3.5 h-3.5 text-primary" />}
+                    {tempSort === 2 && <ArrowDown className="w-3.5 h-3.5 text-primary" />}
                   </button>
                 </th>
                 <th className="p-4">
@@ -613,8 +613,8 @@ export default function ClientesPage() {
                   >
                     Etapa
                     {etapaSort === 0 && <ArrowUpDown className="w-3.5 h-3.5 opacity-40 group-hover:opacity-70" />}
-                    {etapaSort === 1 && <ArrowUp className="w-3.5 h-3.5 text-indigo-400" />}
-                    {etapaSort === 2 && <ArrowDown className="w-3.5 h-3.5 text-indigo-400" />}
+                    {etapaSort === 1 && <ArrowUp className="w-3.5 h-3.5 text-primary" />}
+                    {etapaSort === 2 && <ArrowDown className="w-3.5 h-3.5 text-primary" />}
                   </button>
                 </th>
                 <th className="p-4">
@@ -625,8 +625,8 @@ export default function ClientesPage() {
                   >
                     Inclusão
                     {sortMode === 0 && <ArrowUpDown className="w-3.5 h-3.5 opacity-40 group-hover:opacity-70" />}
-                    {sortMode === 1 && <ArrowUp className="w-3.5 h-3.5 text-indigo-400" />}
-                    {sortMode === 2 && <ArrowDown className="w-3.5 h-3.5 text-indigo-400" />}
+                    {sortMode === 1 && <ArrowUp className="w-3.5 h-3.5 text-primary" />}
+                    {sortMode === 2 && <ArrowDown className="w-3.5 h-3.5 text-primary" />}
                   </button>
                 </th>
                 <th className="p-4">
@@ -638,8 +638,8 @@ export default function ClientesPage() {
                     >
                       Responsável
                       {respSort === 0 && <ArrowUpDown className="w-3.5 h-3.5 opacity-40 group-hover:opacity-70" />}
-                      {respSort === 1 && <ArrowUp className="w-3.5 h-3.5 text-indigo-400" />}
-                      {respSort === 2 && <ArrowDown className="w-3.5 h-3.5 text-indigo-400" />}
+                      {respSort === 1 && <ArrowUp className="w-3.5 h-3.5 text-primary" />}
+                      {respSort === 2 && <ArrowDown className="w-3.5 h-3.5 text-primary" />}
                     </button>
                   ) : (
                     <span className="text-left font-medium text-muted-foreground">Responsável</span>
@@ -682,7 +682,7 @@ export default function ClientesPage() {
                   <td className="p-4">
                     <div className="flex items-center gap-3">
                       <Avatar className="w-8 h-8">
-                        <AvatarFallback className="bg-indigo-100 text-indigo-600 text-xs">
+                        <AvatarFallback className="bg-muted text-foreground text-xs">
                           {c.nome.slice(0, 2).toUpperCase()}
                         </AvatarFallback>
                       </Avatar>
@@ -703,7 +703,7 @@ export default function ClientesPage() {
                     {c.servicoBuscado
                       ? <div className="flex flex-wrap gap-1">
                           {c.servicoBuscado.split(",").map(s => s.trim()).filter(Boolean).map(s => (
-                            <span key={s} className="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">{s}</span>
+                            <span key={s} className="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-muted text-foreground border border-border">{s}</span>
                           ))}
                         </div>
                       : <span className="text-muted-foreground text-xs">—</span>}
@@ -735,7 +735,7 @@ export default function ClientesPage() {
                       <div className="flex items-center gap-2">
                         <Avatar className="w-6 h-6">
                           {c.responsavel.avatar && <AvatarImage src={c.responsavel.avatar} alt={c.responsavel.nome} />}
-                          <AvatarFallback className="text-xs bg-violet-100 text-violet-600">
+                          <AvatarFallback className="text-xs bg-muted text-foreground">
                             {c.responsavel.nome.slice(0, 2).toUpperCase()}
                           </AvatarFallback>
                         </Avatar>

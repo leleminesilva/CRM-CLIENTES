@@ -59,7 +59,7 @@ export function FinanceiroTopbar() {
             <Button variant="ghost" className="flex items-center gap-2 h-9 px-2">
               <Avatar className="w-8 h-8">
                 <AvatarImage src={user?.avatar || undefined} />
-                <AvatarFallback className="bg-emerald-600 text-white text-xs">{initials}</AvatarFallback>
+                <AvatarFallback className="bg-primary text-primary-foreground text-xs">{initials}</AvatarFallback>
               </Avatar>
               <div className="hidden md:block text-left">
                 <p className="text-sm font-medium leading-none">{user?.nome}</p>

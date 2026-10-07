@@ -2,7 +2,7 @@ import prisma from "@/lib/prisma";
 import type { WhatsAppConversa, WhatsAppSessao, Prisma } from "@prisma/client";
 import { sendWhatsAppMessage } from "./send";
 import { emit } from "./events";
-import { hasPermission } from "@/lib/rbac";
+import { hasPermission, WHATSAPP_STANDBY } from "@/lib/rbac";
 import { paraJidNumero } from "@/lib/utils/phone";
 import { waLogger } from "./logger";
 
@@ -165,6 +165,8 @@ export async function executarAutomacoesClienteCadastrado(cliente: {
   whatsapp?: string | null;
   responsavelId?: string | null;
 }): Promise<void> {
+  // Módulo em standby (src/lib/rbac.ts): nada sai pelo WhatsApp, nem as boas-vindas do cadastro.
+  if (WHATSAPP_STANDBY) return;
   const numero = paraJidNumero(cliente.whatsapp);
   if (!numero) return;
 

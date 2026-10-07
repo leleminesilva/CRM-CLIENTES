@@ -40,6 +40,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useDevTheme } from "@/contexts/DevThemeContext";
 import type { DevTheme } from "@/lib/devThemes";
 import { cn } from "@/lib/utils/cn";
+import { ATUALIZACAO_MS } from "@/lib/atualizacao";
 
 const SERVICE_COLORS = ["#6366f1","#3b82f6","#10b981","#f59e0b","#f97316","#ec4899","#8b5cf6","#14b8a6"];
 const VENDOR_COLORS  = ["#6366f1","#10b981","#f59e0b","#3b82f6","#f97316","#ec4899"];
@@ -172,7 +173,7 @@ export default function DashboardPage() {
       const { data } = await axios.get(`/api/dashboard?${params}`);
       return data.data;
     },
-    refetchInterval: 60000,
+    refetchInterval: ATUALIZACAO_MS,
   });
 
   if (isLoading) {

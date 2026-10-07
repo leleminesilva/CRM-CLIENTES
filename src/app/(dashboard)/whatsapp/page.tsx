@@ -32,6 +32,7 @@ import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/lib/supabase";
 import { WHATSAPP_STANDBY } from "@/lib/rbac";
+import { ATUALIZACAO_MS } from "@/lib/atualizacao";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -2077,7 +2078,7 @@ function QuadroKanban({
       return data as Conversa[];
     },
     enabled: !!sessaoId,
-    refetchInterval: 8000,
+    refetchInterval: ATUALIZACAO_MS,
   });
 
   const { data: sessoesQuadro = [] } = useQuery({
@@ -2098,7 +2099,7 @@ function QuadroKanban({
         primeiraRespostaMs: number | null; conversao7d: number | null;
       };
     },
-    refetchInterval: 30000,
+    refetchInterval: ATUALIZACAO_MS,
   });
 
   const mover = useMutation({
@@ -3206,7 +3207,7 @@ function WhatsAppContent() {
       return data as Conversa[];
     },
     enabled: !!sessaoId,
-    refetchInterval: 5000,
+    refetchInterval: ATUALIZACAO_MS,
   });
 
   // Busca todas conversas quando vem via ?phone= para encontrar em qualquer sessão

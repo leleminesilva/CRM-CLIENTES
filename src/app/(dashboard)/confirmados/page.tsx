@@ -42,6 +42,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { formatCurrency, formatDate, STATUS_POS_VENDA_LABELS } from "@/lib/utils/formatters";
 import { useAuth } from "@/contexts/AuthContext";
 import type { StatusPosVenda, Venda } from "@/types";
+import { ATUALIZACAO_MS } from "@/lib/atualizacao";
 
 const ETAPAS: StatusPosVenda[] = ["AGUARDANDO_VIDRO", "VIDRO_CHEGOU", "AGENDADO", "CONCLUIDO"];
 
@@ -413,7 +414,7 @@ export default function ConfirmadosPage() {
       const { data } = await axios.get("/api/vendas");
       return data.data as Venda[];
     },
-    refetchInterval: 30000,
+    refetchInterval: ATUALIZACAO_MS,
   });
 
   const { data: vendedoresData } = useQuery({

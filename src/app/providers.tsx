@@ -6,6 +6,7 @@ import { ThemeProvider } from "next-themes";
 import { Toaster } from "sonner";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { useState } from "react";
+import { ATUALIZACAO_MS, DADOS_FRESCOS_MS } from "@/lib/atualizacao";
 
 export function Providers({ children }: { children: React.ReactNode }) {
   const [queryClient] = useState(
@@ -13,10 +14,10 @@ export function Providers({ children }: { children: React.ReactNode }) {
       new QueryClient({
         defaultOptions: {
           queries: {
-            staleTime: 0,
+            staleTime: DADOS_FRESCOS_MS,      // ao voltar para a aba, só reconsulta dados com mais de 1 min
             refetchOnWindowFocus: true,
             refetchOnMount: true,
-            refetchInterval: 30000,          // atualiza automaticamente a cada 30s
+            refetchInterval: ATUALIZACAO_MS,   // atualiza automaticamente a cada 5 min (ver src/lib/atualizacao.ts)
             refetchIntervalInBackground: false, // pausa quando a aba está em segundo plano
             retry: 1,
           },

@@ -21,6 +21,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { formatDateTime, formatCurrency } from "@/lib/utils/formatters";
+import { RITMO_FINANCEIRO } from "@/lib/atualizacao";
 
 interface Carro {
   id: string; numero: string; modelo: string; ano: number; placa: string; cor: string | null;
@@ -47,12 +48,14 @@ function toDatetimeLocalValue(d: Date) {
 
 function useCarros() {
   return useQuery({
+    ...RITMO_FINANCEIRO,
     queryKey: ["financeiro-carros"],
     queryFn: async () => (await axios.get("/api/financeiro/carros")).data.data as Carro[],
   });
 }
 function useMotoristas() {
   return useQuery({
+    ...RITMO_FINANCEIRO,
     queryKey: ["financeiro-motoristas"],
     queryFn: async () => (await axios.get("/api/financeiro/motoristas")).data.data as Motorista[],
   });
@@ -61,18 +64,21 @@ function useMotoristas() {
 // um carro/motorista que já foi excluído/arquivado depois de ter uso registrado.
 function useCarrosTodos() {
   return useQuery({
+    ...RITMO_FINANCEIRO,
     queryKey: ["financeiro-carros", "todos"],
     queryFn: async () => (await axios.get("/api/financeiro/carros?todos=true")).data.data as Carro[],
   });
 }
 function useMotoristasTodos() {
   return useQuery({
+    ...RITMO_FINANCEIRO,
     queryKey: ["financeiro-motoristas", "todos"],
     queryFn: async () => (await axios.get("/api/financeiro/motoristas?todos=true")).data.data as Motorista[],
   });
 }
 function useContasFinanceiro() {
   return useQuery({
+    ...RITMO_FINANCEIRO,
     queryKey: ["fin-contas"],
     queryFn: async () => (await axios.get("/api/fin/contas")).data.data as ContaFinanceira[],
   });
@@ -696,6 +702,7 @@ export default function CarrosPage() {
   }
 
   const { data: historicoResp } = useQuery({
+    ...RITMO_FINANCEIRO,
     queryKey: ["financeiro-carro-usos", filtros, page],
     queryFn: async () => {
       const params = new URLSearchParams({ limit: String(HISTORICO_LIMIT), page: String(page) });

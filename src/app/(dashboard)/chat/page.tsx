@@ -13,9 +13,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { cn } from "@/lib/utils/cn";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
+import { ATUALIZACAO_MS } from "@/lib/atualizacao";
 
-const POLL_RESUMO_MS = 5000;
-const POLL_MENSAGENS_MS = 3000;
+const POLL_RESUMO_MS = ATUALIZACAO_MS;
+const POLL_MENSAGENS_MS = ATUALIZACAO_MS;
 
 interface Usuario {
   id: string;

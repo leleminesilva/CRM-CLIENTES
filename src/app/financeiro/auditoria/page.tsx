@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { formatDateTime, formatCurrency } from "@/lib/utils/formatters";
+import { RITMO_FINANCEIRO } from "@/lib/atualizacao";
 
 interface AuditLog {
   id: string;
@@ -94,6 +95,7 @@ export default function FinanceiroAuditoriaPage() {
   const [expandido, setExpandido] = useState<string | null>(null);
 
   const { data, isLoading } = useQuery({
+    ...RITMO_FINANCEIRO,
     queryKey: ["financeiro-auditoria", page, entidade, acao, de, ate],
     queryFn: async () => {
       const params = new URLSearchParams({ page: String(page), limit: "20" });

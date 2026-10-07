@@ -20,6 +20,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { useQuery } from "@tanstack/react-query";
 import axios from "axios";
 import { tocarNotificacaoNovoCliente } from "@/lib/utils/sound";
+import { ATUALIZACAO_MS, DADOS_FRESCOS_MS } from "@/lib/atualizacao";
 
 type Role = "ADMINISTRADOR" | "DESENVOLVEDOR" | "GESTOR" | "COMERCIAL" | "OPERACIONAL";
 
@@ -138,9 +139,9 @@ function useNewClientesCount() {
       return data as { count: number };
     },
     enabled: !!user?.id && hydrated && !isOnClientes,
-    refetchInterval: 30000,
+    refetchInterval: ATUALIZACAO_MS,
     refetchIntervalInBackground: true,
-    staleTime: 0,
+    staleTime: DADOS_FRESCOS_MS,
   });
 
   // Toca um som quando a contagem sobe durante a sessão (cliente novo chegou agora) — não na
@@ -172,9 +173,9 @@ function useChatNaoLidas() {
       return data as { totalNaoLidas: number };
     },
     enabled: !!user?.id,
-    refetchInterval: 15000,
+    refetchInterval: ATUALIZACAO_MS,
     refetchIntervalInBackground: true,
-    staleTime: 0,
+    staleTime: DADOS_FRESCOS_MS,
   });
 
   return isOnChat ? 0 : (data?.totalNaoLidas ?? 0);

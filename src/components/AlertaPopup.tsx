@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
 import { useAuth } from "@/contexts/AuthContext";
+import { ATUALIZACAO_MS } from "@/lib/atualizacao";
 
 interface Alerta {
   id: string;
@@ -29,7 +30,7 @@ export function AlertaPopup() {
       return data;
     },
     enabled: !!user,
-    refetchInterval: 30000, // verifica a cada 30s
+    refetchInterval: ATUALIZACAO_MS, // verifica a cada 5 min
     staleTime: 10000,
   });
 

@@ -7,6 +7,7 @@ import { CheckCircle2, Clock, X } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { TIPO_TAREFA_LABELS, dataHoraVencimento, hojeISO } from "@/lib/utils/formatters";
 import type { Tarefa } from "@/types";
+import { ATUALIZACAO_MS, DADOS_FRESCOS_MS } from "@/lib/atualizacao";
 
 const STORAGE_KEY = "crm_agenda_lembretes_disparados";
 const RETENCAO_MS = 3 * 24 * 60 * 60 * 1000; // esquece disparos com mais de 3 dias
@@ -67,9 +68,9 @@ export function LembreteAgenda() {
       return data.data as Tarefa[];
     },
     enabled: !!user,
-    refetchInterval: 30000,
+    refetchInterval: ATUALIZACAO_MS,
     refetchIntervalInBackground: true,
-    staleTime: 0,
+    staleTime: DADOS_FRESCOS_MS,
   });
 
   const concluirMutation = useMutation({

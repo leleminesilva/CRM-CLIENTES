@@ -32,7 +32,7 @@ export const REPORTS: ReportMeta[] = [
   {
     id: "receita-mensal",
     title: "Receita mensal",
-    description: "Base, comissões, renda extra e outros, mês a mês.",
+    description: "Receita principal, comissões, receitas extras e outras, mês a mês.",
     group: "Receitas e despesas",
     filterable: true,
   },

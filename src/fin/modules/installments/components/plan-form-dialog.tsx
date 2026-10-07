@@ -131,7 +131,7 @@ export function PlanFormDialog({
                 <Input
                   {...a}
                   autoFocus
-                  placeholder="Ex.: Sony FX30"
+                  placeholder="Ex.: Máquina de corte de vidro"
                   {...form.register("description")}
                 />
               )}

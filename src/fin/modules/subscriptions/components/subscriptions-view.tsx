@@ -108,7 +108,7 @@ export function SubscriptionsView({
           <EmptyState
             icon={RepeatIcon}
             title="Nenhuma assinatura cadastrada"
-            description="Adobe, Netflix, Spotify, iCloud, academia… Cadastre e descubra quanto gasta por ano com serviços recorrentes."
+            description="Sistema de gestão, internet, telefonia, softwares… Cadastre e descubra quanto a empresa gasta por ano com serviços recorrentes."
             action={
               <Button onClick={() => setCreating(true)}>
                 <PlusIcon /> Nova assinatura

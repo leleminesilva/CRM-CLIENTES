@@ -35,7 +35,7 @@ type V = z.input<typeof createGoalSchema>;
 type O = z.output<typeof createGoalSchema>;
 
 export const KIND_LABELS: Record<(typeof GOAL_KINDS)[number], string> = {
-  EMERGENCY_FUND: "Reserva de emergência",
+  EMERGENCY_FUND: "Reserva de caixa",
   SAVINGS: "Poupança",
   PURCHASE: "Compra",
   INVESTMENT: "Investimento",
@@ -59,7 +59,7 @@ export function GoalFormDialog({
   const form = useForm<V, unknown, O>({
     resolver: zodResolver(createGoalSchema),
     defaultValues: {
-      name: goal?.name ?? (defaultKind === "EMERGENCY_FUND" ? "Reserva de emergência" : ""),
+      name: goal?.name ?? (defaultKind === "EMERGENCY_FUND" ? "Reserva de caixa" : ""),
       kind: goal?.kind ?? defaultKind,
       targetAmount: goal ? moneyToInput(goal.target) : "",
       initialAmount: goal ? moneyToInput(goal.initial) : "0,00",

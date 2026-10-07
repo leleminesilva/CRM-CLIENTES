@@ -191,7 +191,7 @@ export function GoalsView({
     <div className="grid gap-6">
       <PageHeader
         title="Metas"
-        description="Objetivos com valor, progresso e previsão de quando você chega lá — incluindo a reserva de emergência."
+        description="Objetivos com valor, progresso e previsão de quando cada meta é atingida — incluindo a reserva de caixa."
         actions={
           <Button onClick={() => setForm({})}>
             <PlusIcon /> Nova meta
@@ -202,7 +202,7 @@ export function GoalsView({
       <Panel className="grid gap-4 p-5">
         <div className="flex items-center gap-2">
           <ShieldCheckIcon className="size-5 text-ink-2" strokeWidth={1.75} aria-hidden />
-          <h2 className="title-section">Reserva de emergência</h2>
+          <h2 className="title-section">Reserva de caixa</h2>
         </div>
         {fund.goal ? (
           <>
@@ -247,7 +247,7 @@ export function GoalsView({
         ) : (
           <EmptyState
             icon={ShieldCheckIcon}
-            title="Cadastre sua reserva de emergência"
+            title="Cadastre a reserva de caixa"
             description="Informe a meta e onde o dinheiro está guardado: o sistema mostra quantos meses de despesas ela cobre."
             action={
               <Button onClick={() => setForm({ kind: "EMERGENCY_FUND" })}>

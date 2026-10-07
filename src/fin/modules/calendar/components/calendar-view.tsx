@@ -22,7 +22,7 @@ import { sumMoney, toMoney, toMoneyString } from "@fin/lib/money";
 import type { CalendarEvent, EventKind } from "../queries";
 
 export const KIND: Record<EventKind, { label: string; icon: LucideIcon; color: string }> = {
-  salary: { label: "Salário", icon: WalletIcon, color: "var(--series-income)" },
+  salary: { label: "Receita recorrente", icon: WalletIcon, color: "var(--series-income)" },
   commission: { label: "Comissão", icon: BadgePercentIcon, color: "var(--series-commission)" },
   income: { label: "Recebimento", icon: TrendingUpIcon, color: "var(--series-income)" },
   bill: { label: "Conta", icon: ReceiptIcon, color: "var(--series-expense)" },

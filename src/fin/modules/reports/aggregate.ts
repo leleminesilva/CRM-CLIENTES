@@ -16,10 +16,10 @@ const total = (rows: LedgerRow[]) => sumMoney(rows.map((r) => r.amount));
 const where = (rows: LedgerRow[], p: (r: LedgerRow) => boolean) => rows.filter(p);
 
 export const CLASS_NAMES = {
-  BASE: "Base",
+  BASE: "Receita principal",
   COMMISSION: "Comissões",
-  EXTRA: "Renda extra",
-  OTHER: "Outros",
+  EXTRA: "Receitas extras",
+  OTHER: "Outras",
 } as const;
 const CLASS_COLORS = {
   BASE: "var(--series-income)",

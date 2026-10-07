@@ -43,7 +43,7 @@ export const errorMessages = {
   INVOICE_EMPTY: "Esta fatura não tem compras para pagar.",
   PLAN_FINISHED: "Este parcelamento não tem parcelas pendentes.",
   EMERGENCY_FUND_EXISTS:
-    "Você já tem uma reserva de emergência ativa. Edite a existente ou arquive-a antes de criar outra.",
+    "Já existe uma reserva de caixa ativa. Edite a existente ou arquive-a antes de criar outra.",
   GOAL_LINKED: "Esta meta acompanha o saldo de uma conta; o valor atual vem dela.",
   INTERNAL: "Não foi possível concluir a operação. Tente novamente em instantes.",
 } as const;

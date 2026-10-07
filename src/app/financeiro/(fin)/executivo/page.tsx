@@ -141,7 +141,7 @@ export default async function ExecutivePage() {
           />
         </Row>
         <Row
-          question="Quanto minha renda cresceu?"
+          question="Quanto a receita cresceu?"
           href="/financeiro/relatorios/receita-mensal"
           context={growthText(b.incomeGrowth, b.month)}
         >
@@ -177,7 +177,7 @@ export default async function ExecutivePage() {
           href="/financeiro/previsao"
           context={[
             b.recurringCount === 0
-              ? "Sem receitas e despesas recorrentes cadastradas, a projeção só repete o saldo de hoje: salário e contas fixas futuras não entram. Marque “Repetir” no salário e nas contas fixas."
+              ? "Sem receitas e despesas recorrentes cadastradas, a projeção só repete o saldo de hoje: receitas e contas fixas futuras não entram. Marque “Repetir” no salário e nas contas fixas."
               : null,
             b.firstNegative
               ? `Atenção: o caixa pode ficar negativo em ${formatMonth(b.firstNegative.month)}.`

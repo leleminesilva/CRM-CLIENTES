@@ -21,16 +21,16 @@ export function FixedExpensesSummaryCards({ summary }: { summary: FixedExpensesS
         </span>
       </div>
       <div className="grid content-start gap-1 px-5 py-4">
-        <span className="text-[13px] text-ink-2">Da renda base comprometida</span>
+        <span className="text-[13px] text-ink-2">Da receita principal comprometida</span>
         <span className="figure-kpi">{share ? formatPercent(share) : "—"}</span>
         <span className="text-xs text-ink-3">
           {share ? (
             <>
               <MoneyText value={summary.monthly} /> de <MoneyText value={summary.baseIncome} /> de
-              renda base
+              receita principal
             </>
           ) : (
-            "Cadastre a renda base para ver este indicador"
+            "Cadastre a receita principal recorrente para ver este indicador"
           )}
         </span>
       </div>

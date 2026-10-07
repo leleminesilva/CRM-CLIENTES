@@ -29,10 +29,10 @@ import { incomeByClass, loadFormOptions, monthTotals } from "@fin/modules/transa
 export const metadata: Metadata = { title: "Painel" };
 
 const CLASS_LABELS = {
-  BASE: "Base",
+  BASE: "Receita principal",
   COMMISSION: "Comissões",
-  EXTRA: "Renda extra",
-  OTHER: "Outros",
+  EXTRA: "Receitas extras",
+  OTHER: "Outras",
 } as const;
 
 export default async function DashboardPage({

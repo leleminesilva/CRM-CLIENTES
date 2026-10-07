@@ -96,7 +96,7 @@ export default async function ExpensesPage({
         emptyTitle={fixedTab ? "Nenhuma despesa fixa neste mês" : "Nenhuma despesa neste mês"}
         emptyDescription={
           fixedTab
-            ? "Cadastre aluguel, internet, academia… marcando “Repetir”. Elas aparecem aqui e entram na previsão."
+            ? "Cadastre aluguel, internet, salários… marcando “Repetir”. Elas aparecem aqui e entram na previsão."
             : "Registre uma despesa: valor, descrição, categoria e conta."
         }
       />

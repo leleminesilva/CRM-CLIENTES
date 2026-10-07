@@ -22,12 +22,12 @@ const COPY: Record<OnboardingStep["key"], { title: string; hint: string }> = {
     hint: "Com fechamento e vencimento, cada compra cai na fatura certa.",
   },
   income: {
-    title: "Informe sua renda base",
-    hint: "O salário que entra todo mês (ex.: 5º dia útil).",
+    title: "Cadastre as receitas recorrentes",
+    hint: "Contratos e entradas fixas que caem todo mês.",
   },
   fixed: {
     title: "Lance as despesas fixas",
-    hint: "Aluguel, internet, academia: marque “Repetir”.",
+    hint: "Aluguel, internet, salários: marque “Repetir”.",
   },
   installments: {
     title: "Parcelamentos em andamento",
@@ -58,7 +58,7 @@ export function OnboardingChecklist({
             onClick={() =>
               form.openCreate({
                 type: "INCOME",
-                description: "Salário",
+                description: "Receita mensal",
                 categoryId: baseCategoryId,
                 settled: false,
                 repeat: { ...DEFAULT_REPEAT, dayRule: "NTH_BUSINESS_DAY", dayOfMonth: 5 },
@@ -94,7 +94,7 @@ export function OnboardingChecklist({
         <div className="grid gap-0.5">
           <h2 className="title-section">Comece por aqui</h2>
           <p className="text-[13px] text-ink-2">
-            Cinco passos para o painel refletir a sua vida financeira. Leva uns 10 minutos.
+            Cinco passos para o painel refletir o caixa da empresa. Leva uns 10 minutos.
           </p>
         </div>
         <Button

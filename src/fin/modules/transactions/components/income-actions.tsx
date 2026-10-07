@@ -15,14 +15,14 @@ export function IncomeActions({ baseCategoryId }: { baseCategoryId: string | nul
         onClick={() =>
           openCreate({
             type: "INCOME",
-            description: "Salário",
+            description: "Receita mensal",
             categoryId: baseCategoryId,
             settled: false,
             repeat: { ...DEFAULT_REPEAT, dayRule: "NTH_BUSINESS_DAY", dayOfMonth: 5 },
           })
         }
       >
-        <WalletIcon /> Cadastrar renda base
+        <WalletIcon /> Cadastrar receita recorrente
       </Button>
       <Button
         onClick={() =>

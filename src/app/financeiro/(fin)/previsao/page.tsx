@@ -24,7 +24,7 @@ export default async function ForecastPage({
     <div className="grid gap-6">
       <PageHeader
         title="Previsão"
-        description="Renda base, comissões típicas, despesas fixas, parcelas e faturas projetadas para os próximos meses — e em quais o caixa aperta."
+        description="Receitas recorrentes, comissões típicas, despesas fixas, parcelas e faturas projetadas para os próximos meses — e em quais o caixa aperta."
       />
       <ForecastView data={data} horizon={horizon} />
     </div>

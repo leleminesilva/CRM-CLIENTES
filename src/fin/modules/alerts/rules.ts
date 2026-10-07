@@ -220,7 +220,7 @@ export const reserveRule: AlertRule = async (ctx, today) => {
     {
       code: "reserve.low",
       priority: "ATTENTION",
-      title: `Sua reserva cobre ${fund.months.replace(".", ",")} meses de despesas`,
+      title: `A reserva de caixa cobre ${fund.months.replace(".", ",")} meses de despesas`,
       body: `A recomendação é de pelo menos 3 meses (${formatMoney(fund.monthlyCost)} por mês em média).`,
       href: "/financeiro/metas",
       dedupeKey: `reserve-low:${monthKeyOf(today)}`,

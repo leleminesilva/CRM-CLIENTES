@@ -22,10 +22,10 @@ export interface CategoryNode extends CategoryDTO {
 }
 
 export const INCOME_CLASS_LABELS: Record<IncomeClass, string> = {
-  BASE: "Base (salário)",
+  BASE: "Receita principal",
   COMMISSION: "Comissões",
-  EXTRA: "Renda extra",
-  OTHER: "Outros",
+  EXTRA: "Receitas extras",
+  OTHER: "Outras",
 };
 
 export const NATURE_LABELS: Record<ExpenseNature, string> = {

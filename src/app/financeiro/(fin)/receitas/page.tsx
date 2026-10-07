@@ -13,7 +13,7 @@ import { TransactionList } from "@fin/modules/transactions/components/transactio
 import { parseFilters } from "@fin/modules/transactions/filters";
 import { incomeByClass, listTransactions, loadFormOptions } from "@fin/modules/transactions/queries";
 
-export const metadata: Metadata = { title: "Minha renda" };
+export const metadata: Metadata = { title: "Receitas" };
 
 export default async function IncomePage({
   searchParams,
@@ -36,8 +36,8 @@ export default async function IncomePage({
   return (
     <div className="grid gap-6">
       <PageHeader
-        title="Minha renda"
-        description="Salário base, comissões e rendas extras do mês, pelo mês da previsão de recebimento."
+        title="Receitas"
+        description="Vendas, serviços, comissões e receitas extras, pelo mês da previsão de recebimento."
         actions={
           <>
             <MonthSwitcher month={month} currentMonth={currentMonth} />
@@ -53,7 +53,7 @@ export default async function IncomePage({
         accounts={options.accounts}
         emptyType="INCOME"
         emptyTitle="Nenhuma receita neste mês"
-        emptyDescription="Cadastre sua renda base (ela se repete todo mês) e vá adicionando comissões e rendas extras."
+        emptyDescription="Cadastre as receitas que se repetem todo mês e vá lançando vendas, serviços e receitas extras."
       />
       <RecurrenceList
         items={series}

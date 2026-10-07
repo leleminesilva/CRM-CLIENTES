@@ -51,7 +51,7 @@ export const ruleInsightProvider: InsightProvider = {
       insights.push({
         id: `fixed-share:${month}`,
         tone: toMoney(fixed.shareOfBase).greaterThan(0.6) ? "warning" : "neutral",
-        text: `Suas despesas fixas representam ${formatPercent(fixed.shareOfBase)} da sua renda base.`,
+        text: `As despesas fixas representam ${formatPercent(fixed.shareOfBase)} da receita principal.`,
         href: "/financeiro/despesas?aba=fixas",
       });
     }
@@ -81,7 +81,7 @@ export const ruleInsightProvider: InsightProvider = {
       insights.push({
         id: `commission-share:${month}`,
         tone: "neutral",
-        text: `Suas comissões representam ${formatPercent(commission.dividedBy(total))} da sua renda total nos últimos 3 meses.`,
+        text: `As comissões representam ${formatPercent(commission.dividedBy(total))} da receita total nos últimos 3 meses.`,
         href: "/financeiro/comissoes",
       });
     }

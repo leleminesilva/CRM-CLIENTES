@@ -3,9 +3,9 @@ import { Panel } from "@fin/components/shared/panel";
 import type { IncomeClassTotals } from "../queries";
 
 const LABELS = {
-  BASE: "Base (salário)",
+  BASE: "Receita principal",
   COMMISSION: "Comissões",
-  EXTRA: "Renda extra",
+  EXTRA: "Receitas extras",
   OTHER: "Outros recebimentos",
 } as const;
 

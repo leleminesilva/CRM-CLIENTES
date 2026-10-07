@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { Bell, Sun, Moon, Search, LogOut, User, Settings, ChevronDown, Menu, CalendarCheck, AlertCircle, UserPlus, Timer, TrendingDown } from "lucide-react";
+import { Bell, Sun, Moon, LogOut, User, Settings, ChevronDown, Menu, CalendarCheck, AlertCircle, UserPlus, Timer, TrendingDown } from "lucide-react";
 import { useTheme } from "next-themes";
 import { useAuth } from "@/contexts/AuthContext";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -22,6 +22,7 @@ import { ROLE_LABELS, hojeISO } from "@/lib/utils/formatters";
 import { useSidebar } from "@/contexts/SidebarContext";
 import { useDevTheme } from "@/contexts/DevThemeContext";
 import { cn } from "@/lib/utils/cn";
+import { moduloDesligado } from "@/lib/modulos";
 
 const TIPO_TASK_COLORS: Record<string, string> = {
   LIGACAO: "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300",
@@ -102,7 +103,6 @@ export function Topbar() {
   const { user, logout } = useAuth();
   const { theme, setTheme } = useTheme();
   const qc = useQueryClient();
-  const [searchOpen, setSearchOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
   const { openMobile } = useSidebar();
@@ -142,6 +142,7 @@ export function Topbar() {
       const { data } = await axios.get(`/api/tarefas?de=${today}&ate=${today}`);
       return data.data as Tarefa[];
     },
+    enabled: !moduloDesligado("/tarefas"),
     staleTime: 60_000,
   });
 
@@ -189,11 +190,6 @@ export function Topbar() {
       </div>
 
       <div className="flex items-center gap-2">
-        {/* Search */}
-        <Button variant="ghost" size="icon" onClick={() => setSearchOpen(!searchOpen)} className="text-muted-foreground">
-          <Search className="w-5 h-5" />
-        </Button>
-
         {/* Theme toggle */}
         <Button
           variant="ghost"
@@ -321,17 +317,21 @@ export function Topbar() {
               )}
             </ScrollArea>
 
-            <DropdownMenuSeparator className="my-0" />
-            <div className="p-2">
-              <Button
-                variant="ghost"
-                size="sm"
-                className="w-full text-xs text-primary hover:text-foreground hover:bg-muted"
-                onClick={() => router.push("/agenda")}
-              >
-                Ver agenda completa
-              </Button>
-            </div>
+            {!moduloDesligado("/agenda") && (
+              <>
+                <DropdownMenuSeparator className="my-0" />
+                <div className="p-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="w-full text-xs text-primary hover:text-foreground hover:bg-muted"
+                    onClick={() => router.push("/agenda")}
+                  >
+                    Ver agenda completa
+                  </Button>
+                </div>
+              </>
+            )}
           </DropdownMenuContent>
         </DropdownMenu>
 

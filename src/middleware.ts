@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyToken } from "@/lib/auth.edge";
+import { moduloDesligado } from "@/lib/modulos";
 
 const PUBLIC_PATHS = [
   "/login",
@@ -18,6 +19,8 @@ const PUBLIC_PATHS = [
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+
+  if (moduloDesligado(pathname)) return NextResponse.redirect(new URL("/", request.url));
 
   const isPublic = PUBLIC_PATHS.some((p) => pathname.startsWith(p));
   if (isPublic) return NextResponse.next();

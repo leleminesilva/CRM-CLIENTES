@@ -21,6 +21,7 @@ import { useQuery } from "@tanstack/react-query";
 import axios from "axios";
 import { tocarNotificacaoNovoCliente } from "@/lib/utils/sound";
 import { ATUALIZACAO_MS, DADOS_FRESCOS_MS } from "@/lib/atualizacao";
+import { moduloDesligado } from "@/lib/modulos";
 
 type Role = "ADMINISTRADOR" | "DESENVOLVEDOR" | "GESTOR" | "COMERCIAL" | "OPERACIONAL";
 
@@ -34,7 +35,7 @@ const navItems: { href: string; label: string; icon: React.ElementType; roles?: 
   { href: "/chat",       label: "Chat",       icon: MessageSquare },
   { href: "/whatsapp",   label: "WhatsApp",   icon: MessageCircle },
   { href: "/pesquisa",   label: "Pesquisa",   icon: Search },
-];
+].filter((item) => !moduloDesligado(item.href));
 
 const bottomNavItems: { href: string; label: string; icon: React.ElementType; roles?: Role[] }[] = [
   { href: "/relatorios",    label: "Relatórios",   icon: BarChart3, roles: ["ADMINISTRADOR", "DESENVOLVEDOR", "GESTOR"] },
@@ -172,7 +173,7 @@ function useChatNaoLidas() {
       const { data } = await axios.get("/api/chat/conversas");
       return data as { totalNaoLidas: number };
     },
-    enabled: !!user?.id,
+    enabled: !!user?.id && !moduloDesligado("/chat"),
     refetchInterval: ATUALIZACAO_MS,
     refetchIntervalInBackground: true,
     staleTime: DADOS_FRESCOS_MS,

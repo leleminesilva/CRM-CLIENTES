@@ -6,6 +6,7 @@ import { AlertaSistema } from "@/components/AlertaSistema";
 import { AlertaPopup } from "@/components/AlertaPopup";
 import { LembreteAgenda } from "@/components/LembreteAgenda";
 import { DEV_FONT_VARIABLES } from "@/lib/devThemeFonts";
+import { moduloDesligado } from "@/lib/modulos";
 
 export default function DashboardLayout({
   children,
@@ -28,7 +29,7 @@ export default function DashboardLayout({
         </DevThemeRoot>
         <AlertaSistema />
         <AlertaPopup />
-        <LembreteAgenda />
+        {!moduloDesligado("/tarefas") && <LembreteAgenda />}
       </DevThemeProvider>
     </SidebarProvider>
   );

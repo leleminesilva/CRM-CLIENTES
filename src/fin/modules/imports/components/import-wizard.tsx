@@ -2,7 +2,7 @@
 
 import { FileUpIcon, Loader2Icon } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useAction } from "next-safe-action/hooks";
+import { useAction } from "@fin/lib/use-action";
 import * as React from "react";
 import { toast } from "sonner";
 import { AccountSelect } from "@fin/components/shared/account-select";

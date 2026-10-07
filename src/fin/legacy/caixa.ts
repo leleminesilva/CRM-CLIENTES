@@ -1,5 +1,6 @@
 import { Prisma, type CategoryKind, type ExpenseNature, type TransactionType } from "@prisma/client";
 import prisma from "@/lib/prisma";
+import { ensureFuelCategory } from "@fin/crm/combustivel";
 import { ensureBusinessWorkspace } from "@fin/lib/workspace";
 import {
   ACCOUNT_TYPE,
@@ -31,10 +32,11 @@ export interface CaixaReport {
   workspaceId: string;
   accounts: Counts;
   categories: Counts & { adopted: number };
-  transactions: Counts & { trashed: number; skipped: number };
+  /** fuelAlreadyInNew: gasolina já lançada direto no Financeiro novo (depois da troca): não copiada. */
+  transactions: Counts & { trashed: number; skipped: number; fuelAlreadyInNew: number };
   /** Saldo de cada conta no Caixa antigo × no Financeiro novo (mesma consulta das telas novas). */
   balances: { account: string; legacy: string; migrated: string; ok: boolean }[];
-  /** Usos de carro com gasolina cujo lançamento ficou ligado à cópia (pelo id de origem). */
+  /** Usos de carro com gasolina que têm a despesa no Financeiro novo (fin_transactions.car_use_id). */
   fuel: { usesWithFuel: number; linked: number; amountMismatch: number };
   warnings: string[];
 }
@@ -206,8 +208,29 @@ async function run(tx: Tx, workspaceId: string): Promise<CaixaReport> {
     categoryOf.set(cat.id, current);
   }
 
+  // A "Combustível" vira categoria de sistema: a gasolina dos carros passa a lançar nela.
+  await ensureFuelCategory(tx, workspaceId);
+
   // ── Lançamentos ──
-  const transactions = { ...zeroCounts(), trashed: 0, skipped: 0 };
+  const transactions = { ...zeroCounts(), trashed: 0, skipped: 0, fuelAlreadyInNew: 0 };
+  // Gasolina dos carros: lançamento antigo → uso de carro, para ligar a cópia ao uso.
+  const usoPorLancamento = new Map(
+    (
+      await tx.financeiroCarroUso.findMany({
+        where: { lancamentoCombustivelId: { not: null } },
+        select: { id: true, lancamentoCombustivelId: true },
+      })
+    ).map((u) => [u.lancamentoCombustivelId!, u.id]),
+  );
+  // Usos cuja gasolina já foi lançada direto no Financeiro novo (correção feita depois da troca).
+  const lancadoNoNovo = new Set(
+    (
+      await tx.transaction.findMany({
+        where: { workspaceId, carUseId: { not: null }, legacyId: null },
+        select: { carUseId: true },
+      })
+    ).map((t) => t.carUseId!),
+  );
   const existingTransactions = await tx.transaction.findMany({
     where: { workspaceId, legacyId: { not: null } },
   });
@@ -217,6 +240,11 @@ async function run(tx: Tx, workspaceId: string): Promise<CaixaReport> {
 
   for (const l of lancamentos) {
     seen.add(l.id);
+    const carUseId = usoPorLancamento.get(l.id) ?? null;
+    if (carUseId && lancadoNoNovo.has(carUseId)) {
+      transactions.fuelAlreadyInNew++;
+      continue;
+    }
     if (l.valor.lte(0)) {
       warnings.push(`Lançamento "${l.descricao}" (${l.id}) com valor ${l.valor.toFixed(2)}: não copiado.`);
       transactions.skipped++;
@@ -243,6 +271,7 @@ async function run(tx: Tx, workspaceId: string): Promise<CaixaReport> {
       categoryId: category?.id ?? null,
       nature: type === "EXPENSE" ? (category?.defaultNature ?? null) : null,
       externalId: l.pluggyTransactionId ?? null,
+      carUseId,
       deletedAt: null,
     };
 
@@ -318,23 +347,31 @@ async function run(tx: Tx, workspaceId: string): Promise<CaixaReport> {
   });
 
   const usos = await tx.financeiroCarroUso.findMany({
-    where: { lancamentoCombustivelId: { not: null } },
-    select: { lancamentoCombustivelId: true, valorCombustivel: true },
-  });
-  const copies = await tx.transaction.findMany({
-    where: {
-      workspaceId,
-      deletedAt: null,
-      legacyId: { in: usos.map((u) => u.lancamentoCombustivelId!) },
+    where: { valorCombustivel: { not: null } },
+    select: {
+      id: true,
+      valorCombustivel: true,
+      saidaEm: true,
+      carro: { select: { numero: true, modelo: true } },
+      motorista: { select: { nome: true } },
     },
-    select: { legacyId: true, amount: true },
   });
-  const copyAmount = new Map(copies.map((c) => [c.legacyId!, c.amount]));
+  const fuelExpenses = await tx.transaction.findMany({
+    where: { workspaceId, deletedAt: null, carUseId: { in: usos.map((u) => u.id) } },
+    select: { carUseId: true, amount: true },
+  });
+  const fuelAmount = new Map(fuelExpenses.map((t) => [t.carUseId!, t.amount]));
   let linked = 0;
   let amountMismatch = 0;
   for (const uso of usos) {
-    const amount = copyAmount.get(uso.lancamentoCombustivelId!);
-    if (!amount) continue;
+    const amount = fuelAmount.get(uso.id);
+    if (!amount) {
+      // Ex.: o lançamento de gasolina foi excluído no Caixa antigo; o uso ficou só com o valor.
+      warnings.push(
+        `Uso de carro sem despesa de gasolina no Financeiro novo: ${uso.carro.numero} · ${uso.carro.modelo} (${uso.motorista.nome}), saída em ${legacyDateToISO(uso.saidaEm)}, R$ ${uso.valorCombustivel!.toFixed(2)}.`,
+      );
+      continue;
+    }
     linked++;
     if (uso.valorCombustivel && !amount.eq(uso.valorCombustivel)) amountMismatch++;
   }

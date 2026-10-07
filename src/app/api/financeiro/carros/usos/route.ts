@@ -2,7 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { requireFinanceiroAccess } from "@/lib/financeiro/authz";
 import { carroUsoSaidaSchema } from "@/lib/validators/financeiro";
-import { criarLancamentoCombustivel } from "@/lib/financeiro/combustivel";
+import { upsertFuelExpense } from "@fin/crm/combustivel";
+import { findActiveAccount } from "@fin/crm/contas";
+import { resolveFinContext } from "@fin/lib/resolve";
 import { createAuditLog } from "@/lib/audit";
 
 export const dynamic = "force-dynamic";
@@ -78,24 +80,17 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: `Quilometragem menor que a última registrada (${ultimo.kmChegada} km)` }, { status: 400 });
   }
 
-  if (parsed.data.valorCombustivel && parsed.data.contaCombustivelId) {
-    const conta = await prisma.financeiroConta.findUnique({ where: { id: parsed.data.contaCombustivelId } });
-    if (!conta || !conta.ativa) return NextResponse.json({ error: "Conta da gasolina inválida ou arquivada" }, { status: 400 });
+  // A gasolina vira despesa no Financeiro novo (fin_transactions), na conta escolhida.
+  const fin = await resolveFinContext(auth.payload.userId);
+  if (!fin) return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
+  const comCombustivel = !!(parsed.data.valorCombustivel && parsed.data.contaCombustivelId);
+  if (comCombustivel) {
+    const conta = await findActiveAccount(fin.workspaceId, parsed.data.contaCombustivelId);
+    if (!conta) return NextResponse.json({ error: "Conta da gasolina inválida ou arquivada" }, { status: 400 });
   }
 
   const uso = await prisma.$transaction(async (tx) => {
-    let lancamentoCombustivelId: string | null = null;
-    if (parsed.data.valorCombustivel && parsed.data.contaCombustivelId) {
-      const lancamento = await criarLancamentoCombustivel(tx, {
-        contaId: parsed.data.contaCombustivelId,
-        valor: parsed.data.valorCombustivel,
-        descricao: `Combustível — ${carro.numero} · ${carro.modelo} (${motorista.nome})`,
-        criadoPorId: auth.payload.userId,
-      });
-      lancamentoCombustivelId = lancamento.id;
-    }
-
-    return tx.financeiroCarroUso.create({
+    const criado = await tx.financeiroCarroUso.create({
       data: {
         carroId: carro.id,
         motoristaId: motorista.id,
@@ -104,13 +99,22 @@ export async function POST(request: NextRequest) {
         observacoes: parsed.data.observacoes || null,
         registradoPorId: auth.payload.userId,
         valorCombustivel: parsed.data.valorCombustivel ?? null,
-        lancamentoCombustivelId,
       },
       include: {
         carro: { select: { id: true, numero: true, modelo: true, placa: true } },
         motorista: { select: { id: true, nome: true } },
       },
     });
+
+    if (comCombustivel) {
+      await upsertFuelExpense(tx, fin, {
+        carUseId: criado.id,
+        accountId: parsed.data.contaCombustivelId!,
+        amount: parsed.data.valorCombustivel!,
+        description: `Combustível — ${carro.numero} · ${carro.modelo} (${motorista.nome})`,
+      });
+    }
+    return criado;
   });
 
   await createAuditLog({

@@ -3,7 +3,7 @@
 import { AlertTriangleIcon, CheckCircle2Icon, LockIcon } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useAction } from "next-safe-action/hooks";
+import { useAction } from "@fin/lib/use-action";
 import * as React from "react";
 import { toast } from "sonner";
 import { ConfirmDialog } from "@fin/components/shared/confirm-dialog";

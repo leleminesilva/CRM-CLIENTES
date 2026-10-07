@@ -980,6 +980,10 @@ model FinanceiroCarroUso {
   lancamentoCombustivelId String?               @unique
   lancamentoCombustivel   FinanceiroLancamento? @relation("CarroUsoCombustivel", fields: [lancamentoCombustivelId], references: [id], onDelete: SetNull)
 
+  // Financeiro novo: a despesa de gasolina fica em fin_transactions.car_use_id (só relação do
+  // Prisma; esta tabela não ganha coluna).
+  finTransaction Transaction? @relation("FinCarUseFuel")
+
   @@index([carroId, saidaEm])
   @@index([motoristaId])
   @@map("financeiro_carro_usos")
@@ -1352,6 +1356,8 @@ model Transaction {
   externalId    String? @map("external_id")
   /// id da linha correspondente em financeiro_* (Caixa antigo): torna a cópia repetível.
   legacyId      String? @map("legacy_id")
+  /// Uso de carro (financeiro_carro_usos) cuja gasolina gerou esta despesa.
+  carUseId      String? @unique @map("car_use_id")
 
   createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
@@ -1372,6 +1378,7 @@ model Transaction {
   commission       Commission?
   goalContribution GoalContribution?
   attachments      Attachment[]
+  carUse           FinanceiroCarroUso? @relation("FinCarUseFuel", fields: [carUseId], references: [id], onDelete: SetNull)
 
   @@unique([recurrenceId, recurrenceDate])
   @@unique([installmentPlanId, installmentNumber])

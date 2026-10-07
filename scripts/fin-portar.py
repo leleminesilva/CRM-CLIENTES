@@ -7,6 +7,7 @@ Uso: python3 scripts/fin-portar.py <caminho relativo a Financeiro/src> [...]
 Regras aplicadas em todo arquivo (o que não cabe aqui é ajustado à mão depois):
 - imports @/lib, @/modules, @/components → @fin/...; client gerado do Prisma 7 → @prisma/client;
 - pacote unificado "radix-ui" → pacotes @radix-ui/react-* (os que o CRM já usa);
+- next-safe-action/hooks → @fin/lib/use-action (o hook original exige React 19);
 - Zod 4 → Zod 3: z.uuid()/url()/email() → z.string().uuid()...; mensagens como { message };
 - modelo AuditLog do sistema novo se chama FinAuditLog no CRM;
 - SQL bruto: tabelas ganham o prefixo fin_ (FROM/JOIN/INTO/UPDATE) e a função de busca é fin_immutable_unaccent;
@@ -58,6 +59,8 @@ def radix_imports(match: re.Match) -> str:
 def transform(text: str) -> str:
     text = re.sub(r'import \{([^}]+)\} from "radix-ui";', radix_imports, text)
     text = re.sub(r'(["\'])@/generated/prisma(?:/[a-z]+)?\1', r'\1@prisma/client\1', text)
+    # O useAction do next-safe-action importa useActionState (React 19): troca pelo do CRM.
+    text = text.replace('"next-safe-action/hooks"', '"@fin/lib/use-action"')
     for folder in ("lib", "modules", "components"):
         text = text.replace(f'"@/{folder}/', f'"@fin/{folder}/')
     text = re.sub(r"\bz\.(uuid|url|email)\(", r"z.string().\1(", text)

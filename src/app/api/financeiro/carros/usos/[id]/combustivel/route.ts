@@ -2,7 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { requireFinanceiroAccess } from "@/lib/financeiro/authz";
 import { carroUsoCombustivelSchema } from "@/lib/validators/financeiro";
-import { criarLancamentoCombustivel } from "@/lib/financeiro/combustivel";
+import { findActiveAccount } from "@fin/crm/contas";
+import { upsertFuelExpense } from "@fin/crm/combustivel";
+import { resolveFinContext } from "@fin/lib/resolve";
 import { createAuditLog } from "@/lib/audit";
 
 export const dynamic = "force-dynamic";
@@ -14,8 +16,8 @@ const usoInclude = {
 
 // Registrar (ou corrigir) o valor de gasolina de um uso já criado — não precisa
 // esperar a chegada, dá pra usar a qualquer momento depois da saída registrada.
-// Rota própria (em vez de PATCH em /usos/[id]) porque também mexe num
-// lançamento do Caixa, não só no registro de uso.
+// Rota própria (em vez de PATCH em /usos/[id]) porque também mexe na despesa
+// de gasolina do Financeiro novo (fin_transactions), não só no registro de uso.
 export async function PATCH(request: NextRequest, { params }: { params: { id: string } }) {
   const auth = await requireFinanceiroAccess(request);
   if (!auth.ok) return auth.response;
@@ -29,33 +31,24 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
   const uso = await prisma.financeiroCarroUso.findUnique({ where: { id: params.id }, include: usoInclude });
   if (!uso) return NextResponse.json({ error: "Registro não encontrado" }, { status: 404 });
 
-  const conta = await prisma.financeiroConta.findUnique({ where: { id: parsed.data.contaCombustivelId } });
-  if (!conta || !conta.ativa) return NextResponse.json({ error: "Conta inválida ou arquivada" }, { status: 400 });
+  const fin = await resolveFinContext(auth.payload.userId);
+  if (!fin) return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
+  const conta = await findActiveAccount(fin.workspaceId, parsed.data.contaCombustivelId);
+  if (!conta) return NextResponse.json({ error: "Conta inválida ou arquivada" }, { status: 400 });
 
   const valorAntigo = uso.valorCombustivel != null ? Number(uso.valorCombustivel) : null;
 
+  // Cria a despesa de gasolina ou corrige a existente (ligada ao uso por car_use_id).
   const atualizado = await prisma.$transaction(async (tx) => {
-    if (uso.lancamentoCombustivelId) {
-      await tx.financeiroLancamento.update({
-        where: { id: uso.lancamentoCombustivelId },
-        data: { valor: parsed.data.valorCombustivel, contaId: parsed.data.contaCombustivelId },
-      });
-      return tx.financeiroCarroUso.update({
-        where: { id: uso.id },
-        data: { valorCombustivel: parsed.data.valorCombustivel },
-        include: usoInclude,
-      });
-    }
-
-    const lancamento = await criarLancamentoCombustivel(tx, {
-      contaId: parsed.data.contaCombustivelId,
-      valor: parsed.data.valorCombustivel,
-      descricao: `Combustível — ${uso.carro.numero} · ${uso.carro.modelo} (${uso.motorista.nome})`,
-      criadoPorId: auth.payload.userId,
+    await upsertFuelExpense(tx, fin, {
+      carUseId: uso.id,
+      accountId: conta.id,
+      amount: parsed.data.valorCombustivel,
+      description: `Combustível — ${uso.carro.numero} · ${uso.carro.modelo} (${uso.motorista.nome})`,
     });
     return tx.financeiroCarroUso.update({
       where: { id: uso.id },
-      data: { valorCombustivel: parsed.data.valorCombustivel, lancamentoCombustivelId: lancamento.id },
+      data: { valorCombustivel: parsed.data.valorCombustivel },
       include: usoInclude,
     });
   });
@@ -66,7 +59,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     entidadeId: params.id,
     acao: "UPDATE",
     dadosAntigos: { valorCombustivel: valorAntigo },
-    dadosNovos: { valorCombustivel: parsed.data.valorCombustivel, conta: conta.nome },
+    dadosNovos: { valorCombustivel: parsed.data.valorCombustivel, conta: conta.name },
   });
 
   return NextResponse.json({ data: atualizado });

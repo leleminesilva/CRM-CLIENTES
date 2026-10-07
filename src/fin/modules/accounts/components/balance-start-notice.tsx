@@ -2,7 +2,7 @@
 
 import { InfoIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useAction } from "next-safe-action/hooks";
+import { useAction } from "@fin/lib/use-action";
 import { toast } from "sonner";
 import { Panel } from "@fin/components/shared/panel";
 import { Button } from "@fin/components/ui/button";

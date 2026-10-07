@@ -35,7 +35,8 @@ interface Uso {
   motorista: { id: string; nome: string };
   registradoPor: { id: string; nome: string } | null;
 }
-interface ContaFinanceira { id: string; nome: string; tipo: string; ativa: boolean }
+// Contas do Financeiro novo (fin_accounts). "WALLET" = dinheiro em espécie (o antigo "Caixa").
+interface ContaFinanceira { id: string; name: string; type: string }
 
 // Formata pro valor que <input type="datetime-local"> espera, em horário local
 // (não UTC) — é assim que o navegador interpreta esse tipo de input.
@@ -72,8 +73,8 @@ function useMotoristasTodos() {
 }
 function useContasFinanceiro() {
   return useQuery({
-    queryKey: ["financeiro-contas"],
-    queryFn: async () => (await axios.get("/api/financeiro/contas")).data.data as ContaFinanceira[],
+    queryKey: ["fin-contas"],
+    queryFn: async () => (await axios.get("/api/fin/contas")).data.data as ContaFinanceira[],
   });
 }
 
@@ -287,7 +288,7 @@ function SaidaDialog({ carro }: { carro: Carro }) {
   // (de onde o dinheiro físico normalmente sai) pra evitar um clique a mais.
   useEffect(() => {
     if (valorGas && !contaGasId && contas?.length) {
-      setContaGasId(contas.find((c) => c.tipo === "CAIXA")?.id ?? contas[0].id);
+      setContaGasId(contas.find((c) => c.type === "WALLET")?.id ?? contas[0].id);
     }
   }, [valorGas, contaGasId, contas]);
 
@@ -305,7 +306,7 @@ function SaidaDialog({ carro }: { carro: Carro }) {
       toast.success(`Saída registrada — ${carro.numero} com ${motoristas?.find((m) => m.id === motoristaId)?.nome}`);
       qc.invalidateQueries({ queryKey: ["financeiro-carros"] });
       qc.invalidateQueries({ queryKey: ["financeiro-carro-usos"] });
-      qc.invalidateQueries({ queryKey: ["financeiro-contas"] });
+      qc.invalidateQueries({ queryKey: ["fin-contas"] });
       setOpen(false); setMotoristaId(""); setKm(""); setObs(""); setValorGas(""); setContaGasId("");
     },
     onError: (e: unknown) => toast.error((e as { response?: { data?: { error?: string } } })?.response?.data?.error || "Erro ao registrar saída"),
@@ -348,10 +349,10 @@ function SaidaDialog({ carro }: { carro: Carro }) {
               <Select value={contaGasId} onValueChange={setContaGasId}>
                 <SelectTrigger><SelectValue placeholder="Selecione a conta" /></SelectTrigger>
                 <SelectContent>
-                  {(contas ?? []).map((c) => <SelectItem key={c.id} value={c.id}>{c.nome}</SelectItem>)}
+                  {(contas ?? []).map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
                 </SelectContent>
               </Select>
-              <p className="text-[11px] text-muted-foreground">Gera automaticamente uma saída no Caixa, categoria &quot;Combustível&quot;.</p>
+              <p className="text-[11px] text-muted-foreground">Gera automaticamente uma despesa paga em Lançamentos, categoria &quot;Combustível&quot;.</p>
             </div>
           )}
           <div className="space-y-1.5">
@@ -447,7 +448,7 @@ function GasolinaDialog({
 
   useEffect(() => {
     if (open && !contaId && contas?.length) {
-      setContaId(contas.find((c) => c.tipo === "CAIXA")?.id ?? contas[0].id);
+      setContaId(contas.find((c) => c.type === "WALLET")?.id ?? contas[0].id);
     }
   }, [open, contaId, contas]);
 
@@ -477,10 +478,10 @@ function GasolinaDialog({
             <Select value={contaId} onValueChange={setContaId}>
               <SelectTrigger><SelectValue placeholder="Selecione a conta" /></SelectTrigger>
               <SelectContent>
-                {(contas ?? []).map((c) => <SelectItem key={c.id} value={c.id}>{c.nome}</SelectItem>)}
+                {(contas ?? []).map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
               </SelectContent>
             </Select>
-            <p className="text-[11px] text-muted-foreground">Gera automaticamente uma saída no Caixa, categoria &quot;Combustível&quot;.</p>
+            <p className="text-[11px] text-muted-foreground">Gera automaticamente uma despesa paga em Lançamentos, categoria &quot;Combustível&quot;.</p>
           </div>
           <Button
             className="w-full bg-emerald-600 hover:bg-emerald-700"
@@ -614,7 +615,7 @@ function CarroCard({ carro }: { carro: Carro }) {
   const onUsoAlterado = () => {
     qc.invalidateQueries({ queryKey: ["financeiro-carros"] });
     qc.invalidateQueries({ queryKey: ["financeiro-carro-usos"] });
-    qc.invalidateQueries({ queryKey: ["financeiro-contas"] });
+    qc.invalidateQueries({ queryKey: ["fin-contas"] });
   };
   return (
     <Card className="p-4">
@@ -676,7 +677,7 @@ export default function CarrosPage() {
   const onUsoAlterado = () => {
     qc.invalidateQueries({ queryKey: ["financeiro-carros"] });
     qc.invalidateQueries({ queryKey: ["financeiro-carro-usos"] });
-    qc.invalidateQueries({ queryKey: ["financeiro-contas"] });
+    qc.invalidateQueries({ queryKey: ["fin-contas"] });
   };
 
   const excluirUsoMutation = useMutation({

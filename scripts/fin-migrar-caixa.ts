@@ -60,7 +60,7 @@ async function main() {
       console.log(`  ${b.ok ? "ok " : "DIFERENTE"} ${b.account}: R$ ${b.legacy} → R$ ${b.migrated}`);
     }
     console.log(
-      `\nCombustível dos carros: ${r.fuel.linked} de ${r.fuel.usesWithFuel} usos ligados à cópia` +
+      `\nCombustível dos carros: ${r.fuel.linked} de ${r.fuel.usesWithFuel} usos com gasolina têm a despesa no Financeiro novo` +
         (r.fuel.amountMismatch ? ` · ${r.fuel.amountMismatch} com valor diferente!` : ""),
     );
     if (r.warnings.length) {

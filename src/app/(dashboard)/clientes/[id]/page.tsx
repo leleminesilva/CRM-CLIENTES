@@ -40,6 +40,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { formatCurrency, formatCPFCNPJ, formatPhone, ORIGEM_LABELS, PORTE_LABELS, formatDateTime, formatDataVencimento } from "@/lib/utils/formatters";
 import { cn } from "@/lib/utils/cn";
+import { moduloDesligado } from "@/lib/modulos";
 import type { Cliente, EstagioLead } from "@/types";
 import { ETAPAS_PIPELINE, usePipelineActions } from "@/components/clientes/pipeline-actions";
 
@@ -371,7 +372,7 @@ export default function ClienteDetalhePage() {
         mensagens: Array<{ conteudo: string; direcao: string }>;
       }>;
     },
-    enabled: !!id,
+    enabled: !!id && !moduloDesligado("/whatsapp"),
   });
 
   const deleteMutation = useMutation({

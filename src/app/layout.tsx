@@ -1,11 +1,12 @@
 import type { Metadata } from "next";
-import { Archivo } from "next/font/google";
+import localFont from "next/font/local";
 import "./globals.css";
 import { Providers } from "./providers";
 
-const archivo = Archivo({
-  subsets: ["latin", "latin-ext"],
-  axes: ["wdth"],
+// Fonte hospedada no projeto (pacote @fontsource-variable/archivo): o build não depende do Google Fonts.
+const archivo = localFont({
+  src: "../../node_modules/@fontsource-variable/archivo/files/archivo-latin-wdth-normal.woff2",
+  weight: "100 900",
   variable: "--font-archivo",
   display: "swap",
 });

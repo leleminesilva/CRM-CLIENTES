@@ -12,6 +12,8 @@ const PUBLIC_PATHS = [
   // tem como enviar o cookie de sessão do app. Autenticado pelo próprio
   // hub.verify_token no handler, não pelo login de usuário.
   "/api/whatsapp/webhook",
+  // O Vercel Cron chama sem cookie; o handler confere o CRON_SECRET.
+  "/api/cron",
 ];
 
 export async function middleware(request: NextRequest) {

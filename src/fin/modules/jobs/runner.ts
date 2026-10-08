@@ -98,7 +98,8 @@ let inFlight: Promise<unknown> | null = null;
 
 /** Dispara os jobs do dia em segundo plano (no máximo uma execução simultânea por processo). */
 export function triggerDailyJobs(): void {
-  if (!env.JOBS_ENABLED || inFlight) return;
+  // Na Vercel o processo morre ao fim da resposta: os jobs rodam pelo Cron (/api/cron/fin-jobs).
+  if (!env.JOBS_ENABLED || process.env.VERCEL || inFlight) return;
   inFlight = runDailyJobs()
     .catch((error: unknown) => logger.error({ err: error }, "Falha ao executar os jobs diários"))
     .finally(() => {

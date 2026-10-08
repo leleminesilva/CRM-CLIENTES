@@ -1,9 +1,17 @@
 {
-  "regions": ["gru1"],
+  "regions": [
+    "gru1"
+  ],
   "builds": [
     {
       "src": "package.json",
       "use": "@vercel/next"
+    }
+  ],
+  "crons": [
+    {
+      "path": "/api/cron/fin-jobs",
+      "schedule": "0 8 * * *"
     }
   ]
 }

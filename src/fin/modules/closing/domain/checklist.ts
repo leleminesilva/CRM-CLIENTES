@@ -75,7 +75,7 @@ export function buildChecklist(f: ClosingFacts): ChecklistItem[] {
       title:
         f.pendingCommissions === 0
           ? "Comissões recebidas"
-          : plural(f.pendingCommissions, "comissão a receber", "comissões a receber"),
+          : plural(f.pendingCommissions, "comissão a pagar", "comissões a pagar"),
       detail:
         f.pendingCommissions === 0
           ? "Todas as comissões do mês foram recebidas."

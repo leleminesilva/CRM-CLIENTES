@@ -186,9 +186,9 @@ export function spendingByCategory(rows: LedgerRow[], months: MonthKey[]) {
   };
 }
 
-/** Comissões: prevista, recebida e pendente por mês. */
+/** Comissões pagas aos vendedores: prevista, paga e a pagar por mês. */
 export function commissionsByMonth(rows: LedgerRow[], months: MonthKey[]) {
-  const c = where(rows, (r) => r.kind === "INCOME" && r.incomeClass === "COMMISSION");
+  const c = where(rows, (r) => r.kind === "EXPENSE" && r.isCommission);
   const body = months.map((m) => {
     const inMonth = c.filter((r) => r.month === m);
     const sum = total(inMonth);
@@ -196,7 +196,7 @@ export function commissionsByMonth(rows: LedgerRow[], months: MonthKey[]) {
     return { m, sum, received, pending: sum.minus(received) };
   });
   return {
-    head: ["Mês", "Prevista", "Recebida", "A receber"],
+    head: ["Mês", "Prevista", "Paga", "A pagar"],
     rows: body.map((b) => [b.m, money(b.sum), money(b.received), money(b.pending)]),
     totals: [
       "Total",

@@ -67,7 +67,7 @@ export const REPORTS: ReportMeta[] = [
   {
     id: "comissoes",
     title: "Comissões",
-    description: "Previstas, recebidas e a receber por mês.",
+    description: "Comissões pagas aos vendedores: previstas, pagas e a pagar por mês.",
     group: "Receitas e despesas",
     filterable: true,
   },

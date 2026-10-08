@@ -118,7 +118,7 @@ export function ForecastView({ data, horizon }: { data: ForecastResult; horizon:
           <span className="text-xs text-ink-3">por mês, média de 6 meses</span>
         </div>
         <div className="grid gap-1 px-5 py-4">
-          <span className="text-[13px] text-ink-2">Comissão típica por mês</span>
+          <span className="text-[13px] text-ink-2">Comissão a pagar típica por mês</span>
           <MoneyText value={data.commissionTypical[data.scenario]} variant="kpi" />
           <span className="text-xs text-ink-3">
             {data.historyMonths >= 3
@@ -183,7 +183,7 @@ export function ForecastView({ data, horizon }: { data: ForecastResult; horizon:
                 <td className="px-4 py-2 first-letter:uppercase">{formatMonth(m.month)}</td>
                 <td className="px-3 py-2 text-right">
                   <Tooltip
-                    content={`Cadastrado ${formatMoney(m.scheduledIncome)}${Number(m.commissionComplement) > 0 ? ` + comissões estimadas ${formatMoney(m.commissionComplement)}` : ""}`}
+                    content={`Cadastrado ${formatMoney(m.scheduledIncome)}`}
                   >
                     <span className="cursor-help underline decoration-ink-3 decoration-dotted underline-offset-4">
                       <MoneyText value={m.income} variant="table" tone="positive" />
@@ -192,7 +192,7 @@ export function ForecastView({ data, horizon }: { data: ForecastResult; horizon:
                 </td>
                 <td className="px-3 py-2 text-right">
                   <Tooltip
-                    content={`Cadastrado ${formatMoney(m.scheduledExpense)}${Number(m.variableEstimate) > 0 ? ` + variáveis estimadas ${formatMoney(m.variableEstimate)}` : ""}`}
+                    content={`Cadastrado ${formatMoney(m.scheduledExpense)}${Number(m.variableEstimate) > 0 ? ` + variáveis estimadas ${formatMoney(m.variableEstimate)}` : ""}${Number(m.commissionComplement) > 0 ? ` + comissões estimadas ${formatMoney(m.commissionComplement)}` : ""}`}
                   >
                     <span className="cursor-help underline decoration-ink-3 decoration-dotted underline-offset-4">
                       <MoneyText value={m.expense} variant="table" />

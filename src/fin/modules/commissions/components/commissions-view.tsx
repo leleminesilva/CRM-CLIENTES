@@ -48,6 +48,7 @@ interface Props {
   month: string;
   currentMonth: string;
   accounts: FormOptions["accounts"];
+  sellers: string[];
   today: ISODate;
 }
 
@@ -57,6 +58,7 @@ export function CommissionsView({
   month,
   currentMonth,
   accounts,
+  sellers,
   today,
 }: Props) {
   const [form, setForm] = React.useState<{ c?: CommissionDTO } | null>(null);
@@ -65,8 +67,8 @@ export function CommissionsView({
 
   const kpis = [
     { label: "Prevista no mês", value: stats.expected },
-    { label: "Recebida", value: stats.received },
-    { label: "A receber", value: stats.pending },
+    { label: "Paga", value: stats.received },
+    { label: "A pagar", value: stats.pending },
     {
       label: "Atrasada (todas)",
       value: stats.overdue,
@@ -81,7 +83,7 @@ export function CommissionsView({
     <div className="grid gap-6">
       <PageHeader
         title="Comissões"
-        description="Vendas, comissões previstas e recebidas. Cada comissão entra na renda do mês da previsão de pagamento."
+        description="Comissões que a empresa paga aos vendedores. Cada comissão entra nas despesas do mês da previsão de pagamento."
         actions={
           <>
             <MonthSwitcher month={month} currentMonth={currentMonth} />
@@ -103,7 +105,7 @@ export function CommissionsView({
 
       <div className="grid gap-4 lg:grid-cols-[2fr_1fr]">
         <ChartFrame
-          question="Como as comissões evoluíram em 12 meses?"
+          question="Quanto pagamos de comissão em 12 meses?"
           answer={`Média de ${formatMoney(stats.average6)} por mês nos últimos 6 meses (${formatMoney(stats.average12)} em 12).`}
           chart={
             <MonthlyBars
@@ -113,7 +115,7 @@ export function CommissionsView({
           }
           table={
             <ChartTable
-              head={["Mês", "Prevista", "Recebida"]}
+              head={["Mês", "Prevista", "Paga"]}
               rows={stats.byMonth.map((m) => [
                 formatMonth(m.month),
                 formatMoney(m.total),
@@ -125,19 +127,19 @@ export function CommissionsView({
         />
         <Panel className="grid content-start gap-3 p-5">
           <div className="grid gap-0.5">
-            <h2 className="title-section">Quem mais gerou comissão?</h2>
+            <h2 className="title-section">Quem mais recebeu comissão?</h2>
             <p className="text-[13px] text-ink-2">Últimos 12 meses</p>
           </div>
-          {stats.byClient.length === 0 ? (
+          {stats.bySeller.length === 0 ? (
             <p className="text-[13px] text-ink-3">Sem comissões no período.</p>
           ) : (
             <ul className="grid gap-2.5">
-              {stats.byClient.map((c) => {
-                const max = Number(stats.byClient[0]?.total ?? 1) || 1;
+              {stats.bySeller.map((c) => {
+                const max = Number(stats.bySeller[0]?.total ?? 1) || 1;
                 return (
-                  <li key={c.client} className="grid gap-1">
+                  <li key={c.seller} className="grid gap-1">
                     <div className="flex justify-between gap-3 text-sm">
-                      <span className="truncate">{c.client}</span>
+                      <span className="truncate">{c.seller}</span>
                       <MoneyText value={c.total} variant="table" className="font-medium" />
                     </div>
                     <div className="h-1.5 rounded-full bg-surface-sunken">
@@ -160,8 +162,8 @@ export function CommissionsView({
           {commissions.length === 0 ? (
             <EmptyState
               icon={BadgePercentIcon}
-              title="Nenhuma comissão prevista para este mês"
-              description="Registre a venda e o percentual: o sistema calcula a comissão e coloca a receita na data prevista."
+              title="Nenhuma comissão a pagar neste mês"
+              description="Informe o vendedor, a venda e o percentual: o sistema calcula a comissão e lança a despesa na data prevista."
               action={
                 <Button onClick={() => setForm({})}>
                   <PlusIcon /> Nova comissão
@@ -176,9 +178,11 @@ export function CommissionsView({
                   className={`grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-3 px-4 py-3 ${c.status === "CANCELED" ? "bg-surface-sunken/50" : ""}`}
                 >
                   <div className="grid min-w-0 gap-0.5">
-                    <span className="truncate text-sm font-medium">{c.clientName}</span>
+                    <span className="truncate text-sm font-medium">
+                      {c.sellerName || "Sem vendedor"}
+                    </span>
                     <span className="truncate text-[13px] text-ink-3">
-                      {c.saleDescription} · venda de {formatMoney(c.saleAmount)} ×{" "}
+                      {c.clientName} · {c.saleDescription} · venda de {formatMoney(c.saleAmount)} ×{" "}
                       {c.ratePercent.replace(".", ",")}% · previsão {formatDate(c.expectedDate)}
                     </span>
                   </div>
@@ -186,18 +190,17 @@ export function CommissionsView({
                     <MoneyText
                       value={c.amount}
                       variant="table"
-                      sign="always"
-                      tone="positive"
+                      sign="never"
                       className="text-sm font-medium"
                     />
-                    <StatusBadge type="INCOME" status={c.status} />
+                    <StatusBadge type="EXPENSE" status={c.status} />
                   </div>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button
                         variant="ghost"
                         size="icon-sm"
-                        aria-label={`Ações de ${c.clientName}`}
+                        aria-label={`Ações da comissão de ${c.sellerName || c.clientName}`}
                       >
                         <EllipsisIcon />
                       </Button>
@@ -205,7 +208,7 @@ export function CommissionsView({
                     <DropdownMenuContent align="end">
                       {c.status === "PENDING" || c.status === "OVERDUE" ? (
                         <DropdownMenuItem onSelect={() => setReceiving(c)}>
-                          <CheckIcon /> Marcar como recebida
+                          <CheckIcon /> Marcar como paga
                         </DropdownMenuItem>
                       ) : null}
                       {c.status === "SETTLED" ? (
@@ -216,10 +219,10 @@ export function CommissionsView({
                                 await unsettleTransactionsAction({ ids: [c.transactionId] }),
                               )
                             )
-                              toast.success("Voltou para a receber");
+                              toast.success("Voltou para a pagar");
                           }}
                         >
-                          <RotateCcwIcon /> Voltar para a receber
+                          <RotateCcwIcon /> Voltar para a pagar
                         </DropdownMenuItem>
                       ) : null}
                       <DropdownMenuItem onSelect={() => setForm({ c })}>
@@ -260,6 +263,7 @@ export function CommissionsView({
           onOpenChange={(o) => !o && setForm(null)}
           commission={form.c}
           accounts={accounts}
+          sellers={sellers}
           today={today}
         />
       ) : null}
@@ -268,7 +272,7 @@ export function CommissionsView({
           open
           onOpenChange={(o) => !o && setReceiving(null)}
           count={1}
-          verb="recebida"
+          verb="paga"
           needsAccount={!receiving.account}
           accounts={accounts}
           today={today}
@@ -278,7 +282,7 @@ export function CommissionsView({
                 await settleTransactionsAction({ ids: [receiving.transactionId], ...input }),
               )
             ) {
-              toast.success("Comissão recebida");
+              toast.success("Comissão paga");
               setReceiving(null);
             }
           }}
@@ -287,10 +291,10 @@ export function CommissionsView({
       <ConfirmDialog
         open={Boolean(deleting)}
         onOpenChange={(o) => !o && setDeleting(null)}
-        title={`Excluir a comissão de “${deleting?.clientName ?? ""}”?`}
+        title={`Excluir a comissão de “${deleting?.sellerName || deleting?.clientName || ""}”?`}
         description={
           <p>
-            A venda e a receita prevista serão removidas. Se a venda foi desfeita, prefira
+            A venda e a despesa prevista serão removidas. Se a venda foi desfeita, prefira
             “Cancelar” para manter o histórico.
           </p>
         }

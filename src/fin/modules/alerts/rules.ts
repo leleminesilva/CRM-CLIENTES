@@ -91,7 +91,7 @@ export const lateIncomeRule: AlertRule = async (ctx, today) => {
   }));
 };
 
-/** Comissões previstas a receber no mês. */
+/** Comissões a pagar aos vendedores no mês. */
 export const commissionsToReceiveRule: AlertRule = async (ctx, today) => {
   const month = monthKeyOf(today);
   const pending = await prisma.commission.findMany({
@@ -115,7 +115,7 @@ export const commissionsToReceiveRule: AlertRule = async (ctx, today) => {
     {
       code: "commissions.pending",
       priority: "INFO",
-      title: `Você tem ${formatMoney(total)} em comissões previstas para receber`,
+      title: `Você tem ${formatMoney(total)} em comissões a pagar aos vendedores`,
       body: `${pending.length} ${pending.length === 1 ? "comissão prevista" : "comissões previstas"} até o fim de ${formatMonth(month)}.`,
       href: "/financeiro/comissoes",
       dedupeKey: `commissions-pending:${month}:${total.toFixed(2)}`,

@@ -35,18 +35,22 @@ export function CommissionFormDialog({
   onOpenChange,
   commission,
   accounts,
+  sellers,
   today,
 }: {
   open: boolean;
   onOpenChange: (o: boolean) => void;
   commission?: CommissionDTO;
   accounts: FormOptions["accounts"];
+  /** Nomes sugeridos (usuários do CRM); o campo aceita qualquer nome. */
+  sellers: string[];
   today: ISODate;
 }) {
   const form = useForm<V, unknown, O>({
     resolver: zodResolver(commissionSchema),
     defaultValues: commission
       ? {
+          sellerName: commission.sellerName,
           clientName: commission.clientName,
           saleDescription: commission.saleDescription,
           saleAmount: moneyToInput(commission.saleAmount),
@@ -60,6 +64,7 @@ export function CommissionFormDialog({
           notes: commission.notes ?? "",
         }
       : {
+          sellerName: "",
           clientName: "",
           saleDescription: "",
           saleAmount: "",
@@ -100,7 +105,7 @@ export function CommissionFormDialog({
         <DialogHeader>
           <DialogTitle>{commission ? "Editar comissão" : "Nova comissão"}</DialogTitle>
           <DialogDescription>
-            A comissão vira uma receita prevista na data de pagamento e entra na previsão de caixa.
+            A comissão vira uma despesa prevista na data de pagamento e entra na previsão de caixa.
           </DialogDescription>
         </DialogHeader>
         <form
@@ -109,9 +114,27 @@ export function CommissionFormDialog({
           onSubmit={form.handleSubmit(onSubmit)}
           className="grid gap-4"
         >
+          <Field label="Vendedor" error={errors.sellerName?.message}>
+            {(a) => (
+              <>
+                <Input
+                  {...a}
+                  autoFocus
+                  list="comissao-vendedores"
+                  placeholder="Quem recebe a comissão"
+                  {...form.register("sellerName")}
+                />
+                <datalist id="comissao-vendedores">
+                  {sellers.map((n) => (
+                    <option key={n} value={n} />
+                  ))}
+                </datalist>
+              </>
+            )}
+          </Field>
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Cliente" error={errors.clientName?.message}>
-              {(a) => <Input {...a} autoFocus {...form.register("clientName")} />}
+              {(a) => <Input {...a} {...form.register("clientName")} />}
             </Field>
             <Field label="Venda ou projeto" error={errors.saleDescription?.message}>
               {(a) => <Input {...a} {...form.register("saleDescription")} />}
@@ -142,7 +165,7 @@ export function CommissionFormDialog({
           <Field
             label="Valor diferente do cálculo"
             aside="opcional"
-            hint="Use se a empresa pagar outro valor."
+            hint="Use se for pagar ao vendedor outro valor."
             error={errors.amountOverride?.message}
           >
             {(a) => (
@@ -166,14 +189,14 @@ export function CommissionFormDialog({
             name="received"
             render={({ field }) => (
               <label className="flex cursor-pointer items-center justify-between gap-3 rounded-card border border-line bg-surface px-3 py-2.5">
-                <span className="text-sm font-medium">Já recebi</span>
+                <span className="text-sm font-medium">Já paguei</span>
                 <Switch checked={field.value} onCheckedChange={field.onChange} />
               </label>
             )}
           />
           {received ? (
             <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="Conta" error={errors.accountId?.message}>
+              <Field label="Conta de saída" error={errors.accountId?.message}>
                 {(a) => (
                   <Controller
                     control={form.control}
@@ -189,7 +212,7 @@ export function CommissionFormDialog({
                   />
                 )}
               </Field>
-              <Field label="Recebida em">
+              <Field label="Paga em">
                 {(a) => (
                   <Controller
                     control={form.control}

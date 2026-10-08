@@ -23,7 +23,7 @@ import type { CalendarEvent, EventKind } from "../queries";
 
 export const KIND: Record<EventKind, { label: string; icon: LucideIcon; color: string }> = {
   salary: { label: "Receita recorrente", icon: WalletIcon, color: "var(--series-income)" },
-  commission: { label: "Comissão", icon: BadgePercentIcon, color: "var(--series-commission)" },
+  commission: { label: "Comissão a pagar", icon: BadgePercentIcon, color: "var(--series-commission)" },
   income: { label: "Recebimento", icon: TrendingUpIcon, color: "var(--series-income)" },
   bill: { label: "Conta", icon: ReceiptIcon, color: "var(--series-expense)" },
   installment: { label: "Parcela", icon: LayersIcon, color: "var(--series-expense)" },

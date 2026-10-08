@@ -51,6 +51,7 @@ async function variableByMonth(ctx: ServiceContext, from: MonthKey, to: MonthKey
     FROM fin_transactions
     WHERE workspace_id = ${ctx.workspaceId}::uuid AND deleted_at IS NULL AND status <> 'CANCELED' AND is_balance_adjustment = false
       AND type IN ('EXPENSE', 'REFUND') AND nature = 'VARIABLE' AND installment_plan_id IS NULL AND recurrence_id IS NULL
+      AND id NOT IN (SELECT transaction_id FROM fin_commissions)
       AND due_date BETWEEN ${toDbDate(monthRange(from).start)} AND ${toDbDate(monthRange(to).end)}
     GROUP BY 1`,
   );

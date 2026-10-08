@@ -6,10 +6,23 @@ import { assertCan, type ServiceContext } from "@fin/lib/permissions";
 import { computeCommission } from "./domain/commission";
 import type { CommissionInput } from "./schemas";
 
+export const COMMISSION_PAYOUT_KEY = "commission_payout";
+
+/** Categoria de despesa "Comissões de vendedores" (de sistema): criada na primeira comissão. */
 async function commissionCategory(db: DbClient, workspaceId: string) {
-  const c = await db.category.findFirst({ where: { workspaceId, systemKey: "commission" } });
-  if (!c) throw new AppError("NOT_FOUND", "Categoria de comissões não encontrada.");
-  return c;
+  const found = await db.category.findFirst({ where: { workspaceId, systemKey: COMMISSION_PAYOUT_KEY } });
+  if (found) return found;
+  return db.category.create({
+    data: {
+      workspaceId,
+      kind: "EXPENSE",
+      name: "Comissões de vendedores",
+      icon: "badge-percent",
+      color: "#8b5cf6",
+      defaultNature: "VARIABLE",
+      systemKey: COMMISSION_PAYOUT_KEY,
+    },
+  });
 }
 
 async function assertAccount(db: DbClient, ctx: ServiceContext, id: string | null) {
@@ -20,7 +33,7 @@ async function assertAccount(db: DbClient, ctx: ServiceContext, id: string | nul
 
 function txFields(input: CommissionInput, amount: string) {
   return {
-    description: `Comissão: ${input.clientName}`,
+    description: `Comissão: ${input.sellerName} · ${input.clientName}`,
     notes: input.notes,
     amount,
     date: toDbDate(input.saleDate),
@@ -31,7 +44,7 @@ function txFields(input: CommissionInput, amount: string) {
   };
 }
 
-/** Registra a venda e cria a receita a receber correspondente (fonte única para o fluxo de caixa). */
+/** Registra a venda e cria a despesa a pagar ao vendedor (fonte única para o fluxo de caixa). */
 export async function createCommission(ctx: ServiceContext, input: CommissionInput) {
   assertCan(ctx, "write");
   return prisma.$transaction(async (tx) => {
@@ -42,7 +55,8 @@ export async function createCommission(ctx: ServiceContext, input: CommissionInp
     const transaction = await tx.transaction.create({
       data: {
         workspaceId: ctx.workspaceId,
-        type: "INCOME",
+        type: "EXPENSE",
+        nature: "VARIABLE",
         categoryId: category.id,
         paymentMethod: null,
         ...txFields(input, amount),
@@ -52,6 +66,7 @@ export async function createCommission(ctx: ServiceContext, input: CommissionInp
       data: {
         workspaceId: ctx.workspaceId,
         transactionId: transaction.id,
+        sellerName: input.sellerName,
         clientName: input.clientName,
         saleDescription: input.saleDescription,
         saleAmount: input.saleAmount,
@@ -98,6 +113,7 @@ export async function updateCommission(ctx: ServiceContext, id: string, input: C
     const after = await tx.commission.update({
       where: { id },
       data: {
+        sellerName: input.sellerName,
         clientName: input.clientName,
         saleDescription: input.saleDescription,
         saleAmount: input.saleAmount,

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { requirePageContext } from "@fin/lib/context";
+import { prisma } from "@fin/lib/db";
 import { resolveMonth, type SearchParams } from "@fin/lib/month";
 import { CommissionsView } from "@fin/modules/commissions/components/commissions-view";
 import { commissionStats, listCommissions } from "@fin/modules/commissions/queries";
@@ -14,10 +15,11 @@ export default async function CommissionsPage({
 }) {
   const ctx = await requirePageContext();
   const { month, currentMonth } = resolveMonth((await searchParams).mes, ctx.today);
-  const [commissions, stats, options] = await Promise.all([
+  const [commissions, stats, options, users] = await Promise.all([
     listCommissions(ctx, ctx.today, { month }),
     commissionStats(ctx, month, ctx.today),
     loadFormOptions(ctx),
+    prisma.user.findMany({ where: { ativo: true }, select: { nome: true }, orderBy: { nome: "asc" } }),
   ]);
   return (
     <CommissionsView
@@ -26,6 +28,7 @@ export default async function CommissionsPage({
       month={month}
       currentMonth={currentMonth}
       accounts={options.accounts}
+      sellers={users.map((u) => u.nome)}
       today={ctx.today}
     />
   );

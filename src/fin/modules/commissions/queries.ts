@@ -15,6 +15,7 @@ import { displayStatus, type DisplayStatus } from "@fin/modules/transactions/dom
 export interface CommissionDTO {
   id: string;
   transactionId: string;
+  sellerName: string;
   clientName: string;
   saleDescription: string;
   saleAmount: string;
@@ -64,6 +65,7 @@ export async function listCommissions(
     return {
       id: c.id,
       transactionId: t.id,
+      sellerName: c.sellerName,
       clientName: c.clientName,
       saleDescription: c.saleDescription,
       saleAmount: toMoneyString(c.saleAmount),
@@ -81,8 +83,9 @@ export async function listCommissions(
 }
 
 export interface CommissionStats {
-  /** Previstas para o mês (todas, exceto canceladas). */
+  /** A pagar no mês (todas, exceto canceladas). */
   expected: string;
+  /** Já pagas no mês. */
   received: string;
   pending: string;
   /** Atrasadas de qualquer mês. */
@@ -92,7 +95,8 @@ export interface CommissionStats {
   average6: string;
   average12: string;
   byMonth: { month: MonthKey; total: string; received: string }[];
-  byClient: { client: string; total: string; count: number }[];
+  /** Quanto cada vendedor recebeu de comissão nos últimos 12 meses. */
+  bySeller: { seller: string; total: string; count: number }[];
 }
 
 /** Painel de comissões (R6). */
@@ -125,12 +129,13 @@ export async function commissionStats(
   const avg = (n: number) =>
     sumMoney(completed(n).map((m) => byMonthMap.get(m)?.total ?? ZERO)).dividedBy(n);
 
-  const clients = new Map<string, { total: Money; count: number }>();
+  const sellers = new Map<string, { total: Money; count: number }>();
   for (const c of valid.filter(
     (c) => fromDbDate(c.transaction.dueDate) >= `${addMonthsToKey(currentMonth, -11)}-01`,
   )) {
-    const cur = clients.get(c.clientName) ?? { total: ZERO, count: 0 };
-    clients.set(c.clientName, {
+    const name = c.sellerName || "Sem vendedor";
+    const cur = sellers.get(name) ?? { total: ZERO, count: 0 };
+    sellers.set(name, {
       total: cur.total.plus(toMoney(c.transaction.amount)),
       count: cur.count + 1,
     });
@@ -149,8 +154,8 @@ export async function commissionStats(
       total: toMoneyString(byMonthMap.get(m)?.total ?? ZERO),
       received: toMoneyString(byMonthMap.get(m)?.received ?? ZERO),
     })),
-    byClient: [...clients.entries()]
-      .map(([client, v]) => ({ client, total: toMoneyString(v.total), count: v.count }))
+    bySeller: [...sellers.entries()]
+      .map(([seller, v]) => ({ seller, total: toMoneyString(v.total), count: v.count }))
       .sort((a, b) => toMoney(b.total).comparedTo(toMoney(a.total)))
       .slice(0, 8),
   };

@@ -54,8 +54,8 @@ export interface ProjectionInput {
 }
 
 /**
- * Projeção (R11): para cada mês = receitas agendadas + complemento de comissões pelo cenário
- * (percentil do histórico) − despesas agendadas − variáveis estimadas. O complemento só entra com
+ * Projeção (R11): para cada mês = receitas agendadas − despesas agendadas − variáveis estimadas −
+ * complemento de comissões a pagar pelo cenário (percentil do histórico). O complemento só entra com
  * pelo menos 3 meses de histórico; a estimativa de variáveis desconta o que já foi lançado.
  */
 export function projectMonths(input: ProjectionInput): MonthProjection[] {
@@ -69,8 +69,8 @@ export function projectMonths(input: ProjectionInput): MonthProjection[] {
     const commissionComplement = complement.greaterThan(0) ? complement : ZERO;
     const remainingVariable = input.variableAverage.minus(m.variableIncurred);
     const variableEstimate = remainingVariable.greaterThan(0) ? remainingVariable : ZERO;
-    const income = m.scheduledIncome.plus(commissionComplement);
-    const expense = m.scheduledExpense.plus(variableEstimate);
+    const income = m.scheduledIncome;
+    const expense = m.scheduledExpense.plus(variableEstimate).plus(commissionComplement);
     const net = income.minus(expense);
     balance = balance.plus(net);
     return {

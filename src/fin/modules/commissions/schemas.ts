@@ -3,6 +3,7 @@ import { isoDate, moneyInput, optionalText } from "@fin/lib/validation";
 
 export const commissionSchema = z
   .object({
+    sellerName: z.string().trim().min(1, "Informe o vendedor").max(120, "Use até 120 caracteres"),
     clientName: z.string().trim().min(1, "Informe o cliente").max(120, "Use até 120 caracteres"),
     saleDescription: z
       .string()
@@ -17,7 +18,7 @@ export const commissionSchema = z
       .transform((v) => v.replace(",", "."))
       .pipe(z.string().regex(/^\d{1,3}(\.\d{1,4})?$/, "Percentual inválido (ex.: 5 ou 2,5)"))
       .refine((v) => Number.parseFloat(v) > 0 && Number.parseFloat(v) <= 100, "Entre 0 e 100%"),
-    /** Valor digitado manualmente (quando a empresa paga diferente do cálculo). */
+    /** Valor digitado manualmente (quando a empresa paga ao vendedor diferente do cálculo). */
     amountOverride: z
       .union([z.string(), z.null()])
       .transform((v) => (v ?? "").trim())
@@ -35,7 +36,7 @@ export const commissionSchema = z
       ctx.addIssue({
         code: "custom",
         path: ["accountId"],
-        message: "Em qual conta a comissão entrou?",
+        message: "De qual conta a comissão foi paga?",
       });
     if (v.expectedDate < v.saleDate)
       ctx.addIssue({

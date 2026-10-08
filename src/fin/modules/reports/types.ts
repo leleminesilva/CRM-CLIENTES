@@ -56,6 +56,8 @@ export interface LedgerRow {
   groupName: string;
   categoryName: string;
   incomeClass: "BASE" | "COMMISSION" | "EXTRA" | "OTHER" | null;
+  /** Comissão paga a vendedor (despesa). */
+  isCommission: boolean;
   accountName: string | null;
   cardName: string | null;
   isInstallment: boolean;

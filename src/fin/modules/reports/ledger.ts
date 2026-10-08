@@ -59,6 +59,7 @@ export async function loadLedger(
       dueDate: true,
       nature: true,
       installmentPlanId: true,
+      commission: { select: { id: true } },
       category: {
         select: {
           id: true,
@@ -91,6 +92,7 @@ export async function loadLedger(
       accountName: r.account?.name ?? null,
       cardName: r.creditCard?.name ?? null,
       isInstallment: r.installmentPlanId !== null,
+      isCommission: r.commission !== null,
     };
   });
 }

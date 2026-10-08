@@ -67,8 +67,8 @@ export async function calendarEvents(
     const date = fromDbDate(t.dueDate);
     let kind: EventKind;
     if (t.type === "TRANSFER") kind = "transfer";
-    else if (t.type === "INCOME")
-      kind = t.commission ? "commission" : t.category?.incomeClass === "BASE" ? "salary" : "income";
+    else if (t.commission) kind = "commission";
+    else if (t.type === "INCOME") kind = t.category?.incomeClass === "BASE" ? "salary" : "income";
     else if (t.installmentPlanId) kind = "installment";
     else if (t.recurrence?.subscription) kind = "subscription";
     else kind = "bill";

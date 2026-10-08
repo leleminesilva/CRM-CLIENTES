@@ -299,11 +299,12 @@ export function Sidebar() {
           <span className="font-black text-[15px] tracking-wide">
             <span style={activeTheme ? { color: activeTheme.text } : undefined} className={activeTheme ? undefined : "text-sidebar-foreground"}>INFINITY</span>
             <span
-              className={cn("ml-1", !activeTheme && "text-blue-400")}
+              className={cn("ml-1", !activeTheme && "text-cyan-400")}
               style={activeTheme ? accentStyle(activeTheme.navIndicator ?? activeTheme.totalLineColor) : undefined}
             >
               GLASS
             </span>
+            <span className="ml-1.5 align-middle rounded-full bg-primary/15 px-1.5 py-0.5 text-[9px] font-bold tracking-wider text-primary">2.0</span>
           </span>
         </span>
       )}
@@ -366,7 +367,7 @@ export function Sidebar() {
                   <span className="font-black text-[15px] tracking-wide">
                 <span>INFINITY</span>
                 <span
-                  className={cn("ml-1", !activeTheme && "text-blue-400")}
+                  className={cn("ml-1", !activeTheme && "text-cyan-400")}
                   style={activeTheme ? accentStyle(activeTheme.navIndicator ?? activeTheme.totalLineColor) : undefined}
                 >
                   GLASS

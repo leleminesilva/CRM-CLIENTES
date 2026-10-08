@@ -15,7 +15,7 @@ import { Label } from "@/components/ui/label";
 type Sistema = "crm" | "financeiro";
 
 const SISTEMAS: { id: Sistema; label: string; icon: typeof Building2; destino: string; accent: string; glow: string }[] = [
-  { id: "crm", label: "CRM", icon: Building2, destino: "/", accent: "linear-gradient(135deg, #2563eb, #3b82f6)", glow: "rgba(59,130,246,0.35)" },
+  { id: "crm", label: "CRM", icon: Building2, destino: "/", accent: "linear-gradient(135deg, #0891b2, #22d3ee)", glow: "rgba(34,211,238,0.35)" },
   { id: "financeiro", label: "Financeiro", icon: Wallet, destino: "/financeiro", accent: "linear-gradient(135deg, #059669, #10b981)", glow: "rgba(16,185,129,0.35)" },
 ];
 
@@ -90,7 +90,7 @@ export default function LoginPage() {
         {/* Center glow */}
         <div
           className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[700px] h-[700px] rounded-full opacity-100"
-          style={{ background: "radial-gradient(circle, rgba(59,130,246,1), transparent)" }}
+          style={{ background: "radial-gradient(circle, rgba(34,211,238,1), transparent)" }}
         />
       </div>
 
@@ -120,12 +120,13 @@ export default function LoginPage() {
           {/* Brand name */}
           <div className="mb-1">
             <span className="text-2xl font-black tracking-widest text-white">INFINITY</span>
-            <span className="text-2xl font-black tracking-widest text-blue-400 ml-1">GLASS</span>
+            <span className="text-2xl font-black tracking-widest text-cyan-400 ml-1">GLASS</span>
+            <span className="ml-2 inline-block align-top mt-1 rounded-full bg-cyan-400/15 px-2 py-0.5 text-[10px] font-bold tracking-wider text-cyan-300">2.0</span>
           </div>
           <div className="flex items-center justify-center gap-2 mb-5">
-            <div className="h-px w-8 bg-blue-400/50" />
-            <span className="text-xs font-semibold tracking-[0.3em] text-blue-200/70 uppercase">Vidraçaria</span>
-            <div className="h-px w-8 bg-blue-400/50" />
+            <div className="h-px w-8 bg-cyan-400/50" />
+            <span className="text-xs font-semibold tracking-[0.3em] text-cyan-200/70 uppercase">Vidraçaria</span>
+            <div className="h-px w-8 bg-cyan-400/50" />
           </div>
 
           <h2 className="text-xl font-semibold text-white/90">Bem-vindo de volta</h2>
@@ -219,7 +220,7 @@ export default function LoginPage() {
           <div className="flex justify-end">
             <a
               href="/forgot-password"
-              className="text-xs text-blue-400 hover:text-blue-300 transition-colors font-medium"
+              className="text-xs text-cyan-400 hover:text-cyan-300 transition-colors font-medium"
             >
               Esqueceu a senha?
             </a>

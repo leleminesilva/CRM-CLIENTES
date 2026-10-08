@@ -46,7 +46,7 @@ export default function ForgotPasswordPage() {
             <rect x="36" y="36" width="28" height="28" rx="6" transform="rotate(45 50 50)" fill="url(#fp-inner)" />
           </svg>
           <span className="text-xl font-black tracking-wide">
-            INFINITY<span className="text-blue-500 ml-1">GLASS</span>
+            INFINITY<span className="text-cyan-500 ml-1">GLASS</span>
           </span>
         </div>
 

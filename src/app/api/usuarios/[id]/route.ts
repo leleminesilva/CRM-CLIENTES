@@ -57,6 +57,16 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
     if (data.acessoFinanceiro !== undefined && !isAdmin(payload.role)) {
       return NextResponse.json({ error: "Apenas administradores podem liberar o Financeiro" }, { status: 403 });
     }
+    if (data.acessoFinanceiro !== undefined) {
+      // O Desenvolvedor sempre tem acesso; o acesso de um Administrador só o Desenvolvedor altera.
+      const alvo = await prisma.user.findUnique({ where: { id: params.id }, select: { role: true } });
+      if (alvo?.role === "DESENVOLVEDOR") {
+        return NextResponse.json({ error: "O Desenvolvedor sempre tem acesso ao Financeiro" }, { status: 400 });
+      }
+      if (alvo?.role === "ADMINISTRADOR" && payload.role !== "DESENVOLVEDOR") {
+        return NextResponse.json({ error: "Só o Desenvolvedor altera o acesso de um Administrador" }, { status: 403 });
+      }
+    }
 
     const updateData: Record<string, unknown> = { ...data };
     if (data.senha) {

@@ -423,16 +423,18 @@ export default function UsuariosPage() {
                   <Wallet className="w-3.5 h-3.5" />
                   Financeiro
                 </span>
-                {u.role === "ADMINISTRADOR" || u.role === "DESENVOLVEDOR" ? (
+                {u.role === "DESENVOLVEDOR" ? (
                   <span
                     className="text-xs text-emerald-600 dark:text-emerald-400 font-medium"
-                    title="Administradores e desenvolvedores sempre têm acesso"
+                    title="O desenvolvedor sempre tem acesso"
                   >
                     Sempre
                   </span>
                 ) : (
                   <Switch
                     checked={!!u.acessoFinanceiro}
+                    disabled={u.role === "ADMINISTRADOR" && me?.role !== "DESENVOLVEDOR"}
+                    title={u.role === "ADMINISTRADOR" && me?.role !== "DESENVOLVEDOR" ? "Só o desenvolvedor altera o acesso de um administrador" : undefined}
                     onCheckedChange={v => updateMutation.mutate({ id: u.id, acessoFinanceiro: v })}
                   />
                 )}

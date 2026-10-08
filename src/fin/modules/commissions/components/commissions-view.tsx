@@ -163,7 +163,7 @@ export function CommissionsView({
             <EmptyState
               icon={BadgePercentIcon}
               title="Nenhuma comissão a pagar neste mês"
-              description="Informe o vendedor, a venda e o percentual: o sistema calcula a comissão e lança a despesa na data prevista."
+              description="Informe o vendedor e o valor da comissão: o sistema lança a despesa na data prevista."
               action={
                 <Button onClick={() => setForm({})}>
                   <PlusIcon /> Nova comissão
@@ -182,8 +182,7 @@ export function CommissionsView({
                       {c.sellerName || "Sem vendedor"}
                     </span>
                     <span className="truncate text-[13px] text-ink-3">
-                      {c.clientName} · {c.saleDescription} · venda de {formatMoney(c.saleAmount)} ×{" "}
-                      {c.ratePercent.replace(".", ",")}% · previsão {formatDate(c.expectedDate)}
+                      previsão de pagamento {formatDate(c.expectedDate)}
                     </span>
                   </div>
                   <div className="grid justify-items-end gap-0.5">
@@ -200,7 +199,7 @@ export function CommissionsView({
                       <Button
                         variant="ghost"
                         size="icon-sm"
-                        aria-label={`Ações da comissão de ${c.sellerName || c.clientName}`}
+                        aria-label={`Ações da comissão de ${c.sellerName || "vendedor"}`}
                       >
                         <EllipsisIcon />
                       </Button>
@@ -241,7 +240,7 @@ export function CommissionsView({
                           }}
                         >
                           {c.status === "CANCELED" ? <RotateCcwIcon /> : <BanIcon />}{" "}
-                          {c.status === "CANCELED" ? "Reativar" : "Cancelar (venda desfeita)"}
+                          {c.status === "CANCELED" ? "Reativar" : "Cancelar (não será paga)"}
                         </DropdownMenuItem>
                       ) : null}
                       <DropdownMenuSeparator />
@@ -272,7 +271,7 @@ export function CommissionsView({
           open
           onOpenChange={(o) => !o && setReceiving(null)}
           count={1}
-          verb="paga"
+          verb="pago"
           needsAccount={!receiving.account}
           accounts={accounts}
           today={today}
@@ -291,10 +290,10 @@ export function CommissionsView({
       <ConfirmDialog
         open={Boolean(deleting)}
         onOpenChange={(o) => !o && setDeleting(null)}
-        title={`Excluir a comissão de “${deleting?.sellerName || deleting?.clientName || ""}”?`}
+        title={`Excluir a comissão de “${deleting?.sellerName || "vendedor"}”?`}
         description={
           <p>
-            A venda e a despesa prevista serão removidas. Se a venda foi desfeita, prefira
+            A comissão e a despesa prevista serão removidas. Se ela não será mais paga, prefira
             “Cancelar” para manter o histórico.
           </p>
         }

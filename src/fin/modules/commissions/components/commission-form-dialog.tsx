@@ -20,10 +20,8 @@ import { Input, Textarea } from "@fin/components/ui/input";
 import { Switch } from "@fin/components/ui/switch";
 import { handleActionResult } from "@fin/lib/action-result";
 import { addDays, type ISODate } from "@fin/lib/dates";
-import { formatMoney, parseMoneyInput } from "@fin/lib/money";
 import type { FormOptions } from "@fin/modules/transactions/form-options";
 import { createCommissionAction, updateCommissionAction } from "../actions";
-import { computeCommission } from "../domain/commission";
 import type { CommissionDTO } from "../queries";
 import { commissionSchema } from "../schemas";
 
@@ -51,12 +49,7 @@ export function CommissionFormDialog({
     defaultValues: commission
       ? {
           sellerName: commission.sellerName,
-          clientName: commission.clientName,
-          saleDescription: commission.saleDescription,
-          saleAmount: moneyToInput(commission.saleAmount),
-          ratePercent: commission.ratePercent.replace(".", ","),
-          amountOverride: commission.isAmountOverridden ? moneyToInput(commission.amount) : "",
-          saleDate: commission.saleDate,
+          amount: moneyToInput(commission.amount),
           expectedDate: commission.expectedDate,
           received: commission.status === "SETTLED",
           receivedAt: commission.receivedAt,
@@ -65,12 +58,7 @@ export function CommissionFormDialog({
         }
       : {
           sellerName: "",
-          clientName: "",
-          saleDescription: "",
-          saleAmount: "",
-          ratePercent: "",
-          amountOverride: "",
-          saleDate: today,
+          amount: "",
           expectedDate: addDays(today, 30),
           received: false,
           receivedAt: null,
@@ -79,15 +67,7 @@ export function CommissionFormDialog({
         },
   });
   const { errors, isSubmitting } = form.formState;
-  const sale = useWatch({ control: form.control, name: "saleAmount" });
-  const rate = useWatch({ control: form.control, name: "ratePercent" });
   const received = useWatch({ control: form.control, name: "received" });
-  const parsedSale = parseMoneyInput(String(sale ?? ""));
-  const parsedRate = Number.parseFloat(String(rate ?? "").replace(",", "."));
-  const computed =
-    parsedSale && parsedRate > 0 && parsedRate <= 100
-      ? computeCommission(parsedSale, parsedRate.toString())
-      : null;
 
   async function onSubmit(values: O) {
     const result = commission
@@ -133,52 +113,8 @@ export function CommissionFormDialog({
             )}
           </Field>
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Cliente" error={errors.clientName?.message}>
-              {(a) => <Input {...a} {...form.register("clientName")} />}
-            </Field>
-            <Field label="Venda ou projeto" error={errors.saleDescription?.message}>
-              {(a) => <Input {...a} {...form.register("saleDescription")} />}
-            </Field>
-          </div>
-          <div className="grid gap-4 sm:grid-cols-3">
-            <Field label="Valor da venda" error={errors.saleAmount?.message}>
-              {(a) => <MoneyInput {...a} placeholder="0,00" {...form.register("saleAmount")} />}
-            </Field>
-            <Field label="Percentual (%)" error={errors.ratePercent?.message}>
-              {(a) => (
-                <Input
-                  {...a}
-                  inputMode="decimal"
-                  placeholder="5"
-                  {...form.register("ratePercent")}
-                />
-              )}
-            </Field>
-            <div
-              className="grid content-end gap-1 rounded-card bg-surface-sunken px-3 py-2"
-              aria-live="polite"
-            >
-              <span className="text-xs text-ink-3">Comissão calculada</span>
-              <span className="font-semibold nums">{computed ? formatMoney(computed) : "—"}</span>
-            </div>
-          </div>
-          <Field
-            label="Valor diferente do cálculo"
-            aside="opcional"
-            hint="Use se for pagar ao vendedor outro valor."
-            error={errors.amountOverride?.message}
-          >
-            {(a) => (
-              <MoneyInput
-                {...a}
-                placeholder={computed ? formatMoney(computed).replace("R$", "").trim() : "0,00"}
-                {...form.register("amountOverride")}
-              />
-            )}
-          </Field>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Data da venda" error={errors.saleDate?.message}>
-              {(a) => <Input {...a} type="date" {...form.register("saleDate")} />}
+            <Field label="Valor da comissão" error={errors.amount?.message}>
+              {(a) => <MoneyInput {...a} placeholder="0,00" {...form.register("amount")} />}
             </Field>
             <Field label="Previsão de pagamento" error={errors.expectedDate?.message}>
               {(a) => <Input {...a} type="date" {...form.register("expectedDate")} />}

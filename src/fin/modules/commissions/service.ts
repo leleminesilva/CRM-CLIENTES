@@ -3,7 +3,6 @@ import { toDbDate } from "@fin/lib/dates";
 import { prisma, type DbClient } from "@fin/lib/db";
 import { AppError } from "@fin/lib/errors";
 import { assertCan, type ServiceContext } from "@fin/lib/permissions";
-import { computeCommission } from "./domain/commission";
 import type { CommissionInput } from "./schemas";
 
 export const COMMISSION_PAYOUT_KEY = "commission_payout";
@@ -33,10 +32,10 @@ async function assertAccount(db: DbClient, ctx: ServiceContext, id: string | nul
 
 function txFields(input: CommissionInput, amount: string) {
   return {
-    description: `Comissão: ${input.sellerName} · ${input.clientName}`,
+    description: `Comissão: ${input.sellerName}`,
     notes: input.notes,
     amount,
-    date: toDbDate(input.saleDate),
+    date: toDbDate(input.expectedDate),
     dueDate: toDbDate(input.expectedDate),
     status: input.received ? ("SETTLED" as const) : ("PENDING" as const),
     settledAt: input.received ? toDbDate(input.receivedAt ?? input.expectedDate) : null,
@@ -44,14 +43,13 @@ function txFields(input: CommissionInput, amount: string) {
   };
 }
 
-/** Registra a venda e cria a despesa a pagar ao vendedor (fonte única para o fluxo de caixa). */
+/** Registra a comissão e cria a despesa a pagar ao vendedor (fonte única para o fluxo de caixa). */
 export async function createCommission(ctx: ServiceContext, input: CommissionInput) {
   assertCan(ctx, "write");
   return prisma.$transaction(async (tx) => {
     await assertAccount(tx, ctx, input.accountId);
     const category = await commissionCategory(tx, ctx.workspaceId);
-    const amount =
-      input.amountOverride ?? computeCommission(input.saleAmount, input.ratePercent).toFixed(2);
+    const amount = input.amount;
     const transaction = await tx.transaction.create({
       data: {
         workspaceId: ctx.workspaceId,
@@ -67,12 +65,14 @@ export async function createCommission(ctx: ServiceContext, input: CommissionInp
         workspaceId: ctx.workspaceId,
         transactionId: transaction.id,
         sellerName: input.sellerName,
-        clientName: input.clientName,
-        saleDescription: input.saleDescription,
-        saleAmount: input.saleAmount,
-        ratePercent: input.ratePercent,
-        isAmountOverridden: input.amountOverride !== null,
-        saleDate: toDbDate(input.saleDate),
+        // Colunas da versão com venda e percentual (o banco exige venda > 0 e % entre 0 e 100):
+        // guardam o próprio valor da comissão a 100%. Só o valor da comissão importa.
+        clientName: "",
+        saleDescription: "",
+        saleAmount: amount,
+        ratePercent: "100",
+        isAmountOverridden: true,
+        saleDate: toDbDate(input.expectedDate),
         notes: input.notes,
       },
     });
@@ -100,8 +100,7 @@ export async function updateCommission(ctx: ServiceContext, id: string, input: C
   return prisma.$transaction(async (tx) => {
     const before = await getOwned(tx, ctx, id);
     await assertAccount(tx, ctx, input.accountId);
-    const amount =
-      input.amountOverride ?? computeCommission(input.saleAmount, input.ratePercent).toFixed(2);
+    const amount = input.amount;
     const keepCanceled = before.transaction.status === "CANCELED";
     await tx.transaction.update({
       where: { id: before.transactionId },
@@ -114,12 +113,14 @@ export async function updateCommission(ctx: ServiceContext, id: string, input: C
       where: { id },
       data: {
         sellerName: input.sellerName,
-        clientName: input.clientName,
-        saleDescription: input.saleDescription,
-        saleAmount: input.saleAmount,
-        ratePercent: input.ratePercent,
-        isAmountOverridden: input.amountOverride !== null,
-        saleDate: toDbDate(input.saleDate),
+        // Colunas da versão com venda e percentual (o banco exige venda > 0 e % entre 0 e 100):
+        // guardam o próprio valor da comissão a 100%. Só o valor da comissão importa.
+        clientName: "",
+        saleDescription: "",
+        saleAmount: amount,
+        ratePercent: "100",
+        isAmountOverridden: true,
+        saleDate: toDbDate(input.expectedDate),
         notes: input.notes,
       },
     });

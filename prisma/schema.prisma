@@ -1206,6 +1206,9 @@ model Workspace {
   invoices           CreditCardInvoice[]
   installmentPlans   InstallmentPlan[]
   commissions        Commission[]
+  employees          Employee[]
+  payrolls           Payroll[]
+  cheques            Cheque[]
   budgets            Budget[]
   goals              Goal[]
   goalContributions  GoalContribution[]
@@ -1376,6 +1379,8 @@ model Transaction {
   refunds          Transaction[]      @relation("Refunds")
   importBatch      ImportBatch?       @relation(fields: [importBatchId], references: [id], onDelete: NoAction)
   commission       Commission?
+  payroll          Payroll?
+  cheque           Cheque?
   goalContribution GoalContribution?
   attachments      Attachment[]
   carUse           FinanceiroCarroUso? @relation("FinCarUseFuel", fields: [carUseId], references: [id], onDelete: SetNull)
@@ -1913,4 +1918,75 @@ model MonthClose {
 
   @@unique([workspaceId, month])
   @@map("fin_month_closes")
+}
+
+// Folha de pagamento: funcionários e o pagamento mensal de cada um (uma despesa por mês).
+
+model Employee {
+  id          String    @id @default(uuid(7)) @db.Uuid
+  workspaceId String    @map("workspace_id") @db.Uuid
+  name        String
+  /// Cargo ou função (texto livre).
+  position    String?
+  salary      Decimal   @db.Decimal(14, 2)
+  /// Dia do mês em que o salário é pago (1 a 28).
+  payDay      Int       @map("pay_day")
+  /// Usuário do CRM, para somar as comissões dele ao lado do salário (opcional).
+  crmUserId   String?   @map("crm_user_id")
+  active      Boolean   @default(true)
+  notes       String?
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz(3)
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  payrolls  Payroll[]
+
+  @@index([workspaceId, active])
+  @@map("fin_employees")
+}
+
+model Payroll {
+  id            String   @id @default(uuid(7)) @db.Uuid
+  workspaceId   String   @map("workspace_id") @db.Uuid
+  employeeId    String   @map("employee_id") @db.Uuid
+  /// Mês de competência (AAAA-MM).
+  month         String   @db.VarChar(7)
+  transactionId String   @unique @map("transaction_id") @db.Uuid
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  workspace   Workspace   @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  employee    Employee    @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  transaction Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+
+  @@unique([employeeId, month])
+  @@index([workspaceId, month])
+  @@map("fin_payrolls")
+}
+
+// Cheques emitidos e recebidos. Valor, data (bom para), conta e situação ficam no lançamento ligado.
+
+model Cheque {
+  id            String    @id @default(uuid(7)) @db.Uuid
+  workspaceId   String    @map("workspace_id") @db.Uuid
+  /// ISSUED = emitido pela empresa (despesa); RECEIVED = recebido de cliente (receita).
+  direction     String    @db.VarChar(8)
+  number        String
+  bank          String?
+  /// Favorecido (emitido) ou emitente (recebido).
+  party         String
+  issueDate     DateTime  @map("issue_date") @db.Date
+  /// Devolvido pelo banco (o lançamento fica cancelado).
+  bounced       Boolean   @default(false)
+  notes         String?
+  transactionId String    @unique @map("transaction_id") @db.Uuid
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt     DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt     DateTime? @map("deleted_at") @db.Timestamptz(3)
+
+  workspace   Workspace   @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  transaction Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, direction])
+  @@map("fin_cheques")
 }

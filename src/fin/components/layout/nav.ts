@@ -21,6 +21,8 @@ import {
   CalendarCheckIcon,
   SettingsIcon,
   WalletIcon,
+  BanknoteIcon,
+  FileCheckIcon,
 } from "lucide-react";
 
 export interface NavItem {
@@ -54,8 +56,10 @@ export const NAV_GROUPS: NavGroup[] = [
     items: [
       { href: "/financeiro/lancamentos", label: "Lançamentos", icon: ArrowDownUpIcon, mobile: true },
       { href: "/financeiro/receitas", label: "Receitas", icon: WalletIcon },
+      { href: "/financeiro/salario", label: "Salário", icon: BanknoteIcon },
       { href: "/financeiro/comissoes", label: "Comissões", icon: BadgePercentIcon },
       { href: "/financeiro/despesas", label: "Despesas", icon: ReceiptIcon },
+      { href: "/financeiro/cheques", label: "Cheques", icon: FileCheckIcon },
       { href: "/financeiro/parcelamentos", label: "Parcelamentos", icon: LayersIcon },
       { href: "/financeiro/assinaturas", label: "Assinaturas", icon: RepeatIcon },
       { href: "/financeiro/importar", label: "Importar extrato", icon: FileUpIcon },

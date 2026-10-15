@@ -1,3 +1,4 @@
+import { ensureSystemCategory } from "@fin/crm/categorias";
 import { audit } from "@fin/lib/audit";
 import { toDbDate } from "@fin/lib/dates";
 import { prisma, type DbClient } from "@fin/lib/db";
@@ -9,19 +10,16 @@ import { Prisma } from "@prisma/client";
 
 export const COMMISSION_PAYOUT_KEY = "commission_payout";
 
-/** Categoria de despesa "Comissões de vendedores" (de sistema): criada na primeira comissão. */
-async function commissionCategory(db: DbClient, workspaceId: string) {
-  const found = await db.category.findFirst({ where: { workspaceId, systemKey: COMMISSION_PAYOUT_KEY } });
-  if (found) return found;
-  return db.category.create({
-    data: {
-      workspaceId,
+/** Categoria de despesa "Comissões de vendedores" (de sistema): adota a existente ou cria. */
+function commissionCategory(db: DbClient, workspaceId: string) {
+  return ensureSystemCategory(db, workspaceId, {
+    systemKey: COMMISSION_PAYOUT_KEY,
+    create: {
       kind: "EXPENSE",
       name: "Comissões de vendedores",
       icon: "badge-percent",
       color: "#8b5cf6",
       defaultNature: "VARIABLE",
-      systemKey: COMMISSION_PAYOUT_KEY,
     },
   });
 }

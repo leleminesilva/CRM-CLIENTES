@@ -1,5 +1,6 @@
 import type { Prisma } from "@prisma/client";
 import prisma from "@/lib/prisma";
+import { ensureSystemCategory } from "@fin/crm/categorias";
 import { audit } from "@fin/lib/audit";
 import { type ISODate, toDbDate } from "@fin/lib/dates";
 import { type ServiceContext } from "@fin/lib/permissions";
@@ -44,18 +45,15 @@ export async function businessContext(userId: string): Promise<ServiceContext & 
   return { userId, workspaceId: ws.id, role: "OWNER", settings: readCommissionSettings(ws.settings) };
 }
 
-async function payoutCategory(tx: Prisma.TransactionClient, workspaceId: string) {
-  const found = await tx.category.findFirst({ where: { workspaceId, systemKey: COMMISSION_PAYOUT_KEY } });
-  if (found) return found;
-  return tx.category.create({
-    data: {
-      workspaceId,
+function payoutCategory(tx: Prisma.TransactionClient, workspaceId: string) {
+  return ensureSystemCategory(tx, workspaceId, {
+    systemKey: COMMISSION_PAYOUT_KEY,
+    create: {
       kind: "EXPENSE",
       name: "Comissões de vendedores",
       icon: "badge-percent",
       color: "#8b5cf6",
       defaultNature: "VARIABLE",
-      systemKey: COMMISSION_PAYOUT_KEY,
     },
   });
 }

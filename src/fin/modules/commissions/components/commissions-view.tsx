@@ -8,6 +8,7 @@ import {
   PencilIcon,
   PlusIcon,
   RotateCcwIcon,
+  UploadIcon,
   Trash2Icon,
 } from "lucide-react";
 import * as React from "react";
@@ -41,6 +42,7 @@ import {
 import { deleteCommissionAction, setCommissionCanceledAction } from "../actions";
 import type { CommissionDTO, CommissionStats } from "../queries";
 import { CommissionFormDialog } from "./commission-form-dialog";
+import { CommissionImportDialog } from "./commission-import-dialog";
 
 interface Props {
   commissions: CommissionDTO[];
@@ -62,6 +64,7 @@ export function CommissionsView({
   today,
 }: Props) {
   const [form, setForm] = React.useState<{ c?: CommissionDTO } | null>(null);
+  const [importing, setImporting] = React.useState(false);
   const [receiving, setReceiving] = React.useState<CommissionDTO | null>(null);
   const [deleting, setDeleting] = React.useState<CommissionDTO | null>(null);
 
@@ -87,6 +90,9 @@ export function CommissionsView({
         actions={
           <>
             <MonthSwitcher month={month} currentMonth={currentMonth} />
+            <Button variant="secondary" onClick={() => setImporting(true)}>
+              <UploadIcon /> Importar CSV
+            </Button>
             <Button onClick={() => setForm({})}>
               <PlusIcon /> Nova comissão
             </Button>
@@ -182,8 +188,11 @@ export function CommissionsView({
                       {c.sellerName || "Sem vendedor"}
                     </span>
                     <span className="truncate text-[13px] text-ink-3">
-                      {c.clientName} · {c.saleDescription} · venda de {formatMoney(c.saleAmount)} ×{" "}
-                      {c.ratePercent.replace(".", ",")}% · previsão {formatDate(c.expectedDate)}
+                      {c.clientName} · {c.saleDescription}
+                      {Number(c.saleAmount) === Number(c.amount) && Number(c.ratePercent) === 100
+                        ? ""
+                        : ` · venda de ${formatMoney(c.saleAmount)} × ${c.ratePercent.replace(".", ",")}%`}
+                      {` · previsão ${formatDate(c.expectedDate)}`}
                     </span>
                   </div>
                   <div className="grid justify-items-end gap-0.5">
@@ -266,6 +275,9 @@ export function CommissionsView({
           sellers={sellers}
           today={today}
         />
+      ) : null}
+      {importing ? (
+        <CommissionImportDialog open onOpenChange={(o) => !o && setImporting(false)} today={today} />
       ) : null}
       {receiving ? (
         <SettleDialog

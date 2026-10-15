@@ -3,10 +3,11 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { authActionClient } from "@fin/lib/safe-action";
-import { commissionSchema, updateCommissionSchema } from "./schemas";
+import { commissionSchema, importCommissionsSchema, updateCommissionSchema } from "./schemas";
 import {
   createCommission,
   deleteCommission,
+  importCommissions,
   setCommissionCanceled,
   updateCommission,
 } from "./service";
@@ -45,4 +46,13 @@ export const deleteCommissionAction = authActionClient
   .action(async ({ parsedInput, ctx }) => {
     await deleteCommission(ctx.app, parsedInput.id);
     refresh();
+  });
+
+export const importCommissionsAction = authActionClient
+  .metadata({ name: "commissions.import" })
+  .inputSchema(importCommissionsSchema)
+  .action(async ({ parsedInput, ctx }) => {
+    const result = await importCommissions(ctx.app, parsedInput);
+    refresh();
+    return result;
   });

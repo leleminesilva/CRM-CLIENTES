@@ -4,7 +4,7 @@ import { prisma, type DbClient } from "@fin/lib/db";
 import { AppError } from "@fin/lib/errors";
 import { assertCan, type ServiceContext } from "@fin/lib/permissions";
 import { computeCommission } from "./domain/commission";
-import type { CommissionInput } from "./schemas";
+import type { CommissionInput, ImportCommissionsInput } from "./schemas";
 
 export const COMMISSION_PAYOUT_KEY = "commission_payout";
 
@@ -165,4 +165,83 @@ export async function deleteCommission(ctx: ServiceContext, id: string) {
       before: c,
     });
   });
+}
+
+/**
+ * Importa comissões de uma planilha (nº do orçamento, valor, cliente, responsável). O valor da
+ * planilha já é a comissão: vira "valor diferente do cálculo" com venda = valor e 100%.
+ * Idempotente: linha com o mesmo orçamento, vendedor e valor que já existe é pulada.
+ */
+export async function importCommissions(ctx: ServiceContext, input: ImportCommissionsInput) {
+  assertCan(ctx, "write");
+  return prisma.$transaction(
+    async (tx) => {
+      const category = await commissionCategory(tx, ctx.workspaceId);
+      const day = toDbDate(input.expectedDate);
+      const existing = await tx.commission.findMany({
+        where: {
+          workspaceId: ctx.workspaceId,
+          deletedAt: null,
+          saleDescription: { in: input.rows.map((r) => `Orçamento ${r.budget}`) },
+        },
+        select: { saleDescription: true, sellerName: true, transaction: { select: { amount: true } } },
+      });
+      const seen = new Set(
+        existing.map(
+          (c) => `${c.saleDescription}|${c.sellerName}|${Number(c.transaction.amount).toFixed(2)}`,
+        ),
+      );
+      let created = 0;
+      let skipped = 0;
+      for (const row of input.rows) {
+        const amount = Number(row.amount).toFixed(2);
+        const description = `Orçamento ${row.budget}`;
+        const key = `${description}|${row.seller}|${amount}`;
+        if (seen.has(key)) {
+          skipped += 1;
+          continue;
+        }
+        seen.add(key);
+        const transaction = await tx.transaction.create({
+          data: {
+            workspaceId: ctx.workspaceId,
+            type: "EXPENSE",
+            nature: "VARIABLE",
+            categoryId: category.id,
+            paymentMethod: null,
+            description: `Comissão: ${row.seller} · ${row.client}`,
+            amount,
+            date: day,
+            dueDate: day,
+            status: "PENDING",
+            settledAt: null,
+            accountId: null,
+          },
+        });
+        const commission = await tx.commission.create({
+          data: {
+            workspaceId: ctx.workspaceId,
+            transactionId: transaction.id,
+            sellerName: row.seller,
+            clientName: row.client,
+            saleDescription: description,
+            saleAmount: amount,
+            ratePercent: "100",
+            isAmountOverridden: true,
+            saleDate: day,
+            notes: null,
+          },
+        });
+        await audit(tx, ctx, {
+          action: "commission.create",
+          entityType: "Commission",
+          entityId: commission.id,
+          after: { ...commission, amount, imported: true },
+        });
+        created += 1;
+      }
+      return { created, skipped, total: input.rows.length };
+    },
+    { timeout: 60_000 },
+  );
 }

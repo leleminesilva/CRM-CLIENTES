@@ -49,3 +49,22 @@ export const commissionSchema = z
 export const updateCommissionSchema = commissionSchema.and(z.object({ id: z.string().uuid() }));
 
 export type CommissionInput = z.infer<typeof commissionSchema>;
+
+/** Importação de comissões por planilha (CSV): uma linha por comissão, já normalizada no navegador. */
+export const importCommissionsSchema = z.object({
+  /** Dia da previsão de pagamento (vale para todas as linhas importadas). */
+  expectedDate: isoDate("Informe a previsão de pagamento"),
+  rows: z
+    .array(
+      z.object({
+        budget: z.string().trim().min(1).max(40),
+        amount: z.string().regex(/^\d{1,12}(\.\d{1,2})?$/, "Valor inválido"),
+        client: z.string().trim().min(1).max(120),
+        seller: z.string().trim().min(1).max(120),
+      }),
+    )
+    .min(1, "A planilha não tem linhas")
+    .max(500, "Importe até 500 linhas por vez"),
+});
+
+export type ImportCommissionsInput = z.infer<typeof importCommissionsSchema>;

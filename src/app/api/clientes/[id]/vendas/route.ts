@@ -4,6 +4,7 @@ import { requirePermission, canViewAll as canViewAllRole } from "@/lib/rbac";
 import { createAuditLog } from "@/lib/audit";
 import prisma from "@/lib/prisma";
 import { vendaSchema } from "@/lib/validators/venda";
+import { syncCommissionForVenda } from "@fin/crm/comissoes";
 
 export const dynamic = "force-dynamic";
 
@@ -56,6 +57,9 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
         data: new Date(`${data.data}T12:00:00`),
       },
     });
+
+    // Comissão do vendedor nasce sozinha (despesa a pagar no Financeiro). Falha aqui não derruba a venda.
+    await syncCommissionForVenda(venda.id, payload.userId);
 
     await createAuditLog({
       userId: payload.userId,

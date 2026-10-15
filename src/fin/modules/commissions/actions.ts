@@ -3,11 +3,20 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { authActionClient } from "@fin/lib/safe-action";
-import { commissionSchema, importCommissionsSchema, updateCommissionSchema } from "./schemas";
+import { syncCommissionsForMonth } from "@fin/crm/comissoes";
+import { isMonthKey } from "@fin/lib/dates";
+import { assertCan } from "@fin/lib/permissions";
+import {
+  commissionSchema,
+  commissionSettingsSchema,
+  importCommissionsSchema,
+  updateCommissionSchema,
+} from "./schemas";
 import {
   createCommission,
   deleteCommission,
   importCommissions,
+  saveCommissionSettings,
   setCommissionWork,
   setCommissionCanceled,
   updateCommission,
@@ -71,4 +80,23 @@ export const setCommissionWorkAction = authActionClient
     const { id, ...flags } = parsedInput;
     await setCommissionWork(ctx.app, id, flags);
     refresh();
+  });
+
+export const saveCommissionSettingsAction = authActionClient
+  .metadata({ name: "commissions.settings" })
+  .inputSchema(commissionSettingsSchema)
+  .action(async ({ parsedInput, ctx }) => {
+    await saveCommissionSettings(ctx.app, parsedInput);
+    refresh();
+  });
+
+/** Gera as comissões que faltam das vendas do mês (as que já existem são ligadas, não duplicadas). */
+export const syncCommissionsFromSalesAction = authActionClient
+  .metadata({ name: "commissions.syncSales" })
+  .inputSchema(z.object({ month: z.string().refine(isMonthKey, "Mês inválido") }))
+  .action(async ({ parsedInput, ctx }) => {
+    assertCan(ctx.app, "write");
+    const result = await syncCommissionsForMonth(ctx.app.userId, parsedInput.month);
+    refresh();
+    return result;
   });

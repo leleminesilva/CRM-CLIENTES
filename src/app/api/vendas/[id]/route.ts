@@ -1,3 +1,4 @@
+import { removeCommissionForVenda, syncCommissionForVenda } from "@fin/crm/comissoes";
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
 import { requirePermission, canViewAll as canViewAllRole } from "@/lib/rbac";
@@ -87,6 +88,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
       (data.data !== undefined && data.data !== old.data.toISOString().slice(0, 10));
 
     if (houveEdicaoDeValores) {
+      await syncCommissionForVenda(venda.id, payload.userId);
       await prisma.atividade.create({
         data: {
           tipo: "EDICAO",
@@ -144,6 +146,7 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
     if (!venda) return NextResponse.json({ error: "Venda não encontrada" }, { status: 404 });
 
     await prisma.venda.update({ where: { id: params.id }, data: { deletedAt: new Date() } });
+    await removeCommissionForVenda(params.id, payload.userId);
     await sincronizarResumoCliente(venda.clienteId);
 
     await createAuditLog({

@@ -8,6 +8,7 @@ import {
   PencilIcon,
   PlusIcon,
   RotateCcwIcon,
+  SettingsIcon,
   UploadIcon,
   Trash2Icon,
 } from "lucide-react";
@@ -47,6 +48,7 @@ import {
 } from "../actions";
 import type { CommissionDTO, CommissionStats } from "../queries";
 import { CommissionFormDialog } from "./commission-form-dialog";
+import { CommissionAutoDialog } from "./commission-auto-dialog";
 import { CommissionImportDialog } from "./commission-import-dialog";
 
 interface Props {
@@ -56,6 +58,7 @@ interface Props {
   currentMonth: string;
   accounts: FormOptions["accounts"];
   sellers: string[];
+  settings: { ratePercent: string; payDay: number };
   today: ISODate;
 }
 
@@ -66,10 +69,12 @@ export function CommissionsView({
   currentMonth,
   accounts,
   sellers,
+  settings,
   today,
 }: Props) {
   const [form, setForm] = React.useState<{ c?: CommissionDTO } | null>(null);
   const [importing, setImporting] = React.useState(false);
+  const [auto, setAuto] = React.useState(false);
   // Marcações de medidas/projeto aparecem na hora; o servidor confirma em seguida.
   const [work, setWork] = React.useState<Record<string, { m?: boolean; p?: boolean }>>({});
   const isMeasured = (c: CommissionDTO) => work[c.id]?.m ?? c.didMeasurements;
@@ -110,6 +115,9 @@ export function CommissionsView({
         actions={
           <>
             <MonthSwitcher month={month} currentMonth={currentMonth} />
+            <Button variant="secondary" onClick={() => setAuto(true)}>
+              <SettingsIcon /> Comissão automática
+            </Button>
             <Button variant="secondary" onClick={() => setImporting(true)}>
               <UploadIcon /> Importar CSV
             </Button>
@@ -319,6 +327,14 @@ export function CommissionsView({
           accounts={accounts}
           sellers={sellers}
           today={today}
+        />
+      ) : null}
+      {auto ? (
+        <CommissionAutoDialog
+          open
+          onOpenChange={(o) => !o && setAuto(false)}
+          month={month}
+          settings={settings}
         />
       ) : null}
       {importing ? (

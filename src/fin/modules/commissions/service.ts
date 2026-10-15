@@ -5,6 +5,7 @@ import { AppError } from "@fin/lib/errors";
 import { assertCan, type ServiceContext } from "@fin/lib/permissions";
 import { computeCommission } from "./domain/commission";
 import type { CommissionInput, ImportCommissionsInput } from "./schemas";
+import { Prisma } from "@prisma/client";
 
 export const COMMISSION_PAYOUT_KEY = "commission_payout";
 
@@ -269,4 +270,19 @@ export async function setCommissionWork(
       after: { didMeasurements: after.didMeasurements, didProject: after.didProject },
     });
   });
+}
+
+/** Percentual e dia de pagamento da comissão automática (guardados nas preferências do workspace). */
+export async function saveCommissionSettings(
+  ctx: ServiceContext,
+  settings: { ratePercent: string; payDay: number },
+) {
+  assertCan(ctx, "manage");
+  const ws = await prisma.workspace.findUniqueOrThrow({ where: { id: ctx.workspaceId }, select: { settings: true } });
+  const current = (ws.settings ?? {}) as Prisma.JsonObject;
+  await prisma.workspace.update({
+    where: { id: ctx.workspaceId },
+    data: { settings: { ...current, commission: settings } },
+  });
+  await audit(prisma, ctx, { action: "commission.settings", entityType: "Workspace", entityId: ctx.workspaceId, after: settings });
 }

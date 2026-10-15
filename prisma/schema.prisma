@@ -1474,6 +1474,8 @@ model Commission {
   /// Vendedor que recebe a comissão (a empresa paga: é uma despesa).
   sellerName         String    @default("") @map("seller_name")
   /// A pessoa responsável por medidas e projetos fez as medidas / o projeto deste orçamento.
+  /// Venda do CRM que gerou esta comissão automaticamente (vendas.id); null = lançada à mão/CSV.
+  vendaId            String?   @unique @map("venda_id")
   didMeasurements    Boolean   @default(false) @map("did_measurements")
   didProject         Boolean   @default(false) @map("did_project")
   saleDescription    String    @map("sale_description")

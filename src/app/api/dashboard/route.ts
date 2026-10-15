@@ -75,8 +75,7 @@ export async function GET(request: NextRequest) {
       receitaFechadaPeriodo,
       leadsTotal,
       leadsConvertidos,
-      canceladosPeriodo,
-      canceladosAggregate,
+      canceladosRaw,
       valorNegociacaoFinal,
     ] = await Promise.all([
       // Total de clientes cadastrados no período
@@ -177,28 +176,28 @@ export async function GET(request: NextRequest) {
         },
       }),
 
-      // Cancelamentos no período — contagem
-      prisma.lead.count({
-        where: {
-          deletedAt: null,
-          estagio: "FECHADO_PERDIDO",
-          dataFechamento: { gte: de, lte: ate },
-          OR: [{ clienteId: null }, { cliente: { deletedAt: null } }],
-          ...userFilter,
-        },
-      }),
-
-      // Cancelamentos — valor total no período via leads com dataFechamento no range
-      prisma.$queryRaw<Array<{ valor: number }>>(Prisma.sql`
+      // Cancelamentos no período — contagem + valor.
+      // Quando o cliente já tinha orçamento (ou seja, já apareceu em "Valor em
+      // Negociação" em algum mês), o cancelamento é contado no mês de inclusão
+      // desse orçamento (mesma regra de valorNegociacaoAtual: orcamentoEnviadoEm,
+      // ou createdAt quando aquele foi limpo pelo próprio cancelamento), não no
+      // mês em que o cancelamento foi registrado. Leads sem orçamento (nunca
+      // apareceram em negociação) continuam usando a data de fechamento.
+      prisma.$queryRaw<Array<{ count: number; valor: number }>>(Prisma.sql`
         SELECT
+          COUNT(*)::int AS count,
           COALESCE(SUM(COALESCE(c."valorOrcamento", l."valorEstimado")), 0)::float AS valor
         FROM leads l
         LEFT JOIN clientes c ON l."clienteId" = c.id AND c."deletedAt" IS NULL
         WHERE l."deletedAt" IS NULL
           AND l.estagio = 'FECHADO_PERDIDO'::"EstagioLead"
-          AND l."dataFechamento" >= ${de}
-          AND l."dataFechamento" <= ${ate}
           AND (l."clienteId" IS NULL OR c.id IS NOT NULL)
+          AND (
+            CASE
+              WHEN c."valorOrcamento" IS NOT NULL THEN COALESCE(c."orcamentoEnviadoEm", c."createdAt")
+              ELSE l."dataFechamento"
+            END
+          ) BETWEEN ${de} AND ${ate}
           ${leadsUserFilterSql}
       `),
 
@@ -219,8 +218,9 @@ export async function GET(request: NextRequest) {
     const receitaFechada  = receitaFechadaRow?.valor ?? 0;
     const vendasFechadas  = receitaFechadaRow?.count ?? 0;
     const ticketMedio     = vendasFechadas > 0 ? receitaFechada / vendasFechadas : 0;
-    const canceladosValorRow = (canceladosAggregate as Array<{ valor: number }>)[0];
-    const canceladosValor = canceladosValorRow?.valor ?? 0;
+    const canceladosRow   = (canceladosRaw as Array<{ count: number; valor: number }>)[0];
+    const canceladosPeriodo = canceladosRow?.count ?? 0;
+    const canceladosValor   = canceladosRow?.valor ?? 0;
     const taxaConversao   = leadsTotal > 0 ? (leadsConvertidos / leadsTotal) * 100 : 0;
 
     // Performance por vendedor — soma direta do valor de cada venda confirmada

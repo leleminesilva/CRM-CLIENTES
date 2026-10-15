@@ -50,6 +50,18 @@ export const updateCommissionSchema = commissionSchema.and(z.object({ id: z.stri
 
 export type CommissionInput = z.infer<typeof commissionSchema>;
 
+/** Comissão automática: percentual sobre a venda e dia do mês seguinte em que é paga. */
+export const commissionSettingsSchema = z.object({
+  ratePercent: z
+    .string()
+    .trim()
+    .min(1, "Informe o percentual")
+    .transform((v) => v.replace(",", "."))
+    .pipe(z.string().regex(/^\d{1,3}(\.\d{1,4})?$/, "Percentual inválido (ex.: 2 ou 2,5)"))
+    .refine((v) => Number.parseFloat(v) > 0 && Number.parseFloat(v) <= 100, "Entre 0 e 100%"),
+  payDay: z.number().int().min(1, "Dia de 1 a 28").max(28, "Dia de 1 a 28"),
+});
+
 /** Importação de comissões por planilha (CSV): uma linha por comissão, já normalizada no navegador. */
 export const importCommissionsSchema = z.object({
   /** Dia da previsão de pagamento (vale para todas as linhas importadas). */

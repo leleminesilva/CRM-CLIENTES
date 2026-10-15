@@ -244,3 +244,29 @@ export async function importCommissions(ctx: ServiceContext, input: ImportCommis
     { timeout: 60_000 },
   );
 }
+
+/** Marca se o responsável por medidas e projetos fez as medidas e/ou o projeto desta comissão. */
+export async function setCommissionWork(
+  ctx: ServiceContext,
+  id: string,
+  flags: { didMeasurements?: boolean; didProject?: boolean },
+) {
+  assertCan(ctx, "write");
+  await prisma.$transaction(async (tx) => {
+    const before = await getOwned(tx, ctx, id);
+    const after = await tx.commission.update({
+      where: { id },
+      data: {
+        ...(flags.didMeasurements !== undefined ? { didMeasurements: flags.didMeasurements } : {}),
+        ...(flags.didProject !== undefined ? { didProject: flags.didProject } : {}),
+      },
+    });
+    await audit(tx, ctx, {
+      action: "commission.work",
+      entityType: "Commission",
+      entityId: id,
+      before: { didMeasurements: before.didMeasurements, didProject: before.didProject },
+      after: { didMeasurements: after.didMeasurements, didProject: after.didProject },
+    });
+  });
+}

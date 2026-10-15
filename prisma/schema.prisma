@@ -1473,6 +1473,9 @@ model Commission {
   clientName         String    @map("client_name")
   /// Vendedor que recebe a comissão (a empresa paga: é uma despesa).
   sellerName         String    @default("") @map("seller_name")
+  /// A pessoa responsável por medidas e projetos fez as medidas / o projeto deste orçamento.
+  didMeasurements    Boolean   @default(false) @map("did_measurements")
+  didProject         Boolean   @default(false) @map("did_project")
   saleDescription    String    @map("sale_description")
   saleAmount         Decimal   @map("sale_amount") @db.Decimal(14, 2)
   ratePercent        Decimal   @map("rate_percent") @db.Decimal(7, 4)

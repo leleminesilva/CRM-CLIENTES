@@ -23,6 +23,7 @@ import { PageHeader } from "@fin/components/shared/page-header";
 import { Panel } from "@fin/components/shared/panel";
 import { StatusBadge } from "@fin/components/shared/status-badge";
 import { Button } from "@fin/components/ui/button";
+import { Checkbox } from "@fin/components/ui/checkbox";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -39,7 +40,11 @@ import {
   settleTransactionsAction,
   unsettleTransactionsAction,
 } from "@fin/modules/transactions/actions";
-import { deleteCommissionAction, setCommissionCanceledAction } from "../actions";
+import {
+  deleteCommissionAction,
+  setCommissionCanceledAction,
+  setCommissionWorkAction,
+} from "../actions";
 import type { CommissionDTO, CommissionStats } from "../queries";
 import { CommissionFormDialog } from "./commission-form-dialog";
 import { CommissionImportDialog } from "./commission-import-dialog";
@@ -65,6 +70,21 @@ export function CommissionsView({
 }: Props) {
   const [form, setForm] = React.useState<{ c?: CommissionDTO } | null>(null);
   const [importing, setImporting] = React.useState(false);
+  // Marcações de medidas/projeto aparecem na hora; o servidor confirma em seguida.
+  const [work, setWork] = React.useState<Record<string, { m?: boolean; p?: boolean }>>({});
+  const isMeasured = (c: CommissionDTO) => work[c.id]?.m ?? c.didMeasurements;
+  const isProjected = (c: CommissionDTO) => work[c.id]?.p ?? c.didProject;
+  async function toggleWork(c: CommissionDTO, field: "m" | "p", value: boolean) {
+    setWork((w) => ({ ...w, [c.id]: { ...w[c.id], [field]: value } }));
+    const result = await setCommissionWorkAction({
+      id: c.id,
+      ...(field === "m" ? { didMeasurements: value } : { didProject: value }),
+    });
+    if (!handleActionResult(result))
+      setWork((w) => ({ ...w, [c.id]: { ...w[c.id], [field]: !value } }));
+  }
+  const measuredCount = commissions.filter((c) => c.status !== "CANCELED" && isMeasured(c)).length;
+  const projectedCount = commissions.filter((c) => c.status !== "CANCELED" && isProjected(c)).length;
   const [receiving, setReceiving] = React.useState<CommissionDTO | null>(null);
   const [deleting, setDeleting] = React.useState<CommissionDTO | null>(null);
 
@@ -163,7 +183,14 @@ export function CommissionsView({
       </div>
 
       <section className="grid gap-2">
-        <h2 className="title-section">Comissões de {formatMonth(month)}</h2>
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <h2 className="title-section">Comissões de {formatMonth(month)}</h2>
+          {commissions.length > 0 ? (
+            <span className="text-[13px] text-ink-2">
+              Medidas feitas em {measuredCount} · Projeto feito em {projectedCount}
+            </span>
+          ) : null}
+        </div>
         <Panel className="overflow-hidden">
           {commissions.length === 0 ? (
             <EmptyState
@@ -181,7 +208,7 @@ export function CommissionsView({
               {commissions.map((c) => (
                 <li
                   key={c.id}
-                  className={`grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-3 px-4 py-3 ${c.status === "CANCELED" ? "bg-surface-sunken/50" : ""}`}
+                  className={`grid grid-cols-[minmax(0,1fr)_auto_auto_auto] items-center gap-3 px-4 py-3 ${c.status === "CANCELED" ? "bg-surface-sunken/50" : ""}`}
                 >
                   <div className="grid min-w-0 gap-0.5">
                     <span className="truncate text-sm font-medium">
@@ -194,6 +221,24 @@ export function CommissionsView({
                         : ` · venda de ${formatMoney(c.saleAmount)} × ${c.ratePercent.replace(".", ",")}%`}
                       {` · previsão ${formatDate(c.expectedDate)}`}
                     </span>
+                  </div>
+                  <div className="flex items-center gap-4 text-[13px] text-ink-2">
+                    <label className="flex cursor-pointer items-center gap-1.5">
+                      <Checkbox
+                        checked={isMeasured(c)}
+                        onCheckedChange={(v) => void toggleWork(c, "m", v === true)}
+                        aria-label={`Medidas feitas — ${c.sellerName || c.clientName}`}
+                      />
+                      Medidas
+                    </label>
+                    <label className="flex cursor-pointer items-center gap-1.5">
+                      <Checkbox
+                        checked={isProjected(c)}
+                        onCheckedChange={(v) => void toggleWork(c, "p", v === true)}
+                        aria-label={`Projeto feito — ${c.sellerName || c.clientName}`}
+                      />
+                      Projeto
+                    </label>
                   </div>
                   <div className="grid justify-items-end gap-0.5">
                     <MoneyText

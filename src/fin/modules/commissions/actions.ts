@@ -8,6 +8,7 @@ import {
   createCommission,
   deleteCommission,
   importCommissions,
+  setCommissionWork,
   setCommissionCanceled,
   updateCommission,
 } from "./service";
@@ -55,4 +56,19 @@ export const importCommissionsAction = authActionClient
     const result = await importCommissions(ctx.app, parsedInput);
     refresh();
     return result;
+  });
+
+export const setCommissionWorkAction = authActionClient
+  .metadata({ name: "commissions.setWork" })
+  .inputSchema(
+    z.object({
+      id: z.string().uuid(),
+      didMeasurements: z.boolean().optional(),
+      didProject: z.boolean().optional(),
+    }),
+  )
+  .action(async ({ parsedInput, ctx }) => {
+    const { id, ...flags } = parsedInput;
+    await setCommissionWork(ctx.app, id, flags);
+    refresh();
   });

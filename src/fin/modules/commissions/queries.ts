@@ -16,6 +16,9 @@ export interface CommissionDTO {
   id: string;
   transactionId: string;
   sellerName: string;
+  /** Marcações: o responsável por medidas e projetos fez as medidas / o projeto. */
+  didMeasurements: boolean;
+  didProject: boolean;
   clientName: string;
   saleDescription: string;
   saleAmount: string;
@@ -66,6 +69,8 @@ export async function listCommissions(
       id: c.id,
       transactionId: t.id,
       sellerName: c.sellerName,
+      didMeasurements: c.didMeasurements,
+      didProject: c.didProject,
       clientName: c.clientName,
       saleDescription: c.saleDescription,
       saleAmount: toMoneyString(c.saleAmount),

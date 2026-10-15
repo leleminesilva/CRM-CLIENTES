@@ -168,9 +168,9 @@ export async function deleteCommission(ctx: ServiceContext, id: string) {
 }
 
 /**
- * Importa comissões de uma planilha (nº do orçamento, valor, cliente, responsável). O valor da
- * planilha já é a comissão: vira "valor diferente do cálculo" com venda = valor e 100%.
- * Idempotente: linha com o mesmo orçamento, vendedor e valor que já existe é pulada.
+ * Importa comissões de uma planilha (nº do orçamento, valor da venda, cliente, responsável).
+ * A comissão de cada linha = valor × percentual escolhido.
+ * Idempotente: linha com o mesmo orçamento, vendedor e valor de venda que já existe é pulada.
  */
 export async function importCommissions(ctx: ServiceContext, input: ImportCommissionsInput) {
   assertCan(ctx, "write");
@@ -184,19 +184,18 @@ export async function importCommissions(ctx: ServiceContext, input: ImportCommis
           deletedAt: null,
           saleDescription: { in: input.rows.map((r) => `Orçamento ${r.budget}`) },
         },
-        select: { saleDescription: true, sellerName: true, transaction: { select: { amount: true } } },
+        select: { saleDescription: true, sellerName: true, saleAmount: true },
       });
       const seen = new Set(
-        existing.map(
-          (c) => `${c.saleDescription}|${c.sellerName}|${Number(c.transaction.amount).toFixed(2)}`,
-        ),
+        existing.map((c) => `${c.saleDescription}|${c.sellerName}|${Number(c.saleAmount).toFixed(2)}`),
       );
       let created = 0;
       let skipped = 0;
       for (const row of input.rows) {
-        const amount = Number(row.amount).toFixed(2);
+        const sale = Number(row.amount).toFixed(2);
+        const amount = computeCommission(sale, input.ratePercent).toFixed(2);
         const description = `Orçamento ${row.budget}`;
-        const key = `${description}|${row.seller}|${amount}`;
+        const key = `${description}|${row.seller}|${sale}`;
         if (seen.has(key)) {
           skipped += 1;
           continue;
@@ -225,9 +224,9 @@ export async function importCommissions(ctx: ServiceContext, input: ImportCommis
             sellerName: row.seller,
             clientName: row.client,
             saleDescription: description,
-            saleAmount: amount,
-            ratePercent: "100",
-            isAmountOverridden: true,
+            saleAmount: sale,
+            ratePercent: input.ratePercent,
+            isAmountOverridden: false,
             saleDate: day,
             notes: null,
           },

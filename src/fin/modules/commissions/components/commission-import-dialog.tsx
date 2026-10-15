@@ -17,6 +17,7 @@ import { Input } from "@fin/components/ui/input";
 import { handleActionResult } from "@fin/lib/action-result";
 import { addDays, type ISODate } from "@fin/lib/dates";
 import { formatMoney } from "@fin/lib/money";
+import { computeCommission } from "../domain/commission";
 import { importCommissionsAction } from "../actions";
 
 interface Row {
@@ -146,20 +147,31 @@ export function CommissionImportDialog({
   const [parsed, setParsed] = React.useState<Parsed | null>(null);
   const [fileName, setFileName] = React.useState("");
   const [expectedDate, setExpectedDate] = React.useState<string>(addDays(today, 30));
+  const [rate, setRate] = React.useState("");
   const [busy, setBusy] = React.useState(false);
 
-  const total = React.useMemo(
-    () => (parsed?.rows ?? []).reduce((sum, r) => sum + Number(r.amount), 0),
-    [parsed],
-  );
-  const bySeller = React.useMemo(() => {
-    const map = new Map<string, { sum: number; n: number }>();
-    for (const r of parsed?.rows ?? []) {
-      const cur = map.get(r.seller) ?? { sum: 0, n: 0 };
-      map.set(r.seller, { sum: cur.sum + Number(r.amount), n: cur.n + 1 });
+  const rateNumber = Number.parseFloat(rate.replace(",", "."));
+  const rateValid = rateNumber > 0 && rateNumber <= 100;
+
+  /** Venda e comissão por linha (a comissão é arredondada em centavos, igual ao servidor). */
+  const calc = React.useMemo(() => {
+    const rows = (parsed?.rows ?? []).map((r) => ({
+      ...r,
+      commission: rateValid ? Number(computeCommission(r.amount, rateNumber.toString())) : null,
+    }));
+    const sale = rows.reduce((s, r) => s + Number(r.amount), 0);
+    const commission = rateValid ? rows.reduce((s, r) => s + (r.commission ?? 0), 0) : null;
+    const map = new Map<string, { sale: number; commission: number; n: number }>();
+    for (const r of rows) {
+      const cur = map.get(r.seller) ?? { sale: 0, commission: 0, n: 0 };
+      map.set(r.seller, {
+        sale: cur.sale + Number(r.amount),
+        commission: cur.commission + (r.commission ?? 0),
+        n: cur.n + 1,
+      });
     }
-    return [...map.entries()].sort((a, b) => b[1].sum - a[1].sum);
-  }, [parsed]);
+    return { sale, commission, bySeller: [...map.entries()].sort((a, b) => b[1].sale - a[1].sale) };
+  }, [parsed, rateValid, rateNumber]);
 
   async function onFile(file: File | undefined) {
     if (!file) return;
@@ -168,10 +180,10 @@ export function CommissionImportDialog({
   }
 
   async function onImport() {
-    if (!parsed || parsed.rows.length === 0) return;
+    if (!parsed || parsed.rows.length === 0 || !rateValid) return;
     setBusy(true);
     try {
-      const result = await importCommissionsAction({ expectedDate, rows: parsed.rows });
+      const result = await importCommissionsAction({ expectedDate, ratePercent: rate, rows: parsed.rows });
       if (handleActionResult(result)) {
         const d = result?.data;
         toast.success(
@@ -192,8 +204,8 @@ export function CommissionImportDialog({
         <DialogHeader>
           <DialogTitle>Importar comissões de uma planilha</DialogTitle>
           <DialogDescription>
-            CSV com as colunas N° Orçamento, valor, Cliente e Responsável. Cada linha vira uma
-            comissão a pagar ao responsável (vendedor).
+            CSV com as colunas N° Orçamento, valor (da venda), Cliente e Responsável. Cada linha vira
+            uma comissão a pagar ao responsável (vendedor): valor × percentual.
           </DialogDescription>
         </DialogHeader>
 
@@ -224,15 +236,22 @@ export function CommissionImportDialog({
             <>
               <div className="grid gap-1 rounded-card bg-surface-sunken px-3 py-2.5 text-sm">
                 <span className="font-medium">
-                  {parsed.rows.length} comissões · {formatMoney(total.toFixed(2))}
+                  {parsed.rows.length} vendas · {formatMoney(calc.sale.toFixed(2))}
+                  {calc.commission !== null
+                    ? ` → comissão ${formatMoney(calc.commission.toFixed(2))}`
+                    : ""}
                 </span>
                 <ul className="grid gap-0.5 text-[13px] text-ink-2">
-                  {bySeller.map(([seller, v]) => (
+                  {calc.bySeller.map(([seller, v]) => (
                     <li key={seller} className="flex justify-between gap-3">
                       <span className="truncate">
                         {seller} <span className="text-ink-3">({v.n})</span>
                       </span>
-                      <span className="nums">{formatMoney(v.sum.toFixed(2))}</span>
+                      <span className="nums">
+                        {calc.commission !== null
+                          ? formatMoney(v.commission.toFixed(2))
+                          : formatMoney(v.sale.toFixed(2))}
+                      </span>
                     </li>
                   ))}
                 </ul>
@@ -247,6 +266,21 @@ export function CommissionImportDialog({
                   {parsed.invalid.length > 4 ? "…" : ""}
                 </p>
               ) : null}
+              <Field
+                label="Percentual da comissão (%)"
+                hint="Aplicado sobre o valor de cada linha da planilha."
+              >
+                {(a) => (
+                  <Input
+                    {...a}
+                    inputMode="decimal"
+                    placeholder="Ex.: 5"
+                    autoFocus
+                    value={rate}
+                    onChange={(e) => setRate(e.target.value)}
+                  />
+                )}
+              </Field>
               <Field
                 label="Previsão de pagamento"
                 hint="Vale para todas as comissões desta planilha."
@@ -273,7 +307,7 @@ export function CommissionImportDialog({
           </Button>
           <Button
             onClick={() => void onImport()}
-            disabled={busy || !parsed || parsed.rows.length === 0 || !expectedDate}
+            disabled={busy || !parsed || parsed.rows.length === 0 || !expectedDate || !rateValid}
           >
             <UploadIcon />
             {busy ? "Importando…" : `Importar ${parsed?.rows.length ?? 0} comissões`}

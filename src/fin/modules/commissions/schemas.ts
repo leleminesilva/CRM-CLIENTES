@@ -54,10 +54,19 @@ export type CommissionInput = z.infer<typeof commissionSchema>;
 export const importCommissionsSchema = z.object({
   /** Dia da previsão de pagamento (vale para todas as linhas importadas). */
   expectedDate: isoDate("Informe a previsão de pagamento"),
+  /** Percentual da comissão sobre o valor de cada linha da planilha (ex.: "5" ou "2.5"). */
+  ratePercent: z
+    .string()
+    .trim()
+    .min(1, "Informe o percentual")
+    .transform((v) => v.replace(",", "."))
+    .pipe(z.string().regex(/^\d{1,3}(\.\d{1,4})?$/, "Percentual inválido (ex.: 5 ou 2,5)"))
+    .refine((v) => Number.parseFloat(v) > 0 && Number.parseFloat(v) <= 100, "Entre 0 e 100%"),
   rows: z
     .array(
       z.object({
         budget: z.string().trim().min(1).max(40),
+        /** Valor da venda (a comissão é calculada pelo percentual). */
         amount: z.string().regex(/^\d{1,12}(\.\d{1,2})?$/, "Valor inválido"),
         client: z.string().trim().min(1).max(120),
         seller: z.string().trim().min(1).max(120),

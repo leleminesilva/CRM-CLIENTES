@@ -16,7 +16,13 @@ export interface CommissionDTO {
   id: string;
   transactionId: string;
   sellerName: string;
+  clientName: string;
+  saleDescription: string;
+  saleAmount: string;
+  ratePercent: string;
   amount: string;
+  isAmountOverridden: boolean;
+  saleDate: ISODate;
   expectedDate: ISODate;
   receivedAt: ISODate | null;
   status: DisplayStatus;
@@ -60,7 +66,13 @@ export async function listCommissions(
       id: c.id,
       transactionId: t.id,
       sellerName: c.sellerName,
+      clientName: c.clientName,
+      saleDescription: c.saleDescription,
+      saleAmount: toMoneyString(c.saleAmount),
+      ratePercent: c.ratePercent.toString(),
       amount: toMoneyString(t.amount),
+      isAmountOverridden: c.isAmountOverridden,
+      saleDate: fromDbDate(c.saleDate),
       expectedDate: fromDbDate(t.dueDate),
       receivedAt: t.settledAt ? fromDbDate(t.settledAt) : null,
       status: displayStatus(t.status, fromDbDate(t.dueDate), today),

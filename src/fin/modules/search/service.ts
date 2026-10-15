@@ -53,15 +53,16 @@ export async function searchAll(ctx: ServiceContext, raw: string): Promise<Searc
       prisma.$queryRaw<
         {
           id: string;
-          seller_name: string;
+          client_name: string;
+          sale_description: string;
           amount: string;
           sale_date: Date;
         }[]
       >(Prisma.sql`
-        SELECT cm.id, cm.seller_name, t.amount::text AS amount, cm.sale_date
+        SELECT cm.id, cm.client_name, cm.sale_description, t.amount::text AS amount, cm.sale_date
         FROM fin_commissions cm JOIN fin_transactions t ON t.id = cm.transaction_id
         WHERE cm.workspace_id = ${ws}::uuid AND cm.deleted_at IS NULL
-          AND fin_immutable_unaccent(lower(cm.seller_name))
+          AND fin_immutable_unaccent(lower(cm.client_name || ' ' || cm.sale_description))
               LIKE '%' || fin_immutable_unaccent(lower(${esc})) || '%' ESCAPE '\\'
         ORDER BY cm.sale_date DESC LIMIT ${PER_KIND}`),
       prisma.$queryRaw<{ id: string; description: string; total: string; n: number }[]>(Prisma.sql`
@@ -129,10 +130,10 @@ export async function searchAll(ctx: ServiceContext, raw: string): Promise<Searc
     hits.push({
       id: r.id,
       kind: "commission",
-      title: r.seller_name || "Sem vendedor",
-      subtitle: `Comissão · ${formatDate(fromDbDate(r.sale_date))}`,
+      title: r.client_name,
+      subtitle: `${r.sale_description} · ${formatDate(fromDbDate(r.sale_date))}`,
       amount: toMoneyString(r.amount),
-      flow: "out",
+      flow: "in",
       href: `/financeiro/comissoes?mes=${monthKeyOf(fromDbDate(r.sale_date))}`,
     });
   for (const r of plans)
